@@ -7,20 +7,26 @@ const ACCENTS: Record<string, string> = {
   summarize: "#ff5d4d",
   "explain-code": "#8854d0",
   "optimize-prompt": "#3b6ef6",
+  "skill-maker": "#d24b7f",
+  "markdown-convert": "#4bb3ff",
+  "web-beautifier": "#ff3d7f",
+  "cnn-explainer": "#f4c25a",
+  "med-seg-explainer": "#6b8ed6",
 };
 
 export function ToolCard({ tool, index }: { tool: Tool; index: number }) {
   const accent = ACCENTS[tool.slug] ?? "#8854d0";
+  // Stagger: cards emerge in reading order (left→right, then top→bottom).
+  // A longer 160ms step lets each card fully take its place before the next
+  // starts growing in, so the "small → large" scale reads clearly.
+  const delayMs = 500 + index * 160;
   return (
     <Link
       href={tool.href}
       className={cn(
-        "group relative block rise-d",
-        "surface rounded-[20px] p-6",
-        "transition-all duration-300",
-        "hover:-translate-y-0.5 hover:shadow-[0_24px_60px_-30px_rgba(26,23,19,0.35)]",
+        "group relative block card-emerge card-glass rounded-[20px] p-6",
       )}
-      style={{ animationDelay: `${400 + index * 80}ms` }}
+      style={{ animationDelay: `${delayMs}ms` }}
     >
       {/* accent rail */}
       <span

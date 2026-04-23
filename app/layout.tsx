@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
+import { Inter, Instrument_Serif, JetBrains_Mono, Fraunces } from "next/font/google";
 import Link from "next/link";
 import { MeshBackground } from "@/components/mesh-background";
 import "./globals.css";
@@ -24,10 +24,20 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+// Display serif for the hero headline — Fraunces has a SOFT axis that
+// gives italic cuts a distinctly hand-carved, editorial quality.
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  axes: ["SOFT", "opsz"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Toolbox · AI 小工具集",
+  title: "Toolbox · 慢慢长大的小工具合集",
   description:
-    "一个由 DeepSeek 驱动的 AI 小工具合集：网页摘要、代码解释、提示词优化，一个地方全部搞定。",
+    "一个慢慢长大的小工具合集：AI 写作助手、可交互可视化、本地文档处理——按需取用，每周打磨一件。",
 };
 
 export default function RootLayout({
@@ -36,7 +46,7 @@ export default function RootLayout({
   return (
     <html
       lang="zh-CN"
-      className={`${inter.variable} ${instrument.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${instrument.variable} ${jetbrainsMono.variable} ${fraunces.variable} h-full antialiased`}
     >
       <body className="min-h-full text-ink">
         <MeshBackground />
@@ -76,7 +86,7 @@ function SiteNav() {
             rel="noreferrer"
             className="hover:text-ink transition-colors"
           >
-            由 <span className="serif-italic text-ink">DeepSeek</span> 驱动
+            部分 AI 来自 <span className="serif-italic text-ink">DeepSeek</span>
           </a>
         </nav>
       </div>
@@ -92,8 +102,7 @@ function SiteFooter() {
         <span className="text-xs text-ink-3">
           Crafted with <span className="serif-italic text-ink">restraint</span>
           <span className="mx-1.5 text-ink-4">·</span>
-          Powered by{" "}
-          <span className="serif-italic text-ink">DeepSeek</span>
+          <span className="serif-italic text-ink">slowly</span> growing
         </span>
       </div>
     </footer>

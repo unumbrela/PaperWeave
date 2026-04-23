@@ -41,17 +41,16 @@ export default function Home() {
           </div>
 
           <div className="mt-10 grid grid-cols-12 gap-6 items-end">
-            {/* Headline */}
+            {/* Headline — one language, one face (Fraunces italic with its
+                SOFT axis at 100). No mixed English/Chinese typography; the
+                whole line breathes as a single artistic display serif. */}
             <h1
-              className="rise col-span-12 lg:col-span-9 leading-[0.92] tracking-[-0.035em] text-[64px] sm:text-[96px] lg:text-[120px] text-ink"
+              className="rise display-italic col-span-12 lg:col-span-9 leading-[0.88] text-[64px] sm:text-[100px] lg:text-[132px] text-ink font-normal"
               style={{ animationDelay: "120ms" }}
             >
-              <span className="serif-italic text-ink-2">Quiet</span>{" "}
-              <span className="font-medium">工具</span>
+              <span className="text-ink-2">Small</span> tools,
               <br />
-              for{" "}
-              <span className="serif-italic">loud</span>{" "}
-              <span className="font-medium">思考。</span>
+              made <span>slowly</span>.
             </h1>
 
             {/* Right pull */}
@@ -61,9 +60,9 @@ export default function Home() {
             >
               <div className="hairline mb-4" />
               <p className="text-[13px] leading-relaxed text-ink-2 max-w-xs">
-                一个由{" "}
-                <span className="serif-italic text-ink">DeepSeek</span>{" "}
-                驱动的小工具箱。进来就能用，不挑模型，不配 Key。
+                一个慢慢长大的小工具合集——有{" "}
+                <span className="serif-italic text-ink">AI</span>{" "}
+                写作助手，也有可交互的可视化与本地文档处理。按需取用，每周打磨一件。
               </p>
             </div>
           </div>

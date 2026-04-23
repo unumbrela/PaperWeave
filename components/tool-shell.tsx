@@ -6,6 +6,8 @@ const ACCENTS: Record<string, string> = {
   summarize: "#ff5d4d",
   "explain-code": "#8854d0",
   "optimize-prompt": "#3b6ef6",
+  "skill-maker": "#d24b7f",
+  "markdown-convert": "#4bb3ff",
 };
 
 export function ToolShell({
