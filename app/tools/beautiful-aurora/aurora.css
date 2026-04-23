@@ -1,0 +1,74 @@
+.aurora-page-root {
+  background: #000;
+  color: #fff;
+}
+
+.aurora-page-stage {
+  position: relative;
+  width: 100%;
+  height: clamp(560px, 82vh, 920px);
+  min-height: 560px;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: #000;
+}
+
+.aurora-page-overlay {
+  position: absolute;
+  left: 32px;
+  bottom: 32px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  pointer-events: none;
+}
+
+.aurora-page-kicker {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.aurora-page-cta {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  text-decoration: none;
+  font-size: 13px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: all 0.2s ease;
+}
+
+.aurora-page-cta:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(0, 194, 255, 0.58);
+}
+
+@media (max-width: 640px) {
+  .aurora-page-stage {
+    height: 72vh;
+    min-height: 460px;
+  }
+
+  .aurora-page-overlay {
+    left: 20px;
+    right: 20px;
+    bottom: 20px;
+  }
+}

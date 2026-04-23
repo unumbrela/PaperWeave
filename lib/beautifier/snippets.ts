@@ -8,7 +8,7 @@ function read(file: string): string {
 }
 
 export type BeautifierItem = {
-  slug: "mesh-orbs" | "raycast" | "trae";
+  slug: "mesh-orbs" | "raycast" | "trae" | "beautiful-aurora";
   name: string;
   tagline: string;
   inspiration?: string;
@@ -52,6 +52,18 @@ export function loadSnippets(): BeautifierItem[] {
       source: read("trae-background.tsx"),
       theme: "dark",
       accent: "#3b6ef6",
+    },
+    {
+      slug: "beautiful-aurora",
+      name: "Beautiful Aurora",
+      tagline:
+        "复刻 CodePen《The Aurora》：黑底舞台 + 4 团 morphing blur blob，只保留 the beautiful aurora 主视觉。",
+      inspiration: "https://codepen.io/ostylowany/pen/vYzPVZL",
+      componentName: "BeautifulAuroraBackground",
+      filename: "beautiful-aurora-background.tsx",
+      source: read("beautiful-aurora-background.tsx"),
+      theme: "dark",
+      accent: "#00c2ff",
     },
   ];
 }

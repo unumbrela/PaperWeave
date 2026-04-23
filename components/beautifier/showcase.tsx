@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { ArrowUpRight, Check, Copy, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BeautifulAuroraBackground } from "./beautiful-aurora-background";
 import { MeshOrbsBackground } from "./mesh-orbs-background";
 import { RaycastBackground } from "./raycast-background";
 import { TraeBackground } from "./trae-background";
 
 type Item = {
-  slug: "mesh-orbs" | "raycast" | "trae";
+  slug: "mesh-orbs" | "raycast" | "trae" | "beautiful-aurora";
   name: string;
   tagline: string;
   inspiration?: string;
@@ -20,6 +21,7 @@ type Item = {
 };
 
 const PREVIEWS: Record<Item["slug"], React.ComponentType> = {
+  "beautiful-aurora": BeautifulAuroraBackground,
   "mesh-orbs": MeshOrbsBackground,
   raycast: RaycastBackground,
   trae: TraeBackground,
@@ -241,6 +243,19 @@ function CodeTab({
 }
 
 function buildUsage(item: Item): string {
+  if (item.slug === "beautiful-aurora") {
+    return `import { BeautifulAuroraBackground } from "@/components/beautifier/beautiful-aurora-background";
+
+export default function Page() {
+  return (
+    <section className="relative min-h-screen overflow-hidden bg-black">
+      <BeautifulAuroraBackground title="the beautiful aurora" />
+    </section>
+  );
+}
+`;
+  }
+
   return `import { ${item.componentName} } from "@/components/beautifier/${item.filename.replace(/\.tsx$/, "")}";
 
 export default function Page() {

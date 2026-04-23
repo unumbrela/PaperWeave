@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { HpiPage } from "@/components/hpi-potsdam/HpiPage";
-import "./landing.css";
-import "./overrides.css";
 
 export const metadata: Metadata = {
   title: "HPI Potsdam · iGEM 首页 · Toolbox",

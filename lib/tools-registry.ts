@@ -39,6 +39,16 @@ export const TOOLS: Tool[] = [
     href: "/tools/optimize-prompt",
   },
   {
+    slug: "prompt-chunker",
+    name: "任务拆解器",
+    description:
+      "粘贴一段复杂任务，自动拆成原子子问题 + 验收清单 + 可直接执行的 Runbook。小模型也能稳跑。",
+    category: "效率",
+    icon: "🧩",
+    gradient: "from-[#f59e0b] to-[#ec4899]",
+    href: "/tools/prompt-chunker",
+  },
+  {
     slug: "skill-maker",
     name: "Skill 生成器",
     description: "描述需求，产出可直接落地到 ~/.claude/skills 的 SKILL.md。",
@@ -92,6 +102,46 @@ export const TOOLS: Tool[] = [
     icon: "🩻",
     gradient: "from-[#6b8ed6] to-[#f4c25a]",
     href: "/tools/med-seg-explainer",
+  },
+  {
+    slug: "fluid-sim",
+    name: "流体模拟 · Fluid Simulation",
+    description:
+      "原样移植 Pavel Dobryakov 的 16k-star 经典：GPU Navier–Stokes 实时流体 + Bloom + Sunrays，鼠标拖动喷发光液，附中文源码解读。",
+    category: "学习",
+    icon: "🌊",
+    gradient: "from-[#ff4f8b] to-[#4bb3ff]",
+    href: "/tools/fluid-sim",
+  },
+  {
+    slug: "hamish-portfolio",
+    name: "Hamish Portfolio · 位移球体首页",
+    description:
+      "从 HamishMW/portfolio 抽取核心 Intro：MeshPhongMaterial + onBeforeCompile 注入的 Perlin noise 位移球体 + 片假名解码文字动画，附中文源码解读。",
+    category: "学习",
+    icon: "🪐",
+    gradient: "from-[#0ea5e9] to-[#8b5cf6]",
+    href: "/tools/hamish-portfolio",
+  },
+  {
+    slug: "bruno-folio",
+    name: "Bruno Simon · 3D 沙盒作品集",
+    description:
+      "Bruno Simon 传奇 3D 沙盒作品集 folio-2019：页面内嵌原站，配中文源码解读，拆解 Zones / Tiles / Areas / Physics 多层架构。",
+    category: "学习",
+    icon: "🚗",
+    gradient: "from-[#f97316] to-[#facc15]",
+    href: "/tools/bruno-folio",
+  },
+  {
+    slug: "beautiful-aurora",
+    name: "The Beautiful Aurora",
+    description:
+      "复刻 CodePen 的 CSS only 极光标题：黑底舞台 + 4 团 morphing blur 色块在字面内部游走，只保留 the beautiful aurora 主视觉。",
+    category: "学习",
+    icon: "🌌",
+    gradient: "from-[#00c2ff] to-[#e54cff]",
+    href: "/tools/beautiful-aurora",
   },
 ];
 
