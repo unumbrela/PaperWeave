@@ -137,11 +137,31 @@ export const TOOLS: Tool[] = [
     slug: "beautiful-aurora",
     name: "The Beautiful Aurora",
     description:
-      "复刻 CodePen 的 CSS only 极光标题：黑底舞台 + 4 团 morphing blur 色块在字面内部游走，只保留 the beautiful aurora 主视觉。",
+      "参考 CodePen《The Aurora》实现：黑底舞台 + 4 团 morphing blur 色块穿过标题，利用 blend mode 让字体颜色持续动态变化。",
     category: "学习",
     icon: "🌌",
     gradient: "from-[#00c2ff] to-[#e54cff]",
     href: "/tools/beautiful-aurora",
+  },
+  {
+    slug: "toolbox-background",
+    name: "Toolbox 首页动态背景",
+    description:
+      "把当前项目首页的暖纸面动态背景单独拆出来：5 团 radial blob 慢速漂移 + grain 颗粒层，上方实时展示，下方中文拆解实现方式。",
+    category: "学习",
+    icon: "🌤️",
+    gradient: "from-[#ffb4a2] to-[#a9d6ff]",
+    href: "/tools/toolbox-background",
+  },
+  {
+    slug: "algorithm-visualizer",
+    name: "算法可视化",
+    description:
+      "交互式算法可视化集合：全排列决策树、链表反转、最长递增子序列等，逐步动画 + C++ 代码高亮 + 状态面板辅助理解经典算法。",
+    category: "学习",
+    icon: "🌳",
+    gradient: "from-[#4CAF50] to-[#9C27B0]",
+    href: "/tools/algorithm-visualizer",
   },
 ];
 

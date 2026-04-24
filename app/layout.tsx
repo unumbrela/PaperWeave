@@ -86,14 +86,6 @@ function SiteNav() {
           <Link href="/" className="hover:text-ink transition-colors">
             工具
           </Link>
-          <a
-            href="https://platform.deepseek.com/"
-            target="_blank"
-            rel="noreferrer"
-            className="hover:text-ink transition-colors"
-          >
-            部分 AI 来自 <span className="serif-italic text-ink">DeepSeek</span>
-          </a>
         </nav>
       </div>
     </header>

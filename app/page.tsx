@@ -6,9 +6,27 @@ import { ToolCard } from "@/components/tool-card";
 import { CATEGORIES, TOOLS } from "@/lib/tools-registry";
 import { cn } from "@/lib/utils";
 
+function formatDisplayDate(date: Date) {
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Shanghai",
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+
+  return `${values.year}.${values.month}.${values.day}`;
+}
+
 export default function Home() {
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("全部");
   const [query, setQuery] = useState("");
+  const currentDate = formatDisplayDate(new Date());
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -37,7 +55,7 @@ export default function Home() {
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-coral" />
               An Essay in Tools · Vol. 01
             </div>
-            <div className="hidden sm:block overline">MMXXVI / 04</div>
+            <div className="hidden sm:block overline">{currentDate}</div>
           </div>
 
           <div className="mt-10 grid grid-cols-12 gap-6 items-end">
@@ -48,9 +66,9 @@ export default function Home() {
               className="rise display-italic col-span-12 lg:col-span-9 leading-[0.88] text-[64px] sm:text-[100px] lg:text-[132px] text-ink font-normal"
               style={{ animationDelay: "120ms" }}
             >
-              <span className="text-ink-2">Small</span> tools,
+              Tools for thought,
               <br />
-              made <span>slowly</span>.
+              made to <span>keep</span>.
             </h1>
 
             {/* Right pull */}
@@ -60,9 +78,9 @@ export default function Home() {
             >
               <div className="hairline mb-4" />
               <p className="text-[13px] leading-relaxed text-ink-2 max-w-xs">
-                一个慢慢长大的小工具合集——有{" "}
+                这里收着一些认真做过的小工具：有{" "}
                 <span className="serif-italic text-ink">AI</span>{" "}
-                写作助手，也有可交互的可视化与本地文档处理。按需取用，每周打磨一件。
+                写作与编程辅助，也有本地文档处理和带解释的交互式可视化。它们不急着求全，只求真正好用、好看，也值得留下。
               </p>
             </div>
           </div>

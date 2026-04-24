@@ -55,9 +55,9 @@ export function loadSnippets(): BeautifierItem[] {
     },
     {
       slug: "beautiful-aurora",
-      name: "Beautiful Aurora",
+      name: "The Beautiful Aurora",
       tagline:
-        "复刻 CodePen《The Aurora》：黑底舞台 + 4 团 morphing blur blob，只保留 the beautiful aurora 主视觉。",
+        "复刻 CodePen《The Aurora》：黑底舞台 + 4 团 morphing blur blob 穿过标题，用 blend mode 做出字体颜色的动态变化。",
       inspiration: "https://codepen.io/ostylowany/pen/vYzPVZL",
       componentName: "BeautifulAuroraBackground",
       filename: "beautiful-aurora-background.tsx",

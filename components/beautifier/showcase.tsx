@@ -20,7 +20,12 @@ type Item = {
   accent: string;
 };
 
-const PREVIEWS: Record<Item["slug"], React.ComponentType> = {
+type PreviewComponent = React.ComponentType<{
+  className?: string;
+  speed?: number;
+}>;
+
+const PREVIEWS: Record<Item["slug"], PreviewComponent> = {
   "beautiful-aurora": BeautifulAuroraBackground,
   "mesh-orbs": MeshOrbsBackground,
   raycast: RaycastBackground,
@@ -123,7 +128,7 @@ function ShowcaseRow({ item, index }: { item: Item; index: number }) {
 
       <div className="px-6 pt-5 pb-6">
         {tab === "preview" ? (
-          <PreviewPanel Component={Preview} theme={item.theme} />
+          <PreviewPanel Component={Preview} theme={item.theme} slug={item.slug} />
         ) : (
           <CodePanel item={item} usage={usage} copied={copied} onCopy={copy} />
         )}
@@ -135,13 +140,23 @@ function ShowcaseRow({ item, index }: { item: Item; index: number }) {
 function PreviewPanel({
   Component,
   theme,
+  slug,
 }: {
-  Component: React.ComponentType;
+  Component: PreviewComponent;
   theme: "light" | "dark";
+  slug: Item["slug"];
 }) {
+  const previewProps =
+    slug === "beautiful-aurora"
+      ? {
+          className: "beautiful-aurora-preview",
+          speed: 1.55,
+        }
+      : {};
+
   return (
     <div className="relative h-[360px] rounded-2xl overflow-hidden border border-line">
-      <Component />
+      <Component {...previewProps} />
       {/* floating label inside preview */}
       <div className="absolute inset-0 flex items-end justify-between p-5 pointer-events-none">
         <div

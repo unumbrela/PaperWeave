@@ -13,6 +13,8 @@ const ACCENTS: Record<string, string> = {
   "cnn-explainer": "#f4c25a",
   "med-seg-explainer": "#6b8ed6",
   "beautiful-aurora": "#00c2ff",
+  "toolbox-background": "#ff8aa0",
+  "algorithm-visualizer": "#4CAF50",
 };
 
 export function ToolCard({ tool, index }: { tool: Tool; index: number }) {
