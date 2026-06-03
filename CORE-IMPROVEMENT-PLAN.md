@@ -13,7 +13,7 @@
 | 维度 | 状态 | 说明 |
 | --- | --- | --- |
 | `pnpm build` | ✅ 通过 | 52 页全部生成 |
-| `pnpm lint` | ❌ 98 errors / 73 warnings | CI 暂 `continue-on-error`（P4.2 处理） |
+| `pnpm lint` | ⚠️ 68 errors（**核心代码已 0 error**；剩余全在 vendored 可视化代码） | CI 暂 `continue-on-error` |
 | 持久层 | ✅ **已统一**（2026-06-03） | Dexie 为单一真相源；Prisma 降为可选云同步；`data/papers/*.json` 已删除 |
 | 主线链路 | ⚠️ 工具各自能跑，**未串联** | 上游输出无法一键送下游 |
 | LLM 接入 | ⚠️ 散在 3 处 | `lib/ai.ts` / `lib/ai/client.ts` / `lib/services/ai.ts`，部分旧模型 |
@@ -169,9 +169,11 @@
 ## P4.1 拆巨型组件
 - [ ] `paper-search/page.tsx`(1100) / `library/page.tsx`(734) / `viewer/ViewerClient.tsx`(506) 拆成自定义 hooks + 子组件（数据逻辑入 `hooks/`，UI 入 `components/`）
 
-## P4.2 清偿 lint 债务
-- [ ] 分批修 98 errors：`no-explicit-any`(主力) → `react-hooks/*` → `no-unescaped-entities` → `no-require-imports`
-- [ ] 修完把 CI 的 lint 从 `continue-on-error: true` 改回硬门禁
+## P4.2 清偿 lint 债务（核心代码已清零）
+- [x] **核心工作流代码 0 error**：lib/db、lib/ai、lib/workflow、lib/paper-search、components/states|workflow|stream-output、library、viewer、paper-search、papers/analyze API 全部 lint 干净
+- [x] 修复方式：API 响应映射的 `any` 补具体类型；挂载水合类 `set-state-in-effect` 加局部 disable（一次性水合非级联渲染）
+- [ ] 剩余 68 errors **全在 vendored 可视化代码**（transformer/gan/diffusion explainer、ganlab）—— 与主线无关，风险高，留作独立清理
+- [ ] CI lint 暂仍 `continue-on-error`（待 vendored 清理后再翻硬门禁）
 
 ## P4.3 关键路径测试
 - [ ] Vitest 覆盖纯逻辑：`lib/services/arxiv.ts` 解析、Markdown 转换链、`tools-registry` 不变量（slug 唯一 / href 一致）、新仓储层

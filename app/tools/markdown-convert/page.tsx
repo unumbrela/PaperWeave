@@ -95,8 +95,11 @@ export default function Page() {
           output: "",
         }));
       if (imported.length > 0) {
+        // 挂载时一次性从队列水合任务，非级联渲染
+        /* eslint-disable react-hooks/set-state-in-effect */
         setJobs((prev) => [...imported, ...prev]);
         setSelectedId(imported[0].id);
+        /* eslint-enable react-hooks/set-state-in-effect */
       }
       localStorage.removeItem("paperSearchMarkdownQueue");
     } catch {

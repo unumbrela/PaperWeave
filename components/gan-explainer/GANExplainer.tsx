@@ -45,7 +45,7 @@ export function GANExplainer() {
         const minVal = Math.min(...out.flat());
         const range = maxVal - minVal || 1;
         // lazy import color scale
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
+         
         const { layerColorScales } = require("@/lib/gan-explainer/config");
         // use generator color scale
         const colorScale = layerColorScales.generator;
@@ -57,7 +57,7 @@ export function GANExplainer() {
           const val = out[row]?.[col] ?? 0;
           const normalized = (val - minVal) / range;
           // d3 rgb parsing
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
+           
           const { rgb } = require("d3");
           const color = rgb(colorScale(normalized));
           flat[i] = color.r;
@@ -80,7 +80,7 @@ export function GANExplainer() {
       }
     } catch (e) {
       // if any error, fall back to null
-      // eslint-disable-next-line no-console
+       
       console.warn("failed to build generatedDataUrl", e);
       setGeneratedDataUrl(null);
     }

@@ -25,12 +25,15 @@ export default function Page() {
   const { text, loading, error, run, stop } = useStream();
 
   useEffect(() => {
+    // 挂载时一次性消费上游 handoff 并水合输入，非级联渲染
+    /* eslint-disable react-hooks/set-state-in-effect */
     const h = consumeHandoff("idea-generator");
     if (!h) return;
     if (h.fields.direction) setDirection(h.fields.direction);
     if (h.fields.references) setReferences(h.fields.references);
     if (h.fields.baseline) setBaseline(h.fields.baseline);
     setHandoffFrom(h.from);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   const submit = () => {
