@@ -19,32 +19,8 @@ import {
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { repository } from "@/lib/db/repository";
+import type { Paper, Author } from "@/lib/db/types";
 import { LoadingState, EmptyState, ErrorState } from "@/components/states";
-
-interface Author {
-  name: string;
-  affiliation?: string;
-}
-
-interface Paper {
-  id: string;
-  title: string;
-  abstract?: string;
-  authors: Author[];
-  sourceType: "ARXIV" | "LOCAL" | "DOI";
-  sourceUrl?: string;
-  arxivId?: string;
-  pdfPath?: string;
-  publishedAt?: string;
-  tags: string[];
-  direction?: string;
-  notes?: string;
-  summary?: string;
-  methodology?: string;
-  contribution?: string;
-  createdAt: string;
-  citations: number;
-}
 
 export default function LibraryPage() {
   const [papers, setPapers] = useState<Paper[]>([]);
@@ -64,7 +40,7 @@ export default function LibraryPage() {
   const [importMessage, setImportMessage] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; paper: Paper | null }>({
     show: false,
-    paper: null
+    paper: null,
   });
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -73,6 +49,7 @@ export default function LibraryPage() {
 
   useEffect(() => {
     fetchPapers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedTag, selectedDirection, sortBy, sortOrder]);
 
   async function fetchPapers() {
@@ -87,7 +64,7 @@ export default function LibraryPage() {
         ...(selectedDirection && { direction: selectedDirection }),
         ...(searchQuery && { search: searchQuery }),
       });
-      setPapers(data as Paper[]);
+      setPapers(data);
     } catch (err) {
       console.error("Failed to fetch papers:", err);
       setError(err instanceof Error ? err.message : "读取本地论文库失败");
@@ -104,11 +81,11 @@ export default function LibraryPage() {
     try {
       // 从本地仓储删除（级联删除标注/笔记/进度）
       await repository.deletePaper(deleteConfirm.paper.id);
-      setPapers(prev => prev.filter(p => p.id !== deleteConfirm.paper!.id));
+      setPapers((prev) => prev.filter((p) => p.id !== deleteConfirm.paper!.id));
       setDeleteConfirm({ show: false, paper: null });
     } catch (error) {
-      console.error('删除论文失败:', error);
-      alert('删除论文失败');
+      console.error("删除论文失败:", error);
+      alert("删除论文失败");
     } finally {
       setIsDeleting(false);
     }
@@ -141,7 +118,7 @@ export default function LibraryPage() {
         const newPaper = await repository.savePaper(data.data as Partial<Paper> & { title: string });
         setImportMessage("✅ 导入成功！");
         setArxivId("");
-        setPapers((prev) => [newPaper as Paper, ...prev]);
+        setPapers((prev) => [newPaper, ...prev]);
         setTimeout(() => setShowImportModal(false), 1500);
       } else {
         setImportMessage(data.isDuplicate ? "⚠️ 该论文已存在" : "❌ " + data.message);
@@ -175,7 +152,7 @@ export default function LibraryPage() {
         const newPaper = await repository.savePaper(data.data as Partial<Paper> & { title: string });
         setImportMessage("✅ 导入成功！");
         setSelectedFile(null);
-        setPapers((prev) => [newPaper as Paper, ...prev]);
+        setPapers((prev) => [newPaper, ...prev]);
         setTimeout(() => setShowImportModal(false), 1500);
       } else {
         setImportMessage(data.isDuplicate ? "⚠️ 该论文已存在" : "❌ " + data.message);
@@ -202,16 +179,20 @@ export default function LibraryPage() {
 
       if (data.success) {
         const { summary, methodology, contribution, notes } = data.data as {
-          summary?: string; methodology?: string; contribution?: string; notes?: string;
+          summary?: string;
+          methodology?: string;
+          contribution?: string;
+          notes?: string;
         };
         // 分析结果回写本地仓储
         const updated = await repository.updatePaper(paperId, {
-          summary, methodology, contribution, notes,
+          summary,
+          methodology,
+          contribution,
+          notes,
         });
         if (updated) {
-          setPapers((prev) =>
-            prev.map((p) => (p.id === paperId ? { ...p, ...updated } : p))
-          );
+          setPapers((prev) => prev.map((p) => (p.id === paperId ? { ...p, ...updated } : p)));
         }
       }
     } catch (error) {
@@ -229,12 +210,8 @@ export default function LibraryPage() {
   }
 
   function getSourceTypeLabel(type: string) {
-    const labels: Record<string, { label: string; className: string }> = {
-      ARXIV: { label: "arXiv", className: "bg-purple-100 text-purple-700" },
-      LOCAL: { label: "本地", className: "bg-gray-100 text-gray-700" },
-      DOI: { label: "DOI", className: "bg-blue-100 text-blue-700" },
-    };
-    return labels[type] || { label: type, className: "bg-gray-100 text-gray-700" };
+    const labels: Record<string, string> = { ARXIV: "arXiv", LOCAL: "本地", DOI: "DOI" };
+    return labels[type] || type;
   }
 
   function renderAuthors(authors: Author[]) {
@@ -263,39 +240,41 @@ export default function LibraryPage() {
     return count.toString();
   }
 
+  const chip = "px-2 py-0.5 rounded-full text-xs bg-paper-3 text-ink-3";
+
   return (
     <div className="min-h-screen">
       {/* 删除确认弹窗 */}
       {deleteConfirm.show && deleteConfirm.paper && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-ink/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="surface-strong rounded-2xl shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                <Trash2 className="w-6 h-6 text-red-600" />
+              <div className="w-12 h-12 rounded-full bg-coral/12 flex items-center justify-center">
+                <Trash2 className="w-6 h-6 text-coral" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">确认删除</h3>
-                <p className="text-sm text-gray-500">此操作无法撤销</p>
+                <h3 className="text-lg serif text-ink">确认删除</h3>
+                <p className="text-sm text-ink-3">此操作无法撤销</p>
               </div>
             </div>
-            
-            <p className="text-gray-600 mb-6">
-              确定要删除论文 <strong className="text-gray-900">{deleteConfirm.paper.title}</strong> 吗？所有相关的笔记和标注也会被删除。
+
+            <p className="text-ink-2 mb-6 text-sm leading-relaxed">
+              确定要删除论文 <strong className="text-ink">{deleteConfirm.paper.title}</strong> 吗？所有相关的笔记和标注也会被删除。
             </p>
-            
+
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteConfirm({ show: false, paper: null })}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className="flex-1 rounded-full border border-line bg-paper-2/70 px-4 py-2 text-sm text-ink-2 transition-colors hover:border-line-strong hover:text-ink focus-ring"
               >
                 取消
               </button>
               <button
                 onClick={handleDeletePaper}
                 disabled={isDeleting}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                className="flex-1 rounded-full bg-coral px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-105 disabled:opacity-50 focus-ring"
               >
-                {isDeleting ? '删除中...' : '确认删除'}
+                {isDeleting ? "删除中…" : "确认删除"}
               </button>
             </div>
           </div>
@@ -303,7 +282,7 @@ export default function LibraryPage() {
       )}
 
       {/* 顶部栏 */}
-      <div className="border-b border-line bg-[rgba(255,253,247,0.8)] backdrop-blur-sm sticky top-14 z-30">
+      <div className="border-b border-line bg-glass-2 backdrop-blur-xl sticky top-14 z-30">
         <div className="mx-auto max-w-6xl px-6 py-4">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
             <div className="flex-1 max-w-md">
@@ -313,8 +292,8 @@ export default function LibraryPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="搜索论文标题或作者..."
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-line bg-white text-sm focus:outline-none focus:border-coral transition-colors"
+                  placeholder="搜索论文标题或作者…"
+                  className="w-full pl-10 pr-4 py-2 rounded-full border border-line bg-paper-2/80 text-sm text-ink placeholder:text-ink-4 focus:outline-none focus:border-line-strong transition-colors"
                 />
               </div>
             </div>
@@ -324,7 +303,7 @@ export default function LibraryPage() {
                 <select
                   value={selectedTag}
                   onChange={(e) => setSelectedTag(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-2 rounded-lg border border-line bg-white text-sm focus:outline-none focus:border-coral cursor-pointer"
+                  className="appearance-none pl-3 pr-8 py-2 rounded-full border border-line bg-paper-2/80 text-sm text-ink-2 focus:outline-none focus:border-line-strong cursor-pointer"
                 >
                   <option value="">所有标签</option>
                   {allTags.map((tag) => (
@@ -340,7 +319,7 @@ export default function LibraryPage() {
                 <select
                   value={selectedDirection}
                   onChange={(e) => setSelectedDirection(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-2 rounded-lg border border-line bg-white text-sm focus:outline-none focus:border-coral cursor-pointer"
+                  className="appearance-none pl-3 pr-8 py-2 rounded-full border border-line bg-paper-2/80 text-sm text-ink-2 focus:outline-none focus:border-line-strong cursor-pointer"
                 >
                   <option value="">所有方向</option>
                   {allDirections.map((dir) => (
@@ -354,7 +333,7 @@ export default function LibraryPage() {
 
               <button
                 onClick={() => setShowImportModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#ff5d4d] to-[#9b5de5] text-white rounded-lg text-sm font-medium hover:shadow-lg transition-shadow"
+                className="cta-gradient flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all focus-ring"
               >
                 <Upload className="w-4 h-4" />
                 导入论文
@@ -407,7 +386,7 @@ export default function LibraryPage() {
             action={
               <button
                 onClick={() => setShowImportModal(true)}
-                className="px-6 py-2 bg-gradient-to-r from-[#ff5d4d] to-[#9b5de5] text-white rounded-lg text-sm font-medium"
+                className="cta-gradient rounded-full px-6 py-2 text-sm font-medium focus-ring"
               >
                 导入论文
               </button>
@@ -418,13 +397,13 @@ export default function LibraryPage() {
             {papers.map((paper) => (
               <div
                 key={paper.id}
-                className="bg-white rounded-xl border border-line shadow-sm hover:shadow-md transition-shadow overflow-hidden relative"
+                className="surface rounded-2xl overflow-hidden relative transition-shadow hover:shadow-md"
               >
                 {/* 卡片头部 */}
                 <div className="p-5">
                   <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                    {/* 左侧引用次数标识框 */}
-                    <div 
+                    {/* 左侧引用次数标识框（热度色阶编码引用量） */}
+                    <div
                       className={cn(
                         "flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center",
                         "bg-gradient-to-br " + getCitationColor(paper.citations)
@@ -443,7 +422,7 @@ export default function LibraryPage() {
                       <div className="flex items-start justify-between gap-4">
                         <Link
                           href={`/library/${paper.id}`}
-                          className="text-lg font-medium text-ink line-clamp-2 hover:text-coral transition-colors"
+                          className="text-lg serif text-ink line-clamp-2 hover:text-coral transition-colors"
                         >
                           {paper.title}
                         </Link>
@@ -452,7 +431,7 @@ export default function LibraryPage() {
                             href={paper.sourceUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex-shrink-0 p-1 hover:bg-ink-1 rounded transition-colors"
+                            className="flex-shrink-0 p-1 rounded hover:bg-paper-3 transition-colors"
                           >
                             <ExternalLink className="w-4 h-4 text-ink-3" />
                           </a>
@@ -464,24 +443,14 @@ export default function LibraryPage() {
                       </p>
 
                       <div className="flex flex-wrap items-center gap-2 mt-3">
-                        <span
-                          className={cn(
-                            "px-2 py-0.5 rounded-full text-xs font-medium",
-                            getSourceTypeLabel(paper.sourceType).className
-                          )}
-                        >
-                          {getSourceTypeLabel(paper.sourceType).label}
-                        </span>
+                        <span className={chip}>{getSourceTypeLabel(paper.sourceType)}</span>
                         {paper.direction && (
-                          <span className="px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-600">
+                          <span className="px-2 py-0.5 rounded-full text-xs bg-paper-3 text-ocean">
                             {paper.direction}
                           </span>
                         )}
                         {paper.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="px-2 py-0.5 rounded-full text-xs bg-gray-50 text-gray-600 flex items-center gap-1"
-                          >
+                          <span key={tag} className={cn(chip, "flex items-center gap-1")}>
                             <Tag className="w-3 h-3" />
                             {tag}
                           </span>
@@ -507,7 +476,7 @@ export default function LibraryPage() {
                 {/* 删除按钮 - 绝对定位在右下角 */}
                 <button
                   onClick={() => setDeleteConfirm({ show: true, paper })}
-                  className="absolute bottom-4 right-4 flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                  className="absolute bottom-4 right-4 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-ink-3 transition-colors hover:text-coral"
                   title="删除论文"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -517,17 +486,13 @@ export default function LibraryPage() {
                 {/* AI 分析折叠组件 */}
                 <div className="border-t border-line">
                   <button
-                    onClick={() =>
-                      setOpenAccordion(openAccordion === paper.id ? null : paper.id)
-                    }
-                    className="w-full px-5 py-3 flex items-center justify-between hover:bg-ink-5 transition-colors"
+                    onClick={() => setOpenAccordion(openAccordion === paper.id ? null : paper.id)}
+                    className="w-full px-5 py-3 flex items-center justify-between hover:bg-paper-2/50 transition-colors"
                   >
                     <span className="flex items-center gap-2 text-sm text-ink">
-                      <Sparkles className="w-4 h-4 text-[#f4c25a]" />
+                      <Sparkles className="w-4 h-4 text-sun" />
                       AI 关键介绍
-                      {!paper.summary && (
-                        <span className="text-xs text-ink-3">（未分析）</span>
-                      )}
+                      {!paper.summary && <span className="text-xs text-ink-3">（未分析）</span>}
                     </span>
                     {openAccordion === paper.id ? (
                       <ChevronUp className="w-4 h-4 text-ink-3" />
@@ -540,51 +505,41 @@ export default function LibraryPage() {
                     <div className="px-5 pb-5">
                       {paper.summary || paper.methodology || paper.contribution ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="p-4 rounded-lg bg-gradient-to-br from-orange-50 to-orange-100/50 border border-orange-100">
-                            <h4 className="text-sm font-medium text-orange-800 mb-2">
-                              🔍 研究问题
-                            </h4>
-                            <p className="text-sm text-orange-700 leading-relaxed">
+                          <div className="p-4 rounded-xl bg-paper-2/60 border border-line">
+                            <h4 className="overline mb-2 text-coral">🔍 研究问题</h4>
+                            <p className="text-sm text-ink-2 leading-relaxed">
                               {paper.summary || "暂无分析"}
                             </p>
                           </div>
-                          <div className="p-4 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-100">
-                            <h4 className="text-sm font-medium text-blue-800 mb-2">
-                              🧠 核心方法
-                            </h4>
-                            <p className="text-sm text-blue-700 leading-relaxed">
+                          <div className="p-4 rounded-xl bg-paper-2/60 border border-line">
+                            <h4 className="overline mb-2 text-ocean">🧠 核心方法</h4>
+                            <p className="text-sm text-ink-2 leading-relaxed">
                               {paper.methodology || "暂无分析"}
                             </p>
                           </div>
-                          <div className="p-4 rounded-lg bg-gradient-to-br from-green-50 to-green-100/50 border border-green-100">
-                            <h4 className="text-sm font-medium text-green-800 mb-2">
-                              ✨ 创新点
-                            </h4>
-                            <p className="text-sm text-green-700 leading-relaxed">
+                          <div className="p-4 rounded-xl bg-paper-2/60 border border-line">
+                            <h4 className="overline mb-2 text-sage">✨ 创新点</h4>
+                            <p className="text-sm text-ink-2 leading-relaxed">
                               {paper.contribution || "暂无分析"}
                             </p>
                           </div>
-                          <div className="p-4 rounded-lg bg-gradient-to-br from-purple-50 to-purple-100/50 border border-purple-100">
-                            <h4 className="text-sm font-medium text-purple-800 mb-2">
-                              🚀 应用方向
-                            </h4>
-                            <p className="text-sm text-purple-700 leading-relaxed">
-                              暂无分析
+                          <div className="p-4 rounded-xl bg-paper-2/60 border border-line">
+                            <h4 className="overline mb-2 text-plum">🚀 应用方向</h4>
+                            <p className="text-sm text-ink-2 leading-relaxed">
+                              {paper.notes || "暂无分析"}
                             </p>
                           </div>
                         </div>
                       ) : (
                         <div className="text-center py-6">
-                          <Sparkles className="w-12 h-12 mx-auto text-ink-2 mb-3" />
-                          <p className="text-sm text-ink-3 mb-4">
-                            点击下方按钮让 AI 分析这篇论文
-                          </p>
+                          <Sparkles className="w-12 h-12 mx-auto text-ink-4 mb-3" />
+                          <p className="text-sm text-ink-3 mb-4">点击下方按钮让 AI 分析这篇论文</p>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleAnalyze(paper.id);
                             }}
-                            className="px-4 py-2 bg-gradient-to-r from-[#f4c25a] to-[#3b6ef6] text-white rounded-lg text-sm font-medium hover:shadow-lg transition-shadow"
+                            className="cta-gradient rounded-full px-4 py-2 text-sm font-medium focus-ring"
                           >
                             🔮 开始分析
                           </button>
@@ -603,32 +558,32 @@ export default function LibraryPage() {
       {showImportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            className="absolute inset-0 bg-ink/30 backdrop-blur-sm"
             onClick={() => setShowImportModal(false)}
           />
 
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+          <div className="relative surface-strong rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
             <div className="flex items-center justify-between p-5 border-b border-line">
-              <h2 className="text-lg font-medium text-ink">导入论文</h2>
+              <h2 className="text-lg serif text-ink">导入论文</h2>
               <button
                 onClick={() => setShowImportModal(false)}
-                className="p-1 hover:bg-ink-1 rounded-full transition-colors"
+                className="p-1 rounded-full hover:bg-paper-3 transition-colors"
               >
                 <X className="w-5 h-5 text-ink-3" />
               </button>
             </div>
 
-            <div className="flex p-4 border-b border-line">
+            <div className="flex gap-2 p-4 border-b border-line">
               <button
                 onClick={() => {
                   setImportMode("arxiv");
                   setImportMessage("");
                 }}
                 className={cn(
-                  "flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors",
+                  "flex-1 py-2 px-4 rounded-full text-sm font-medium transition-colors",
                   importMode === "arxiv"
-                    ? "bg-coral text-white"
-                    : "bg-ink-5 text-ink-3 hover:bg-ink-10"
+                    ? "bg-ink text-paper-2"
+                    : "bg-paper-3 text-ink-3 hover:text-ink"
                 )}
               >
                 通过 arXiv ID 导入
@@ -640,10 +595,10 @@ export default function LibraryPage() {
                   setImportMessage("");
                 }}
                 className={cn(
-                  "flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors",
+                  "flex-1 py-2 px-4 rounded-full text-sm font-medium transition-colors",
                   importMode === "pdf"
-                    ? "bg-coral text-white"
-                    : "bg-ink-5 text-ink-3 hover:bg-ink-10"
+                    ? "bg-ink text-paper-2"
+                    : "bg-paper-3 text-ink-3 hover:text-ink"
                 )}
               >
                 上传 PDF 文件
@@ -654,32 +609,28 @@ export default function LibraryPage() {
               {importMode === "arxiv" ? (
                 <>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-ink mb-2">
-                      输入 arXiv ID
-                    </label>
+                    <label className="overline block mb-2">输入 arXiv ID</label>
                     <input
                       type="text"
                       value={arxivId}
                       onChange={(e) => setArxivId(e.target.value)}
-                      placeholder="例如: 2301.12345"
-                      className="w-full px-4 py-2 rounded-lg border border-line bg-white text-sm focus:outline-none focus:border-coral transition-colors"
+                      placeholder="例如：2301.12345"
+                      className="w-full px-4 py-2 rounded-xl border border-line bg-paper-2/80 text-sm text-ink placeholder:text-ink-4 focus:outline-none focus:border-line-strong transition-colors"
                     />
                   </div>
                   <button
                     onClick={handleArxivImport}
                     disabled={importing}
-                    className="w-full py-2 bg-gradient-to-r from-[#ff5d4d] to-[#9b5de5] text-white rounded-lg text-sm font-medium hover:shadow-lg transition-shadow disabled:opacity-50"
+                    className="cta-gradient w-full rounded-full py-2 text-sm font-medium transition-all focus-ring disabled:opacity-50"
                   >
-                    {importing ? "导入中..." : "导入"}
+                    {importing ? "导入中…" : "导入"}
                   </button>
                 </>
               ) : (
                 <>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-ink mb-2">
-                      选择 PDF 文件
-                    </label>
-                    <div className="border-2 border-dashed border-line rounded-lg p-8 text-center hover:border-coral transition-colors">
+                    <label className="overline block mb-2">选择 PDF 文件</label>
+                    <div className="border-2 border-dashed border-line rounded-xl p-8 text-center hover:border-line-strong transition-colors">
                       <input
                         type="file"
                         accept=".pdf"
@@ -688,19 +639,13 @@ export default function LibraryPage() {
                         id="pdf-upload"
                       />
                       <label htmlFor="pdf-upload" className="cursor-pointer">
-                        <FileText className="w-12 h-12 mx-auto text-ink-3 mb-3" />
+                        <FileText className="w-12 h-12 mx-auto text-ink-4 mb-3" />
                         {selectedFile ? (
-                          <div className="text-sm text-ink">
-                            已选择: {selectedFile.name}
-                          </div>
+                          <div className="text-sm text-ink">已选择：{selectedFile.name}</div>
                         ) : (
                           <>
-                            <div className="text-sm text-ink-3 mb-1">
-                              点击选择 PDF 文件
-                            </div>
-                            <div className="text-xs text-ink-3">
-                              或拖拽文件到此处
-                            </div>
+                            <div className="text-sm text-ink-3 mb-1">点击选择 PDF 文件</div>
+                            <div className="text-xs text-ink-4">或拖拽文件到此处</div>
                           </>
                         )}
                       </label>
@@ -709,16 +654,14 @@ export default function LibraryPage() {
                   <button
                     onClick={handlePdfImport}
                     disabled={importing || !selectedFile}
-                    className="w-full py-2 bg-gradient-to-r from-[#ff5d4d] to-[#9b5de5] text-white rounded-lg text-sm font-medium hover:shadow-lg transition-shadow disabled:opacity-50"
+                    className="cta-gradient w-full rounded-full py-2 text-sm font-medium transition-all focus-ring disabled:opacity-50"
                   >
-                    {importing ? "导入中..." : "导入"}
+                    {importing ? "导入中…" : "导入"}
                   </button>
                 </>
               )}
               {importMessage && (
-                <p className="mt-3 text-sm text-center text-ink-3">
-                  {importMessage}
-                </p>
+                <p className="mt-3 text-sm text-center text-ink-3">{importMessage}</p>
               )}
             </div>
           </div>

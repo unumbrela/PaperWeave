@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { 
-  LayoutGrid, 
-  Highlighter, 
-  Lightbulb, 
-  CheckSquare, 
-  ArrowRight, 
+import {
+  LayoutGrid,
+  Highlighter,
+  Lightbulb,
+  CheckSquare,
+  ArrowRight,
   Sparkles,
   FileText,
   Trash2,
@@ -28,9 +28,17 @@ function getAnnotationTypeLabel(type: AnnotationType): string {
   return ANNOTATION_TYPE_LABELS[type] || type;
 }
 
+interface AISummaryShape {
+  coreIdea?: string;
+  relatedConcepts?: string;
+  whyItMatters?: string;
+  applications?: string;
+}
+
 interface SidebarProps {
   annotations: Annotation[];
-  aiSummary: any;
+  /** AI 解释结果（来自 useAIExplanation，运行时为 unknown，渲染前在内部收窄） */
+  aiSummary: unknown;
   researchNotes: string;
   onDeleteAnnotation: (id: string) => void;
   onEditAnnotation: (id: string, comment: string) => Promise<void>;
@@ -104,11 +112,11 @@ export default function Sidebar({
   const renderAnnotationCard = (annotation: Annotation) => {
     const isExpanded = expandedId === annotation.id;
     const isEditing = editingId === annotation.id;
-    
+
     return (
       <div
         key={annotation.id}
-        className="group rounded-xl p-4 bg-gray-800/50 border border-gray-700/30 hover:border-gray-600/50 transition-all duration-200"
+        className="group rounded-xl p-4 bg-paper-2/60 border border-line hover:border-line-strong transition-all duration-200"
       >
         <div className="flex items-start gap-3">
           <div
@@ -117,38 +125,38 @@ export default function Sidebar({
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: `${annotation.color}30`, color: annotation.color }}>
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: `${annotation.color}55`, color: 'var(--ink-2)' }}>
                 {getAnnotationTypeLabel(annotation.type)}
               </span>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-ink-3">
                 第 {annotation.page + 1} 页
               </span>
             </div>
-            
-            <p className="text-sm text-gray-200 mb-2">
+
+            <p className="text-sm text-ink mb-2">
               {annotation.selectedText || '(无文本)'}
             </p>
-            
+
             {isEditing ? (
               <div className="mb-2">
                 <textarea
                   value={editingText}
                   onChange={(e) => setEditingText(e.target.value)}
                   placeholder="添加笔记..."
-                  className="w-full h-20 bg-gray-900/80 border border-gray-600 rounded-lg p-2 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
+                  className="w-full h-20 bg-paper-2/80 border border-line rounded-lg p-2 text-xs text-ink placeholder:text-ink-4 focus:outline-none focus:border-line-strong resize-none"
                   autoFocus
                 />
                 <div className="flex justify-end gap-2 mt-2">
                   <button
                     onClick={handleCancelEdit}
-                    className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-paper-3 text-ink-3 hover:text-ink transition-colors"
                     disabled={saving}
                   >
                     <X className="w-4 h-4" />
                   </button>
                   <button
                     onClick={handleSaveEdit}
-                    className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
+                    className="p-1.5 rounded-lg bg-ink hover:brightness-110 text-paper-2 transition-all disabled:opacity-50"
                     disabled={saving}
                   >
                     <Check className="w-4 h-4" />
@@ -156,20 +164,20 @@ export default function Sidebar({
                 </div>
               </div>
             ) : annotation.comment ? (
-              <p className="text-xs text-gray-400 bg-gray-900/50 rounded-lg p-2 mb-2">
+              <p className="text-xs text-ink-2 bg-paper-2/60 rounded-lg p-2 mb-2">
                 {annotation.comment}
               </p>
             ) : annotation.type !== 'highlight' ? (
               <button
                 onClick={() => handleStartEdit(annotation)}
-                className="w-full text-xs text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg p-2 mb-2 border border-blue-500/20 transition-colors"
+                className="w-full text-xs text-ocean bg-ocean/8 hover:bg-ocean/12 rounded-lg p-2 mb-2 border border-ocean/20 transition-colors"
               >
                 + 点击添加笔记
               </button>
             ) : null}
-            
+
             {isExpanded && !!annotation.aiSummary && (
-              <div className="text-xs text-gray-400 bg-purple-500/10 rounded-lg p-3 mb-2 border border-purple-500/20">
+              <div className="text-xs text-ink-2 bg-plum/8 rounded-lg p-3 mb-2 border border-plum/20">
                 {(() => {
                   const aiSummary = annotation.aiSummary as {
                     coreIdea?: string;
@@ -181,25 +189,25 @@ export default function Sidebar({
                     <>
                       {aiSummary.coreIdea && (
                         <div className="mb-2">
-                          <span className="text-purple-400 font-medium">核心概念:</span>
+                          <span className="text-plum font-medium">核心概念:</span>
                           <p className="mt-1">{aiSummary.coreIdea}</p>
                         </div>
                       )}
                       {aiSummary.relatedConcepts && (
                         <div className="mb-2">
-                          <span className="text-purple-400 font-medium">相关概念:</span>
+                          <span className="text-plum font-medium">相关概念:</span>
                           <p className="mt-1">{aiSummary.relatedConcepts}</p>
                         </div>
                       )}
                       {aiSummary.whyItMatters && (
                         <div className="mb-2">
-                          <span className="text-purple-400 font-medium">重要性:</span>
+                          <span className="text-plum font-medium">重要性:</span>
                           <p className="mt-1">{aiSummary.whyItMatters}</p>
                         </div>
                       )}
                       {aiSummary.applications && (
                         <div>
-                          <span className="text-purple-400 font-medium">应用场景:</span>
+                          <span className="text-plum font-medium">应用场景:</span>
                           <p className="mt-1">{aiSummary.applications}</p>
                         </div>
                       )}
@@ -208,16 +216,16 @@ export default function Sidebar({
                 })()}
               </div>
             )}
-            
+
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-ink-4">
                 {formatDate(annotation.createdAt)}
               </span>
               <div className="flex items-center gap-1">
                 {!isEditing && (
                   <button
                     onClick={() => setExpandedId(isExpanded ? null : annotation.id)}
-                    className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-paper-3 text-ink-3 hover:text-ink transition-colors"
                     title={isExpanded ? "收起" : "展开"}
                   >
                     <ArrowRight className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
@@ -226,7 +234,7 @@ export default function Sidebar({
                 {annotation.type !== 'highlight' && !isEditing && (
                   <button
                     onClick={() => handleStartEdit(annotation)}
-                    className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-paper-3 text-ink-3 hover:text-ink transition-colors"
                     title="编辑笔记"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -234,7 +242,7 @@ export default function Sidebar({
                 )}
                 <button
                   onClick={() => onDeleteAnnotation(annotation.id)}
-                  className="p-1.5 rounded-lg hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-coral/12 text-ink-3 hover:text-coral transition-colors"
                   title="删除"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -250,37 +258,39 @@ export default function Sidebar({
   const renderAISummary = () => {
     if (!aiSummary) {
       return (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-center py-12 text-ink-4">
           <Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p className="text-sm">选择文本后点击 AI 解释</p>
         </div>
       );
     }
 
+    const summary = aiSummary as AISummaryShape;
+
     return (
       <div className="space-y-4">
-        {aiSummary.coreIdea && (
-          <div className="rounded-xl p-4 bg-purple-500/10 border border-purple-500/20">
-            <h4 className="text-sm font-medium text-purple-400 mb-2">核心概念</h4>
-            <p className="text-sm text-gray-200">{aiSummary.coreIdea}</p>
+        {summary.coreIdea && (
+          <div className="rounded-xl p-4 bg-paper-2/60 border border-line">
+            <h4 className="overline mb-2 text-plum">核心概念</h4>
+            <p className="text-sm text-ink-2">{summary.coreIdea}</p>
           </div>
         )}
-        {aiSummary.relatedConcepts && (
-          <div className="rounded-xl p-4 bg-blue-500/10 border border-blue-500/20">
-            <h4 className="text-sm font-medium text-blue-400 mb-2">相关概念</h4>
-            <p className="text-sm text-gray-200">{aiSummary.relatedConcepts}</p>
+        {summary.relatedConcepts && (
+          <div className="rounded-xl p-4 bg-paper-2/60 border border-line">
+            <h4 className="overline mb-2 text-ocean">相关概念</h4>
+            <p className="text-sm text-ink-2">{summary.relatedConcepts}</p>
           </div>
         )}
-        {aiSummary.whyItMatters && (
-          <div className="rounded-xl p-4 bg-green-500/10 border border-green-500/20">
-            <h4 className="text-sm font-medium text-green-400 mb-2">为什么重要</h4>
-            <p className="text-sm text-gray-200">{aiSummary.whyItMatters}</p>
+        {summary.whyItMatters && (
+          <div className="rounded-xl p-4 bg-paper-2/60 border border-line">
+            <h4 className="overline mb-2 text-sage">为什么重要</h4>
+            <p className="text-sm text-ink-2">{summary.whyItMatters}</p>
           </div>
         )}
-        {aiSummary.applications && (
-          <div className="rounded-xl p-4 bg-yellow-500/10 border border-yellow-500/20">
-            <h4 className="text-sm font-medium text-yellow-400 mb-2">潜在应用</h4>
-            <p className="text-sm text-gray-200">{aiSummary.applications}</p>
+        {summary.applications && (
+          <div className="rounded-xl p-4 bg-paper-2/60 border border-line">
+            <h4 className="overline mb-2 text-sun">潜在应用</h4>
+            <p className="text-sm text-ink-2">{summary.applications}</p>
           </div>
         )}
       </div>
@@ -289,9 +299,9 @@ export default function Sidebar({
 
   const renderResearchNotes = () => {
     return (
-      <div className="rounded-xl p-4 bg-gray-800/50 border border-gray-700/30">
+      <div className="rounded-xl p-4 bg-paper-2/60 border border-line">
         <textarea
-          className="w-full h-64 bg-transparent text-gray-200 text-sm resize-none focus:outline-none placeholder-gray-500"
+          className="w-full h-64 bg-transparent text-ink text-sm resize-none focus:outline-none placeholder:text-ink-4"
           placeholder="在此添加研究笔记..."
           value={researchNotes}
           onChange={(event) => onResearchNotesChange(event.target.value)}
@@ -301,16 +311,16 @@ export default function Sidebar({
   };
 
   return (
-    <div className="w-80 h-full flex flex-col bg-gray-900/80 backdrop-blur-sm border-l border-gray-800">
-      <div className="flex border-b border-gray-800">
+    <div className="w-80 h-full flex flex-col bg-paper/80 backdrop-blur-sm border-l border-line">
+      <div className="flex border-b border-line">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex-1 flex flex-col items-center gap-1.5 py-3 px-2 transition-all duration-200 ${
               activeTab === tab.id
-                ? 'text-white border-b-2 border-blue-500 bg-blue-500/10'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
+                ? 'text-ink border-b-2 border-coral bg-paper-2/60'
+                : 'text-ink-3 hover:text-ink hover:bg-paper-2/50'
             }`}
           >
             <tab.icon className="w-5 h-5" />
@@ -325,7 +335,7 @@ export default function Sidebar({
         ) : activeTab === 'notes' ? (
           renderResearchNotes()
         ) : filteredAnnotations.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-ink-4">
             <p className="text-sm">暂无{activeTab !== 'all' ? getAnnotationTypeLabel(activeTab as AnnotationType) : ''}标注</p>
           </div>
         ) : (
@@ -333,8 +343,8 @@ export default function Sidebar({
         )}
       </div>
 
-      <div className="p-4 border-t border-gray-800">
-        <div className="flex items-center justify-between text-xs text-gray-500">
+      <div className="p-4 border-t border-line">
+        <div className="flex items-center justify-between text-xs text-ink-3">
           <span>{annotations.length} 个标注</span>
           <span className="flex items-center gap-2">
             {annotations.filter((a) => a.type === 'highlight').length} <Highlighter className="w-3 h-3" style={{ color: ANNOTATION_COLORS.highlight }} />

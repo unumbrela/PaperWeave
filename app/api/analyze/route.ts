@@ -1,24 +1,8 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { chatCompletion } from '@/lib/ai/client';
+import { callAnalysis, parseAnalysis, toPaperFields, ANALYSIS_OUTPUT_SPEC } from '@/lib/ai/analyze';
 import prisma from '@/lib/db/prisma';
-
-interface AIAnalysisResult {
-  problem: string;
-  method: string;
-  contribution: string;
-  application: string;
-}
-
-function toPaperAnalysis(result: AIAnalysisResult) {
-  return {
-    summary: result.problem,
-    methodology: result.method,
-    contribution: result.contribution,
-    notes: `应用方向：${result.application}`,
-  };
-}
 
 const extractTextFromPdf = async (pdfPath: string): Promise<string> => {
   try {
@@ -73,7 +57,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { text, paperId } = body;
-    
+
     if (!text && !paperId) {
       return NextResponse.json(
         {
@@ -83,9 +67,9 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    
+
     let contentToAnalyze = text || '';
-    
+
     if (paperId) {
       let paper = null;
 
@@ -101,7 +85,7 @@ export async function POST(request: Request) {
         if (paper.abstract) {
           contentToAnalyze = paper.abstract;
         }
-        
+
         if (paper.pdfPath) {
           const pdfText = await extractTextFromPdf(paper.pdfPath);
           if (pdfText) {
@@ -110,46 +94,22 @@ export async function POST(request: Request) {
         }
       }
     }
-    
+
     console.log(`[AI Analyze] Analyzing content (${contentToAnalyze.length} chars) for ${paperId ? `paper ${paperId}` : 'text'}`);
 
-    const prompt = `任务说明：请从给定的论文摘要或文本中提取关键信息，并以机器可解析的严格 JSON 返回。\n\n输入文本：\n${contentToAnalyze}\n\n要求：\n- 仅输出一段合法 JSON（不允许任何额外说明或 markdown）。\n- 输出字段及格式（必须遵守）：{\n  "keywords": ["..."],            // 3-7 个关键词（数组）\n  "summary": "...",             // 1-3 句的论文概述（字符串）\n  "methodology": "...",         // 方法/技术概要（字符串）\n  "contributions": ["..."],     // 2-3 个主要贡献点（数组）\n  "applications": ["..."],      // 研究可应用的领域或场景（数组）\n  "limitations": ["..."],       //（可选）已识别的局限或开放问题（数组）\n  "confidence": 0.0              // 0-1 的置信度估计（数字）\n}\n- 如果某字段无法提取，请用空字符串或空数组表示（例如："summary":"" 或 "contributions":[]）。\n- 保持输出语言与输入一致（若输入含中文，请用中文输出）。\n- 请尽量把每个字段控制在简洁长度（summary 不超过 3 句，keywords 最多 7 个词）。\n\n示例返回：\n{\n  "keywords": ["volume rendering","ray casting","shear-warp"],\n  "summary": "本文综述了直接体渲染（DVR）的关键技术，比较了 ray casting 和 shear-warp 等方法，并讨论了性能权衡。",\n  "methodology": "分析和比较常见体渲染算法的实现细节与复杂度，基于文献归纳方法优缺点。",\n  "contributions": ["整理并比较主要 DVR 算法","提出性能优化思路"],\n  "applications": ["医学影像","科学可视化"],\n  "limitations": ["未提供新的实验结果"],\n  "confidence": 0.75\n}\n\n请严格输出 JSON，立即开始处理。`;
+    const prompt = `任务说明：请从给定的论文摘要或文本中提取关键信息，并以机器可解析的严格 JSON 返回。\n\n输入文本：\n${contentToAnalyze}\n\n${ANALYSIS_OUTPUT_SPEC}\n\n请严格输出 JSON，立即开始处理。`;
 
-    const raw = await chatCompletion([
-      { role: 'system', content: '你是一个严谨的学术助手，输出应为机器可解析的 JSON。' },
-      { role: 'user', content: prompt },
-    ], { model: process.env.DEEPSEEK_API_KEY ? 'deepseek-chat' : undefined, temperature: 0.2, max_tokens: 1000 });
+    const raw = await callAnalysis(prompt);
+    const parsed = parseAnalysis(raw);
 
-    type ParsedAnalysis = {
-      summary?: string; methodology?: string; contribution?: string;
-      keywords?: string[]; applications?: string[];
-    };
-    let parsed: ParsedAnalysis | null = null;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      // 尝试从文本中抽取第一个 JSON 对象
-      const m = raw.match(/\{[\s\S]*\}/);
-      if (m) {
-        try {
-          parsed = JSON.parse(m[0]);
-        } catch {
-          parsed = null;
-        }
-      }
-    }
-
-    const paperAnalysis = parsed ? {
-      summary: parsed.summary || '',
-      methodology: parsed.methodology || '',
-      contribution: parsed.contribution || '',
-      notes: `关键词：${(parsed.keywords || []).join(', ')}；应用：${(parsed.applications || []).join(', ')}`,
-    } : {
-      summary: '未分析成功',
-      methodology: '未分析成功',
-      contribution: '未分析成功',
-      notes: '未分析成功',
-    };
+    const paperAnalysis = parsed
+      ? toPaperFields(parsed)
+      : {
+          summary: '未分析成功',
+          methodology: '未分析成功',
+          contribution: '未分析成功',
+          notes: '未分析成功',
+        };
 
     // 可选云同步：仅当配置了 Postgres 时尝试回写；失败忽略（本地 Dexie 为准）
     if (paperId) {
