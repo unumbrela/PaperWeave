@@ -1,9 +1,10 @@
 import { streamText } from "ai";
-import { deepseek, MODELS, isStreamingAIConfigured, aiNotConfiguredResponse } from "@/lib/ai";
+import { getDeepSeek, MODELS, aiNotConfiguredResponse } from "@/lib/ai";
+import { resolveKeys } from "@/lib/ai/keys";
 import { z } from "zod";
 
 export const runtime = "nodejs";
-export const maxDuration = 90;
+export const maxDuration = 60; // Vercel Hobby 上限 60s
 
 const Body = z.object({
   task: z.string().min(1).max(8000),
@@ -35,7 +36,8 @@ const EXECUTOR_LABEL = {
 } as const;
 
 export async function POST(req: Request) {
-  if (!isStreamingAIConfigured()) return aiNotConfiguredResponse();
+  const { deepseek: dsKey } = resolveKeys(req);
+  if (!dsKey) return aiNotConfiguredResponse();
   let parsed;
   try {
     parsed = Body.parse(await req.json());
@@ -114,7 +116,7 @@ ${parsed.task}
 现在开始输出五阶段 Markdown。`;
 
   const result = streamText({
-    model: deepseek(MODELS.chat),
+    model: getDeepSeek(dsKey)(MODELS.chat),
     system,
     prompt,
     temperature: 0.3,

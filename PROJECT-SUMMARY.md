@@ -103,7 +103,8 @@
 | **P4.2** | lint 清零（核心） | 核心路径（`lib/db`、`lib/ai`、`lib/workflow`、library、viewer、paper-search、papers/analyze API 等）现 **0 lint error**。 |
 | **P5** | 核心页打磨 + 去重 + 拆分 | (A) library / library[id] / viewer 及子组件（Sidebar / FloatingMenu / PDFViewerDynamic）从原生灰蓝/暗色全量换为暖纸面 token，消除画风割裂；(B) 去掉 library[id] 用随机数伪造的 PDF 下载进度条，改为诚实状态；(C) 三页 `Paper`/`Author` 改用 `lib/db/types` 单一类型源，抽 `lib/ai/analyze.ts` 收敛 `/api/analyze` 与 `/api/analyze-paper` 的重复 prompt/解析；(D) 拆分三个巨型组件（详见 §五·4）。 |
 | **P0.2（本轮）** | 零配置盖章 + 真离线 PDF | (1) 启用预留的 `pdfBlob`：viewer 优先读本地缓存 Blob，并在首次在线打开后**静默暖缓存**为 Dexie Blob，之后可断网阅读；`repository` 新增 `getPdfBlob` / `cachePdfBlob`。(2) 修正 `getPaper` / `listPapers` 泄漏 Blob 进 UI 状态的类型不诚实问题（统一 `stripBlob`）。(3) 修复潜伏 bug：`paperDB.getAll()` 用 `orderBy('cachedAt')` 但该键未建索引（真实 IndexedDB 也会抛 `SchemaError`），改内存排序。(4) 仓储层单测给「不开云同步时绝不发起任何网络请求」**盖章**——替代一次性手动跑。 |
-| **P4.3（本轮）** | 测试落地 + CI 硬门禁 | 引入 **Vitest**，新增 `test/` 5 个文件 **42 条**用例：arXiv 解析、检索过滤/去重/`allSettled` 容错、OMML→LaTeX、注册表不变量（slug 唯一 / 页面文件存在 / 阶段合法）、Dexie 仓储层。`eslint.config.mjs` 把 vendored 可视化（transformer/gan/diffusion explainer + ganlab）纳入 ignores，再清掉核心 ~20 处 `any` / `require()` 错误；CI 把 **lint 翻成硬门禁**并新增 `pnpm test` 步骤（lint / tsc / test / build 四道全绿）。顺手修正检索过滤不识别中文分号 `；` 的小 bug。 |
+| **P6（本轮）** | 部署上线适配（Vercel + 访客自带 key） | 把项目改造成可公开部署：(1) **serverless 文件系统适配**——新增同源 PDF 代理 `app/api/pdf-proxy`（带 SSRF 防护），arXiv 入库 `pdfPath` 指向代理、本地上传 PDF 直接存 Dexie Blob，彻底去掉 `public/papers` 落盘（Vercel 只读 FS 会报错）；(2) **`maxDuration` 压到 ≤60s** 符合 Hobby 上限；(3) **访客自带 key**——`lib/ai/keys.ts`（请求头→env 解析）贯通流式 5 路由 + 非流式 `client`/`analyze`/`explanation` + analyze/analyze-paper/explain 路由；前端 `lib/ai/user-keys.ts` + `/settings` 页 + 右上角入口 + `useStream`/各 AI fetch 自动带 key 头。公开 demo 零成本、不会被刷爆。新增 `DEPLOY.md`（Vercel + Cloudflare 域名分步指南）。lint/tsc/test(42)/build（无 key 也能构建）全绿。 |
+| **P4.3** | 测试落地 + CI 硬门禁 | 引入 **Vitest**，新增 `test/` 5 个文件 **42 条**用例：arXiv 解析、检索过滤/去重/`allSettled` 容错、OMML→LaTeX、注册表不变量（slug 唯一 / 页面文件存在 / 阶段合法）、Dexie 仓储层。`eslint.config.mjs` 把 vendored 可视化（transformer/gan/diffusion explainer + ganlab）纳入 ignores，再清掉核心 ~20 处 `any` / `require()` 错误；CI 把 **lint 翻成硬门禁**并新增 `pnpm test` 步骤（lint / tsc / test / build 四道全绿）。顺手修正检索过滤不识别中文分号 `；` 的小 bug。 |
 
 ---
 
@@ -127,7 +128,7 @@
 
 按"对核心链路价值 / 可见度"排序（定位收敛、链路回存、零配置盖章、测试+CI 硬门禁均已完成，见 §五·1/2/3/5/6）：
 
-1. **门面与首因** —— README Demo GIF（检索→入库→批注→总结→生 idea→回存）+ Vercel Live Demo（纯本地模式无需数据库），补上"访客 0 秒能看见的价值"。这是当前**最高优先级**。
+1. **门面与首因** —— 部署适配已就绪（见 `DEPLOY.md`：Vercel + 访客自带 key + Cloudflare 域名）；**剩待执行**的是需账号/付费的人工步骤（Vercel 登录部署、买域名接 DNS）+ 一张 README Demo GIF（检索→入库→批注→总结→生 idea→回存）。这是当前**最高优先级**。
 2. **补 E2E 与转换链测试** —— Playwright 跑 1 条 happy-path（检索→入库→阅读→批注→导出）；为 Markdown 转换链（docx/pdf/html→md）补端到端用例，进一步收紧门禁。
 3. **传播放大** —— i18n（至少 README 英文版）、iGEM 第三方素材改外链、技术故事 + 可玩 demo 投 HN / Reddit。
 4. **统一错误 envelope + 可观测性** —— 非 AI 路由统一 `{ success, error }`；接错误率 / token 消耗埋点；补 OG 图 / sitemap。

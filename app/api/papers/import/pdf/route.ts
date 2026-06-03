@@ -1,18 +1,11 @@
 import { NextResponse } from 'next/server';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
-import fs from 'fs';
-import path from 'path';
 
-// 无状态助手：解析 PDF 文本 + 落地文件到 public/papers，返回论文数据。
-// 不再持久化到 Prisma / 本地 JSON —— 入库由客户端写入 Dexie（单一真相源）。
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-const getPapersDir = () => {
-  const dir = path.join(process.cwd(), 'public', 'papers');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  return dir;
-};
+// 无状态助手：仅在内存里解析 PDF 文本并返回论文数据；不落盘（Vercel 文件系统只读）。
+// PDF 原始二进制由客户端直接存入 Dexie Blob（真离线），入库写本地（单一真相源）。
 
 export async function POST(request: Request) {
   try {
@@ -78,19 +71,14 @@ export async function POST(request: Request) {
     }
     
     const paperId = `paper-${Date.now()}`;
-    const papersDir = getPapersDir();
-    const finalPdfPath = path.join(papersDir, `${paperId}.pdf`);
-    
-    fs.writeFileSync(finalPdfPath, buffer);
-    console.log(`[PDF Import] File saved to papers directory: ${finalPdfPath}`);
-    
+
+    // 不落盘：PDF 二进制由客户端拿到响应后直接存入 Dexie Blob（见 library 的 handlePdfImport）
     const paperData = {
       id: paperId,
       title: file.name.replace(/\.pdf$/i, '').substring(0, 500),
       abstract: extractedText.substring(0, 5000) || '未提取到文本内容',
       authors: [],
       sourceType: 'LOCAL' as const,
-      pdfPath: `/papers/${paperId}.pdf`,
       tags: ['本地上传'],
       citations: 0,
       createdAt: new Date().toISOString(),

@@ -1,81 +1,13 @@
 import { NextResponse } from 'next/server';
 import { fetchArxivMetadata, parseArxivId } from '@/lib/services/arxiv';
-import fs from 'fs';
-import path from 'path';
 
-// 无状态助手：本路由只负责「拉取 arXiv 元数据 + 下载 PDF」，
-// 不再持久化到 Prisma / 本地 JSON。论文入库由客户端写入 Dexie（单一真相源）。
+// 无状态助手：只负责拉取 arXiv 元数据，返回论文数据（不持久化、不落盘）。
+// PDF 不再下载到 public/papers（Vercel 文件系统只读）；改为把 pdfPath 指向同源 PDF
+// 代理 `/api/pdf-proxy`，viewer 读取后缓存为本地 Blob（真离线）。入库由客户端写 Dexie。
 
-const getPublicPapersDir = () => {
-  const dir = path.join(process.cwd(), 'public', 'papers');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  return dir;
-};
-
-const downloadArxivPdf = async (arxivId: string, paperId: string): Promise<string> => {
-  const pdfUrl = `https://arxiv.org/pdf/${arxivId}.pdf`;
-  const papersDir = getPublicPapersDir();
-  const pdfFilePath = path.join(papersDir, `${paperId}.pdf`);
-  
-  if (fs.existsSync(pdfFilePath)) {
-    console.log(`[arXiv PDF] Already downloaded: ${paperId}`);
-    return `/papers/${paperId}.pdf`;
-  }
-  
-  try {
-    console.log(`[arXiv PDF] Downloading: ${pdfUrl}`);
-    
-    const response = await fetch(pdfUrl, {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error: ${response.status}`);
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    const contentType = response.headers.get('content-type') || '';
-    const isPdf = (buf: Buffer) => {
-      try {
-        return buf.slice(0, 4).toString() === '%PDF';
-      } catch {
-        return false;
-      }
-    };
-
-    if (!contentType.includes('pdf') && !isPdf(buffer)) {
-      console.warn(`[arXiv PDF] Downloaded content is not PDF: content-type=${contentType}`);
-      if (process.env.NODE_ENV !== 'production') {
-        fs.writeFileSync(pdfFilePath, buffer);
-        console.log(`[arXiv PDF] Saved non-PDF content as file for debugging (dev): ${paperId}`);
-        return `/papers/${paperId}.pdf`;
-      }
-      throw new Error('Downloaded content is not a PDF');
-    }
-
-    fs.writeFileSync(pdfFilePath, buffer);
-    console.log(`[arXiv PDF] Downloaded successfully: ${paperId}`);
-    
-    return `/papers/${paperId}.pdf`;
-
-  } catch (downloadError) {
-    console.warn(`[arXiv PDF] Download failed: ${downloadError}`);
-    if (process.env.NODE_ENV !== 'production') {
-      const fileContent = (downloadError instanceof Error) ? downloadError.message : String(downloadError);
-      fs.writeFileSync(pdfFilePath, fileContent);
-      console.log(`[arXiv PDF] Saved error output to file for debugging (dev): ${paperId}`);
-      return `/papers/${paperId}.pdf`;
-    }
-    throw downloadError;
-  }
-};
+/** 远端 arXiv PDF → 同源代理 URL（前端读取无 CORS、serverless 无落盘） */
+const proxiedPdfPath = (arxivId: string): string =>
+  `/api/pdf-proxy?url=${encodeURIComponent(`https://arxiv.org/pdf/${arxivId}.pdf`)}`;
 
 export async function POST(request: Request) {
   try {
@@ -125,22 +57,10 @@ export async function POST(request: Request) {
     }
     
     const paperId = `paper-${Date.now()}`;
-    
-    console.log(`[arXiv Import] Downloading PDF for ${paperId}`);
-    let pdfPath: string;
-    try {
-      pdfPath = await downloadArxivPdf(cleanId, paperId);
-    } catch (err) {
-      console.error(`[arXiv Import] PDF download failed for ${cleanId}:`, err);
-      return NextResponse.json(
-        {
-          success: false,
-          message: `PDF 下载失败: ${err instanceof Error ? err.message : 'unknown'}`,
-        },
-        { status: 502 }
-      );
-    }
-    
+
+    // 不再下载落盘：pdfPath 指向同源 PDF 代理，viewer 读取后自动缓存为本地 Blob
+    const pdfPath = proxiedPdfPath(cleanId);
+
     const paperData = {
       id: paperId,
       title: metadata.title.substring(0, 500),

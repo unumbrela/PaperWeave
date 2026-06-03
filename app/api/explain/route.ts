@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAIExplanation } from '@/lib/ai/explanation';
+import { resolveKeys } from '@/lib/ai/keys';
 
 export async function POST(request: Request) {
   try {
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
       );
     }
     
-    const explanation = await getAIExplanation(text);
+    const explanation = await getAIExplanation(text, resolveKeys(request));
     
     return NextResponse.json({
       success: true,

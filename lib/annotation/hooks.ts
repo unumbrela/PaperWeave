@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import type { Annotation, AnnotationType, Rect } from '@/lib/db/types';
 import { ANNOTATION_COLORS } from '@/lib/db/types';
 import { repository } from '@/lib/db/repository';
+import { userKeyHeaders } from '@/lib/ai/user-keys';
 
 export { ANNOTATION_COLORS };
 
@@ -144,7 +145,7 @@ export function useAIExplanation() {
     try {
       const response = await fetch('/api/explain', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...userKeyHeaders() },
         body: JSON.stringify({ text }),
       });
 
