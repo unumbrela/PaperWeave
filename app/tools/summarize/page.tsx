@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
@@ -17,15 +17,12 @@ const LENGTHS = [
 
 function SummarizeContent() {
   const searchParams = useSearchParams();
-  const [url, setUrl] = useState("");
+  // 从 URL 查询参数派生初始值（链路 handoff 带来的 url），避免在 effect 里
+  // 同步 setState 触发级联渲染。
+  const [url, setUrl] = useState(() => searchParams.get("url") ?? "");
   const [length, setLength] =
     useState<(typeof LENGTHS)[number]["value"]>("medium");
   const { text, loading, error, run, stop } = useStream();
-
-  useEffect(() => {
-    const incomingUrl = searchParams.get("url");
-    if (incomingUrl) setUrl(incomingUrl);
-  }, [searchParams]);
 
   const submit = () => {
     const trimmed = url.trim();

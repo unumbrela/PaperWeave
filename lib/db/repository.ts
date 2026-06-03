@@ -94,11 +94,13 @@ export const repository = {
       return sortOrder === 'desc' ? -cmp : cmp
     })
 
-    return papers
+    // 列表不需要 PDF 二进制：剥离 Blob，避免把大对象灌进 UI 状态
+    return papers.map(stripBlob)
   },
 
   async getPaper(id: string): Promise<Paper | undefined> {
-    return paperDB.getById(id)
+    const p = await paperDB.getById(id)
+    return p ? stripBlob(p) : undefined
   },
 
   async getPaperByArxivId(arxivId: string): Promise<Paper | undefined> {
@@ -166,6 +168,30 @@ export const repository = {
   async deletePaper(id: string): Promise<void> {
     await paperDB.delete(id)
     pushToCloud(`/api/papers/${id}`, 'DELETE')
+  },
+
+  // ────────────────────────────────────────────────────────
+  // 离线 PDF（纯本地真离线阅读）
+  // ────────────────────────────────────────────────────────
+
+  /** 读取已离线缓存的 PDF 二进制；无缓存返回 undefined。 */
+  async getPdfBlob(id: string): Promise<Blob | undefined> {
+    const p = await paperDB.getById(id)
+    return p?.pdfBlob
+  },
+
+  /**
+   * 把 PDF 二进制写入本地缓存，使该论文可在断网时阅读。
+   * Blob 永不出本地（不 pushToCloud），与「Dexie 单一真相源」一致。
+   */
+  async cachePdfBlob(id: string, blob: Blob): Promise<void> {
+    const existing = await paperDB.getById(id)
+    if (!existing) return
+    await paperDB.upsert({
+      ...(existing as CachedPaper),
+      pdfBlob: blob,
+      cachedAt: new Date().toISOString(),
+    })
   },
 
   // ────────────────────────────────────────────────────────

@@ -83,7 +83,7 @@ export async function PUT(request: Request) {
       );
     }
     
-    const data: any = {};
+    const data: Record<string, unknown> = {};
     if (title !== undefined) data.title = title;
     if (content !== undefined) data.content = content;
     

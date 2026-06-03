@@ -88,7 +88,7 @@ export function PdfContainer({ pdfUrl }: PdfContainerProps) {
     { id: 'underline', label: '下划线', icon: Underline },
     { id: 'comment', label: '评论', icon: MessageSquare },
     { id: 'bookmark', label: '书签', icon: Bookmark },
-  ]
+  ] as const
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -149,7 +149,7 @@ export function PdfContainer({ pdfUrl }: PdfContainerProps) {
               return (
                 <button
                   key={tool.id}
-                  onClick={() => setActiveTool(tool.id as any)}
+                  onClick={() => setActiveTool(tool.id)}
                   className={`p-2 rounded-lg transition-colors ${
                     isActive
                       ? 'bg-blue-100 text-blue-700'

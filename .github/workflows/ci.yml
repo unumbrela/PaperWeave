@@ -28,15 +28,17 @@ jobs:
       - name: Generate Prisma client
         run: pnpm prisma generate
 
-      # Lint 历史债务集中在 vendored 可视化代码（约 68 error，多为 no-explicit-any）；
-      # 核心工作流代码已 0 error。暂设为非阻塞，逐步清偿（见 PROJECT-SUMMARY.md §五）；
-      # 类型与构建是硬门禁。
-      - name: Lint (non-blocking)
+      # Lint 已是硬门禁：核心链路 0 error；vendored 可视化代码（transformer /
+      # gan / diffusion explainer + ganlab）在 eslint.config.mjs 的 ignores 内，
+      # 不阻塞 CI（其 any/require 历史债务后续在独立 showcase 仓清偿）。
+      - name: Lint
         run: pnpm lint
-        continue-on-error: true
 
       - name: Type check
         run: pnpm exec tsc --noEmit
+
+      - name: Test
+        run: pnpm test
 
       - name: Build
         run: pnpm build

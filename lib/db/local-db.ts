@@ -71,7 +71,10 @@ export const paperDB = {
    * 获取所有论文
    */
   async getAll(): Promise<CachedPaper[]> {
-    return await db.papers.orderBy('cachedAt').reverse().toArray()
+    // 注意：cachedAt 不在 Dexie 索引里（schema 仅 id/arxivId/title/createdAt），
+    // 不能用 orderBy('cachedAt')——那会抛 SchemaError。改为内存排序「最近缓存优先」。
+    const all = await db.papers.toArray()
+    return all.sort((a, b) => (b.cachedAt || '').localeCompare(a.cachedAt || ''))
   },
 
   /**

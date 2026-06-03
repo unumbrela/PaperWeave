@@ -152,7 +152,7 @@ export function NoteSidebar() {
 
                               {anno.selectedText && (
                                 <p className="text-sm text-gray-700 mb-2">
-                                  "{anno.selectedText}"
+                                  &ldquo;{anno.selectedText}&rdquo;
                                 </p>
                               )}
 
