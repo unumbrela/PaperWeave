@@ -1,7 +1,10 @@
 {
-  "name": "web",
+  "name": "paperweave",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
@@ -11,15 +14,23 @@
   "dependencies": {
     "@ai-sdk/deepseek": "^2.0.29",
     "@ai-sdk/react": "^3.0.170",
+    "@google/generative-ai": "^0.24.1",
     "@opendocsg/pdf2md": "^0.2.6",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@prisma/config": "^7.8.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.0",
     "@react-three/postprocessing": "^3.0.4",
-    "@tensorflow/tfjs": "^4",
+    "@supabase/supabase-js": "^2.106.1",
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tiptap/react": "^3.23.6",
+    "@tiptap/starter-kit": "^3.23.6",
     "ai": "^6.0.168",
     "cheerio": "^1.2.0",
     "clsx": "^2.1.1",
     "d3": "^7",
+    "dexie": "^4.4.2",
     "framer-motion": "^12.38.0",
     "highlight.js": "^11.11.1",
     "jszip": "^3.10.1",
@@ -28,33 +39,55 @@
     "mammoth": "^1.12.0",
     "mathml-to-latex": "^1.5.0",
     "next": "16.2.4",
+    "openai": "^6.39.0",
     "papaparse": "^5.5.3",
+    "pdfjs-dist": "^5.4.296",
+    "pdfreader": "^3.0.8",
+    "pg": "^8.21.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
+    "react-pdf": "^10.4.1",
     "rehype-highlight": "^7.0.2",
     "rehype-katex": "^7.0.1",
+    "remark": "^15.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "remark-stringify": "^11.0.0",
     "tailwind-merge": "^3.5.0",
     "three": "^0.184.0",
     "turndown": "^7.2.4",
     "turndown-plugin-gfm": "^1.0.2",
-    "zod": "^4.3.6"
+    "xml2js": "^0.6.2",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/d3": "^7.4.3",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "^0.184.0",
     "@types/turndown": "^5.0.6",
+    "@types/xml2js": "^0.4.14",
     "domhandler": "^6.0.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "prisma": "^7.8.0",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "core-js",
+      "prisma",
+      "sharp",
+      "unrs-resolver"
+    ]
   }
 }

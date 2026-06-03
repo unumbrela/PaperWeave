@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "reference_repos/**",
+    // Vendored / generated assets — not our source, don't lint.
+    "public/**",
   ]),
 ]);
 

@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Paper {
+  id            String            @id @default(cuid())
+  title         String            @db.VarChar(500)
+  abstract      String?           @db.Text
+  authors       Json             
+  sourceType    SourceType       
+  sourceUrl     String?           @db.VarChar(500)
+  arxivId       String?           @unique @db.VarChar(50)
+  pdfPath       String?           @db.VarChar(500)
+  publishedAt   DateTime?        
+  tags          Json             
+  direction     String?           @db.VarChar(100)
+  notes         String?           @db.Text
+  summary       String?           @db.Text
+  methodology   String?           @db.Text
+  contribution  String?           @db.Text
+  citations     Int?              @default(0)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  
+  annotations   Annotation[]
+  researchNotes ResearchNote[]
+}
+
+model Annotation {
+  id          String            @id @default(cuid())
+  paperId     String
+  page        Int
+  rects       Json
+  selectedText String?          @db.Text
+  type        AnnotationType
+  color       String            @db.VarChar(20)
+  comment     String?           @db.Text
+  aiSummary   Json?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  
+  paper       Paper             @relation(fields: [paperId], references: [id], onDelete: Cascade)
+}
+
+model ResearchNote {
+  id          String            @id @default(cuid())
+  paperId     String
+  title       String?           @db.VarChar(200)
+  content     String            @db.Text
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  
+  paper       Paper             @relation(fields: [paperId], references: [id], onDelete: Cascade)
+}
+
+enum AnnotationType {
+  highlight
+  insight
+  todo
+  transferable
+}
+
+enum SourceType {
+  ARXIV
+  LOCAL
+  DOI
+}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
 import { StreamOutput } from "@/components/stream-output";
@@ -14,11 +15,17 @@ const LENGTHS = [
   { value: "long", label: "长", hint: "600 字" },
 ] as const;
 
-export default function Page() {
+function SummarizeContent() {
+  const searchParams = useSearchParams();
   const [url, setUrl] = useState("");
   const [length, setLength] =
     useState<(typeof LENGTHS)[number]["value"]>("medium");
   const { text, loading, error, run } = useStream();
+
+  useEffect(() => {
+    const incomingUrl = searchParams.get("url");
+    if (incomingUrl) setUrl(incomingUrl);
+  }, [searchParams]);
 
   const submit = () => {
     const trimmed = url.trim();
@@ -94,5 +101,13 @@ export default function Page() {
         />
       </div>
     </ToolShell>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={null}>
+      <SummarizeContent />
+    </Suspense>
   );
 }

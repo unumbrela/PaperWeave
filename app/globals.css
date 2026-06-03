@@ -92,7 +92,7 @@ body {
   top: -18vw;
   left: -12vw;
   background: radial-gradient(closest-side, #ffb4a2 0%, transparent 72%);
-  animation: drift-a 34s ease-in-out infinite alternate;
+  animation: drift-a 6s ease-in-out infinite alternate;
   opacity: 0.85;
 }
 .mesh-blob.b2 {
@@ -101,7 +101,7 @@ body {
   top: -14vw;
   right: -10vw;
   background: radial-gradient(closest-side, #c7b4ff 0%, transparent 70%);
-  animation: drift-b 41s ease-in-out infinite alternate;
+  animation: drift-b 7s ease-in-out infinite alternate;
   opacity: 0.8;
 }
 .mesh-blob.b3 {
@@ -110,7 +110,7 @@ body {
   bottom: -24vw;
   left: 6vw;
   background: radial-gradient(closest-side, #ffe0a3 0%, transparent 72%);
-  animation: drift-c 48s ease-in-out infinite alternate;
+  animation: drift-c 8s ease-in-out infinite alternate;
   opacity: 0.7;
 }
 .mesh-blob.b4 {
@@ -119,7 +119,7 @@ body {
   bottom: -10vw;
   right: -8vw;
   background: radial-gradient(closest-side, #a9d6ff 0%, transparent 70%);
-  animation: drift-d 37s ease-in-out infinite alternate;
+  animation: drift-d 6.5s ease-in-out infinite alternate;
   opacity: 0.7;
 }
 .mesh-blob.b5 {
@@ -128,34 +128,34 @@ body {
   top: 34vh;
   left: 28vw;
   background: radial-gradient(closest-side, #ffc8d6 0%, transparent 70%);
-  animation: drift-e 29s ease-in-out infinite alternate;
+  animation: drift-e 5s ease-in-out infinite alternate;
   opacity: 0.55;
 }
 
 @keyframes drift-a {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
-  50%  { transform: translate3d(6vw, 10vh, 0) scale(1.12); }
-  100% { transform: translate3d(-4vw, 5vh, 0) scale(0.94); }
+  50%  { transform: translate3d(16vw, 22vh, 0) scale(1.22); }
+  100% { transform: translate3d(-12vw, 13vh, 0) scale(0.86); }
 }
 @keyframes drift-b {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
-  50%  { transform: translate3d(-8vw, 6vh, 0) scale(1.08); }
-  100% { transform: translate3d(3vw, -4vh, 0) scale(0.92); }
+  50%  { transform: translate3d(-18vw, 15vh, 0) scale(1.18); }
+  100% { transform: translate3d(11vw, -13vh, 0) scale(0.84); }
 }
 @keyframes drift-c {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
-  50%  { transform: translate3d(5vw, -8vh, 0) scale(1.1); }
-  100% { transform: translate3d(-6vw, -3vh, 0) scale(0.95); }
+  50%  { transform: translate3d(15vw, -19vh, 0) scale(1.2); }
+  100% { transform: translate3d(-16vw, -12vh, 0) scale(0.86); }
 }
 @keyframes drift-d {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
-  50%  { transform: translate3d(-4vw, -5vh, 0) scale(1.14); }
-  100% { transform: translate3d(2vw, 4vh, 0) scale(0.9); }
+  50%  { transform: translate3d(-14vw, -16vh, 0) scale(1.24); }
+  100% { transform: translate3d(10vw, 13vh, 0) scale(0.82); }
 }
 @keyframes drift-e {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
-  50%  { transform: translate3d(4vw, -4vh, 0) scale(1.2); }
-  100% { transform: translate3d(-3vw, 3vh, 0) scale(0.85); }
+  50%  { transform: translate3d(14vw, -15vh, 0) scale(1.32); }
+  100% { transform: translate3d(-11vw, 12vh, 0) scale(0.74); }
 }
 
 /* Grain overlay (sits above mesh, below content) */

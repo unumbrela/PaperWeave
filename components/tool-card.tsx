@@ -4,21 +4,30 @@ import type { Tool } from "@/lib/tools-registry";
 import { cn } from "@/lib/utils";
 
 const ACCENTS: Record<string, string> = {
+  "paper-search": "#b14bff",
   summarize: "#ff5d4d",
-  "explain-code": "#8854d0",
-  "optimize-prompt": "#3b6ef6",
-  "skill-maker": "#d24b7f",
   "markdown-convert": "#4bb3ff",
-  "web-beautifier": "#ff3d7f",
+  "markdown-summarize": "#6b8ed6",
+  "idea-generator": "#f59e0b",
+  "prompt-chunker": "#ec4899",
+  "skill-maker": "#d24b7f",
   "cnn-explainer": "#f4c25a",
   "med-seg-explainer": "#6b8ed6",
+  "hpi-potsdam": "#4cc9f0",
   "beautiful-aurora": "#00c2ff",
+  "web-beautifier": "#ff3d7f",
   "toolbox-background": "#ff8aa0",
+  "fluid-sim": "#ff4f8b",
+  "hamish-portfolio": "#0ea5e9",
+  "bruno-folio": "#f97316",
   "algorithm-visualizer": "#4CAF50",
+  "explain-code": "#8854d0",
+  "optimize-prompt": "#3b6ef6",
 };
 
 export function ToolCard({ tool, index }: { tool: Tool; index: number }) {
   const accent = ACCENTS[tool.slug] ?? "#8854d0";
+  const primaryPhase = tool.phases[0];
   // Stagger: cards emerge in reading order (left→right, then top→bottom).
   // A longer 160ms step lets each card fully take its place before the next
   // starts growing in, so the "small → large" scale reads clearly.
@@ -39,7 +48,21 @@ export function ToolCard({ tool, index }: { tool: Tool; index: number }) {
       />
 
       <div className="flex items-start justify-between pl-4">
-        <div className="overline">{tool.category}</div>
+        <div className="flex items-center gap-2">
+          <div className="overline">{primaryPhase}</div>
+          {tool.comingSoon && (
+            <span
+              className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider"
+              style={{
+                borderColor: "var(--line)",
+                color: "var(--ink-3)",
+                letterSpacing: "0.08em",
+              }}
+            >
+              Coming
+            </span>
+          )}
+        </div>
         <div
           className="numeral text-[42px] leading-none opacity-50 transition-opacity group-hover:opacity-90"
           style={{ color: accent }}
@@ -60,7 +83,9 @@ export function ToolCard({ tool, index }: { tool: Tool; index: number }) {
         <span
           className="inline-flex items-center gap-1.5 text-[13px] text-ink-2 group-hover:text-ink transition-colors"
         >
-          <span className="serif-italic">Open</span>
+          <span className="serif-italic">
+            {tool.comingSoon ? "Preview" : "Open"}
+          </span>
           <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
         </span>
         <span
