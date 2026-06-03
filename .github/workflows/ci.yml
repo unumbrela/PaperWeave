@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm prisma generate
+
+      # Lint 当前存在历史债务（约 100 个 error，多为 no-explicit-any）。
+      # 暂设为非阻塞，逐步清偿（见 OPTIMIZATION-ROADMAP.md P2.2）；类型与构建是硬门禁。
+      - name: Lint (non-blocking)
+        run: pnpm lint
+        continue-on-error: true
+
+      - name: Type check
+        run: pnpm exec tsc --noEmit
+
+      - name: Build
+        run: pnpm build
+        env:
+          # CI 构建用占位值，避免缺少环境变量导致失败；真实部署在 Vercel 配置
+          DEEPSEEK_API_KEY: ci-placeholder

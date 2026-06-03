@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   Copy,
@@ -23,6 +23,7 @@ type Status = "pending" | "running" | "done" | "error";
 type Job = {
   id: string;
   file: File;
+  sourceUrl?: string;
   status: Status;
   output: string;
   error?: string;
@@ -64,6 +65,11 @@ function newId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+function safePdfName(title: string) {
+  const base = title.replace(/[\\/:*?"<>|]/g, "_").slice(0, 90) || "paper";
+  return base.endsWith(".pdf") ? base : `${base}.pdf`;
+}
+
 export default function Page() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -72,6 +78,30 @@ export default function Page() {
   const [dragOver, setDragOver] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const raw = localStorage.getItem("paperSearchMarkdownQueue");
+    if (!raw) return;
+    try {
+      const queue = JSON.parse(raw) as Array<{ title: string; url: string }>;
+      const imported = queue
+        .filter((item) => item.url)
+        .map((item) => ({
+          id: newId(),
+          file: new File([], safePdfName(item.title), { type: "application/pdf" }),
+          sourceUrl: item.url,
+          status: "pending" as Status,
+          output: "",
+        }));
+      if (imported.length > 0) {
+        setJobs((prev) => [...imported, ...prev]);
+        setSelectedId(imported[0].id);
+      }
+      localStorage.removeItem("paperSearchMarkdownQueue");
+    } catch {
+      localStorage.removeItem("paperSearchMarkdownQueue");
+    }
+  }, []);
 
   const selected = useMemo(
     () => jobs.find((j) => j.id === selectedId) ?? null,
@@ -127,12 +157,22 @@ export default function Page() {
     );
     try {
       const fd = new FormData();
-      fd.append("file", job.file);
-      const res = await fetch("/api/markdown-convert", {
-        method: "POST",
-        body: fd,
-        signal,
-      });
+      let res: Response;
+      if (job.sourceUrl) {
+        res = await fetch("/api/markdown-convert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: job.sourceUrl, name: job.file.name }),
+          signal,
+        });
+      } else {
+        fd.append("file", job.file);
+        res = await fetch("/api/markdown-convert", {
+          method: "POST",
+          body: fd,
+          signal,
+        });
+      }
       if (!res.ok || !res.body) {
         const msg = await res.text().catch(() => "");
         throw new Error(msg || `请求失败 (${res.status})`);

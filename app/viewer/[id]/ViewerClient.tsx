@@ -1,0 +1,506 @@
+'use client';
+
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { ArrowLeft, Download, Share2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Maximize2, Copy, Check, ExternalLink } from 'lucide-react';
+import type { Annotation, AnnotationType } from '@prisma/client';
+import FloatingMenu from '@/components/annotation/FloatingMenu';
+import Sidebar from '@/components/sidebar/Sidebar';
+import PDFViewerDynamic from '@/components/pdf/PDFViewerDynamic';
+import { generateMarkdown, downloadMarkdown } from '@/lib/export/markdown';
+import { useAnnotations, useResearchNotes, useAIExplanation } from '@/lib/annotation/hooks';
+
+interface Paper {
+  id: string;
+  title: string;
+  abstract?: string;
+  authors: { name: string; affiliation?: string }[];
+  sourceType: 'ARXIV' | 'LOCAL' | 'DOI';
+  sourceUrl?: string;
+  arxivId?: string;
+  pdfPath?: string;
+  publishedAt?: string;
+  tags: string[];
+  direction?: string;
+  summary?: string;
+  methodology?: string;
+  contribution?: string;
+  createdAt: string;
+  citations?: number;
+}
+
+export default function ViewerClient() {
+  const params = useParams();
+  const router = useRouter();
+  const [paper, setPaper] = useState<Paper | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [numPages, setNumPages] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [scale, setScale] = useState(1.0);
+  const [fitMode, setFitMode] = useState<'page' | 'width'>('width');
+  const [floatingMenu, setFloatingMenu] = useState<{ x: number; y: number; text: string } | null>(null);
+  const pdfContainerRef = useRef<HTMLDivElement>(null);
+  const [selectionRects, setSelectionRects] = useState<Array<{ x: number; y: number; width: number; height: number }>>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [copiedState, setCopiedState] = useState<{ [key: string]: boolean }>({});
+
+  const { annotations, fetchAnnotations, createAnnotation, updateAnnotation, deleteAnnotation } = useAnnotations(params.id as string);
+  const { notes: researchNotes, setNotes: setResearchNotes, fetchNotes, saveNotes } = useResearchNotes(params.id as string);
+  const { explanation: aiSummary, explain: requestAIExplanation } = useAIExplanation();
+
+  useEffect(() => {
+    const fetchPaper = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/papers/${params.id}`);
+        const data = await response.json();
+
+        if (data.success) {
+          setPaper(data.data);
+          setError(null);
+        } else {
+          setError('论文不存在');
+        }
+      } catch (err) {
+        console.error('获取论文失败:', err);
+        setError('获取论文失败');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (params.id) {
+      fetchPaper();
+    }
+  }, [params.id]);
+
+  useEffect(() => {
+    fetchAnnotations();
+  }, [fetchAnnotations]);
+
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
+
+  useEffect(() => {
+    const debounce = setTimeout(() => saveNotes(researchNotes), 800);
+    return () => clearTimeout(debounce);
+  }, [researchNotes, saveNotes]);
+
+  const handleDocumentLoadSuccess = (info: { numPages: number } | number) => {
+    const totalPages = typeof info === 'number' ? info : info.numPages;
+    setNumPages(totalPages);
+  };
+
+  const handleFitWidth = () => {
+    setFitMode('width');
+    setScale(1.0);
+  };
+
+  const handleFitPage = () => {
+    setFitMode('page');
+    setScale(0.7);
+  };
+
+  const calculateFitWidthScale = useCallback(() => {
+    if (!pdfContainerRef.current) return;
+    
+    const containerWidth = pdfContainerRef.current.offsetWidth;
+    const padding = 32;
+    const availableWidth = containerWidth - padding;
+    
+    const standardPageWidth = 612;
+    const targetScale = availableWidth / standardPageWidth;
+    
+    return Math.min(Math.max(targetScale, 0.3), 2);
+  }, []);
+
+  const handleAutoFit = useCallback(() => {
+    if (fitMode === 'width') {
+      const targetScale = calculateFitWidthScale();
+      if (targetScale) {
+        setScale(targetScale);
+      }
+    }
+  }, [fitMode, calculateFitWidthScale]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      handleAutoFit();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [handleAutoFit]);
+
+  useEffect(() => {
+    if (fitMode === 'width') {
+      const timer = setTimeout(() => {
+        handleAutoFit();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [fitMode, handleAutoFit]);
+
+  const handleCopyLink = async (key: string, url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedState(prev => ({ ...prev, [key]: true }));
+      setTimeout(() => {
+        setCopiedState(prev => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy link:', err);
+    }
+  };
+
+  const handleDocumentLoadError = (error: Error) => {
+    console.error('PDF加载失败:', error);
+    setError('PDF加载失败');
+  };
+
+  const handleTextSelection = useCallback((event: MouseEvent) => {
+    const selection = window.getSelection();
+    if (!selection) return;
+    
+    const selectedText = selection.toString().trim();
+    
+    if (selectedText && selectedText.length > 0 && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const selectionNode = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+        ? (range.commonAncestorContainer as Element)
+        : range.commonAncestorContainer.parentElement;
+      const pageElement = selectionNode?.closest('.react-pdf__Page') as HTMLElement | null;
+
+      if (!pageElement) return;
+
+      const pageRect = pageElement.getBoundingClientRect();
+      const rects = Array.from(range.getClientRects())
+        .map((rect) => ({
+          x: (rect.left - pageRect.left) / scale,
+          y: (rect.top - pageRect.top) / scale,
+          width: rect.width / scale,
+          height: rect.height / scale,
+        }))
+        .filter((rect) => rect.width > 2 && rect.height > 2);
+
+      if (rects.length === 0) return;
+
+      const rect = range.getBoundingClientRect();
+      setSelectionRects(rects);
+      
+      setFloatingMenu({
+        x: rect.left + rect.width / 2,
+        y: rect.top,
+        text: selectedText,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener('mouseup', handleTextSelection);
+    return () => document.removeEventListener('mouseup', handleTextSelection);
+  }, [handleTextSelection]);
+
+  const handleCreateAnnotation = async (type: AnnotationType, text: string, comment?: string) => {
+    if (!params.id || !paper) return;
+    console.log('[Viewer] Creating annotation:', { type, text, comment, paperId: params.id });
+
+    const result = await createAnnotation({
+      page: currentPage - 1,
+      rects: selectionRects,
+      selectedText: text,
+      type,
+      comment,
+    });
+    
+    console.log('[Viewer] Annotation created:', result);
+    setSelectionRects([]);
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    console.log('[Viewer] Copied to clipboard:', text);
+  };
+
+  const handleAIExplain = async (text: string) => {
+    console.log('[Viewer] Starting AI explanation for:', text);
+    await requestAIExplanation(text);
+  };
+
+  const handleEditAnnotation = async (id: string, comment: string) => {
+    console.log('[Viewer] Editing annotation:', id, comment);
+    await updateAnnotation(id, { comment });
+  };
+
+  const handleExport = () => {
+    if (!paper) return;
+    
+    const markdown = generateMarkdown({
+      paper: paper as any,
+      annotations,
+      aiSummary,
+      researchNotes,
+    });
+    
+    downloadMarkdown(markdown, `${paper.title.replace(/[^a-z0-9]/gi, '_')}_research_brief.md`);
+  };
+
+  const [pdfFilePath, setPdfFilePath] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!paper) return;
+
+    const localCandidate = `/papers/${paper.id}.pdf`;
+
+    const resolvePath = (remotePath?: string) => {
+      if (remotePath) {
+        return remotePath.startsWith('http') ? remotePath : (remotePath.startsWith('/') ? remotePath : `/${remotePath}`);
+      }
+      return localCandidate;
+    };
+
+    fetch(localCandidate, { method: 'HEAD' })
+      .then((res) => {
+        if (res.ok) {
+          setPdfFilePath(localCandidate);
+        } else {
+          setPdfFilePath(resolvePath(paper.pdfPath));
+        }
+      })
+      .catch(() => {
+        setPdfFilePath(resolvePath(paper.pdfPath));
+      });
+
+    console.log('[Viewer] Paper loaded:', paper);
+  }, [paper]);
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-900">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-400">正在加载论文...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!paper) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-900">
+        <div className="text-center">
+          <p className="text-gray-400 mb-4">{error || '论文不存在'}</p>
+          <button
+            onClick={() => router.push('/library')}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            返回论文库
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen flex flex-col bg-gray-900">
+      <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => router.push(`/library/${paper.id}`)}
+            className="flex items-center gap-2 px-3 py-1.5 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="text-sm">返回</span>
+          </button>
+          <h1 className="text-white font-medium text-lg truncate max-w-xl mb-1">
+            {paper.title}
+          </h1>
+          
+          {paper.sourceUrl && (
+            <div className="mt-2 w-full max-w-xl">
+              <div className="flex items-center gap-2 bg-gray-700/50 rounded-lg px-3 py-2 border border-gray-600">
+                <a
+                  href={paper.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 min-w-0 text-xs text-blue-400 truncate hover:text-blue-300 transition-colors"
+                  title="打开链接"
+                >
+                  {paper.sourceUrl}
+                </a>
+                <button
+                  onClick={() => paper.sourceUrl && handleCopyLink('source', paper.sourceUrl)}
+                  className="flex-shrink-0 p-1 hover:bg-gray-600 rounded-md transition-colors"
+                  title="复制论文链接"
+                >
+                  {copiedState['source'] ? (
+                    <Check className="w-4 h-4 text-green-400" />
+                  ) : (
+                    <Copy className="w-4 h-4 text-gray-400 hover:text-white" />
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {pdfFilePath && (
+            <div className="mt-1 w-full max-w-xl">
+              <div className="flex items-center gap-2 bg-blue-500/10 rounded-lg px-3 py-2 border border-blue-500/20">
+                <span className="text-xs text-blue-400 truncate flex-1">
+                  {pdfFilePath}
+                </span>
+                <button
+                  onClick={() => handleCopyLink('pdf', pdfFilePath)}
+                  className="flex-shrink-0 p-1 hover:bg-blue-500/20 rounded-md transition-colors"
+                  title="复制PDF链接"
+                >
+                  {copiedState['pdf'] ? (
+                    <Check className="w-4 h-4 text-green-400" />
+                  ) : (
+                    <Copy className="w-4 h-4 text-blue-400 hover:text-blue-300" />
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="px-3 py-1.5 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            {isSidebarOpen ? '隐藏侧边栏' : '显示侧边栏'}
+          </button>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <Share2 className="w-4 h-4" />
+            <span className="text-sm">导出</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden">
+        <div className={`flex-1 flex flex-col overflow-hidden ${isSidebarOpen ? '' : ''}`}>
+          <div className="bg-gray-800/50 border-b border-gray-700 px-4 py-2 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage <= 1}
+                className="p-2 hover:bg-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-5 h-5 text-gray-300" />
+              </button>
+              <span className="text-sm text-gray-400">
+                第 {currentPage} 页 / 共 {numPages} 页
+              </span>
+              <button
+                onClick={() => setCurrentPage(Math.min(numPages, currentPage + 1))}
+                disabled={currentPage >= numPages}
+                className="p-2 hover:bg-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-5 h-5 text-gray-300" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleFitWidth}
+                className={`p-2 rounded-lg transition-colors ${fitMode === 'width' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'}`}
+                title="适应宽度"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                </svg>
+              </button>
+              <button
+                onClick={handleFitPage}
+                className={`p-2 rounded-lg transition-colors ${fitMode === 'page' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'}`}
+                title="适应页面"
+              >
+                <Maximize2 className="w-5 h-5" />
+              </button>
+              <div className="w-px h-6 bg-gray-600 mx-2" />
+              <button
+                onClick={() => setScale(Math.max(0.3, scale - 0.1))}
+                className="p-2 hover:bg-gray-700 rounded-lg"
+                title="缩小"
+              >
+                <ZoomOut className="w-5 h-5 text-gray-300" />
+              </button>
+              <span className="text-sm text-gray-400 w-16 text-center">
+                {Math.round(scale * 100)}%
+              </span>
+              <button
+                onClick={() => setScale(Math.min(3, scale + 0.1))}
+                className="p-2 hover:bg-gray-700 rounded-lg"
+                title="放大"
+              >
+                <ZoomIn className="w-5 h-5 text-gray-300" />
+              </button>
+              <button
+                onClick={() => setScale(1.0)}
+                className="p-2 hover:bg-gray-700 rounded-lg"
+                title="重置"
+              >
+                <RotateCcw className="w-5 h-5 text-gray-300" />
+              </button>
+            </div>
+          </div>
+
+          <div ref={pdfContainerRef} className="flex-1 overflow-auto bg-gray-900">
+            {pdfFilePath ? (
+              <PDFViewerDynamic
+                file={pdfFilePath}
+                currentPage={currentPage}
+                scale={scale}
+                annotations={annotations}
+                onLoadSuccess={handleDocumentLoadSuccess}
+                onLoadError={handleDocumentLoadError}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full min-h-[600px]">
+                <div className="text-center">
+                  <div className="w-12 h-12 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                  <p className="text-gray-400">正在定位 PDF 文件...</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {isSidebarOpen && (
+          <Sidebar
+            annotations={annotations}
+            aiSummary={aiSummary}
+            researchNotes={researchNotes}
+            onDeleteAnnotation={deleteAnnotation}
+            onEditAnnotation={handleEditAnnotation}
+            onAIExplain={handleAIExplain}
+            onResearchNotesChange={setResearchNotes}
+          />
+        )}
+      </div>
+
+      {floatingMenu && (
+        <FloatingMenu
+          position={{ x: floatingMenu.x, y: floatingMenu.y }}
+          selectedText={floatingMenu.text}
+          onSelect={handleCreateAnnotation}
+          onAIExplain={handleAIExplain}
+          onCopy={handleCopy}
+          onClose={() => setFloatingMenu(null)}
+        />
+      )}
+    </div>
+  );
+}

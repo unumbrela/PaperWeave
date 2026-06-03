@@ -45,7 +45,7 @@ export default function WebBeautifierPage() {
       </header>
 
       <div className="rise-d mt-10 flex items-center gap-3 text-[12px] text-ink-3">
-        <span className="overline">{tool?.category ?? "效率"}</span>
+        <span className="overline">{tool?.phases[0] ?? "资产"}</span>
         <span className="h-3 w-px bg-[var(--line-strong)]" />
         <span className="mono">
           {items.length} component{items.length > 1 ? "s" : ""}
