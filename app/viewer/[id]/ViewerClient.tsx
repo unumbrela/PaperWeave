@@ -2,12 +2,13 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Share2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Maximize2, Copy, Check } from 'lucide-react';
 import type { Paper, AnnotationType } from '@/lib/db/types';
 import { repository } from '@/lib/db/repository';
 import FloatingMenu from '@/components/annotation/FloatingMenu';
 import Sidebar from '@/components/sidebar/Sidebar';
 import PDFViewerDynamic from '@/components/pdf/PDFViewerDynamic';
+import { ViewerHeader } from '@/components/viewer/ViewerHeader';
+import { PdfToolbar } from '@/components/viewer/PdfToolbar';
 import { generateMarkdown, downloadMarkdown } from '@/lib/export/markdown';
 import { useAnnotations, useResearchNotes, useAIExplanation } from '@/lib/annotation/hooks';
 
@@ -309,152 +310,33 @@ export default function ViewerClient() {
 
   return (
     <div className="h-screen flex flex-col bg-paper">
-      <div className="surface-strong border-b border-line px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => router.push(`/library/${paper.id}`)}
-            className="flex items-center gap-2 rounded-full px-3 py-1.5 text-ink-2 hover:text-ink hover:bg-paper-3 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm">返回</span>
-          </button>
-          <h1 className="serif text-ink text-lg truncate max-w-xl">
-            {paper.title}
-          </h1>
-
-          {paper.sourceUrl && (
-            <div className="mt-2 w-full max-w-xl">
-              <div className="flex items-center gap-2 rounded-lg px-3 py-2 border border-line bg-paper-2/70">
-                <a
-                  href={paper.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 min-w-0 text-xs text-ocean truncate hover:underline transition-colors"
-                  title="打开链接"
-                >
-                  {paper.sourceUrl}
-                </a>
-                <button
-                  onClick={() => paper.sourceUrl && handleCopyLink('source', paper.sourceUrl)}
-                  className="flex-shrink-0 p-1 rounded-md hover:bg-paper-3 transition-colors"
-                  title="复制论文链接"
-                >
-                  {copiedState['source'] ? (
-                    <Check className="w-4 h-4 text-sage" />
-                  ) : (
-                    <Copy className="w-4 h-4 text-ink-3 hover:text-ink" />
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {pdfFilePath && (
-            <div className="mt-1 w-full max-w-xl">
-              <div className="flex items-center gap-2 rounded-lg px-3 py-2 border border-line bg-ocean/8">
-                <span className="text-xs text-ocean truncate flex-1">
-                  {pdfFilePath}
-                </span>
-                <button
-                  onClick={() => handleCopyLink('pdf', pdfFilePath)}
-                  className="flex-shrink-0 p-1 rounded-md hover:bg-ocean/12 transition-colors"
-                  title="复制PDF链接"
-                >
-                  {copiedState['pdf'] ? (
-                    <Check className="w-4 h-4 text-sage" />
-                  ) : (
-                    <Copy className="w-4 h-4 text-ocean" />
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="rounded-full px-3 py-1.5 text-sm text-ink-2 hover:text-ink hover:bg-paper-3 transition-colors"
-          >
-            {isSidebarOpen ? '隐藏侧边栏' : '显示侧边栏'}
-          </button>
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-2 rounded-full bg-ink px-4 py-1.5 text-paper-2 transition-all hover:brightness-110 focus-ring"
-          >
-            <Share2 className="w-4 h-4" />
-            <span className="text-sm">导出</span>
-          </button>
-        </div>
-      </div>
+      <ViewerHeader
+        title={paper.title}
+        sourceUrl={paper.sourceUrl}
+        pdfFilePath={pdfFilePath}
+        copiedState={copiedState}
+        onCopyLink={handleCopyLink}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        onExport={handleExport}
+        onBack={() => router.push(`/library/${paper.id}`)}
+      />
 
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="bg-paper-2/60 border-b border-line px-4 py-2 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage <= 1}
-                className="p-2 rounded-lg hover:bg-paper-3 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="w-5 h-5 text-ink-2" />
-              </button>
-              <span className="text-sm text-ink-3">
-                第 {currentPage} 页 / 共 {numPages} 页
-              </span>
-              <button
-                onClick={() => setCurrentPage(Math.min(numPages, currentPage + 1))}
-                disabled={currentPage >= numPages}
-                className="p-2 rounded-lg hover:bg-paper-3 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ChevronRight className="w-5 h-5 text-ink-2" />
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleFitWidth}
-                className={`p-2 rounded-lg transition-colors ${fitMode === 'width' ? 'bg-ink text-paper-2' : 'hover:bg-paper-3 text-ink-2'}`}
-                title="适应宽度"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                </svg>
-              </button>
-              <button
-                onClick={handleFitPage}
-                className={`p-2 rounded-lg transition-colors ${fitMode === 'page' ? 'bg-ink text-paper-2' : 'hover:bg-paper-3 text-ink-2'}`}
-                title="适应页面"
-              >
-                <Maximize2 className="w-5 h-5" />
-              </button>
-              <div className="w-px h-6 bg-line-strong mx-2" />
-              <button
-                onClick={() => setScale(Math.max(0.3, scale - 0.1))}
-                className="p-2 rounded-lg hover:bg-paper-3"
-                title="缩小"
-              >
-                <ZoomOut className="w-5 h-5 text-ink-2" />
-              </button>
-              <span className="text-sm text-ink-3 w-16 text-center">
-                {Math.round(scale * 100)}%
-              </span>
-              <button
-                onClick={() => setScale(Math.min(3, scale + 0.1))}
-                className="p-2 rounded-lg hover:bg-paper-3"
-                title="放大"
-              >
-                <ZoomIn className="w-5 h-5 text-ink-2" />
-              </button>
-              <button
-                onClick={() => setScale(1.0)}
-                className="p-2 rounded-lg hover:bg-paper-3"
-                title="重置"
-              >
-                <RotateCcw className="w-5 h-5 text-ink-2" />
-              </button>
-            </div>
-          </div>
+          <PdfToolbar
+            currentPage={currentPage}
+            numPages={numPages}
+            scale={scale}
+            fitMode={fitMode}
+            onPrev={() => setCurrentPage(Math.max(1, currentPage - 1))}
+            onNext={() => setCurrentPage(Math.min(numPages, currentPage + 1))}
+            onFitWidth={handleFitWidth}
+            onFitPage={handleFitPage}
+            onZoomOut={() => setScale(Math.max(0.3, scale - 0.1))}
+            onZoomIn={() => setScale(Math.min(3, scale + 0.1))}
+            onResetZoom={() => setScale(1.0)}
+          />
 
           <div ref={pdfContainerRef} className="flex-1 overflow-auto bg-paper-3">
             {pdfFilePath ? (
