@@ -14,7 +14,7 @@ import {
   Check,
   X
 } from 'lucide-react';
-import type { Annotation, AnnotationType } from '@prisma/client';
+import type { Annotation, AnnotationType } from '@/lib/db/types';
 import { ANNOTATION_COLORS } from '@/lib/annotation/hooks';
 
 const ANNOTATION_TYPE_LABELS: Record<AnnotationType, string> = {
@@ -168,7 +168,7 @@ export default function Sidebar({
               </button>
             ) : null}
             
-            {isExpanded && annotation.aiSummary && (
+            {isExpanded && !!annotation.aiSummary && (
               <div className="text-xs text-gray-400 bg-purple-500/10 rounded-lg p-3 mb-2 border border-purple-500/20">
                 {(() => {
                   const aiSummary = annotation.aiSummary as {

@@ -1,4 +1,4 @@
-import type { Annotation, Paper } from '@prisma/client';
+import type { Annotation, Paper } from '@/lib/db/types';
 import { getAnnotationTypeLabel } from '@/lib/annotation/service';
 
 export interface ExportData {

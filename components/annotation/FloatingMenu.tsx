@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Highlighter, Lightbulb, CheckSquare, ArrowRight, Sparkles, Copy, X, Send } from 'lucide-react';
-import type { AnnotationType } from '@prisma/client';
+import type { AnnotationType } from '@/lib/db/types';
 
 interface FloatingMenuProps {
   position: { x: number; y: number };

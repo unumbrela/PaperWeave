@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
-import type { Annotation } from '@prisma/client';
+import type { Annotation } from '@/lib/db/types';
 import AnnotationLayer from '@/components/annotation/AnnotationLayer';
 
 const Document = dynamic(() => import('react-pdf').then(mod => mod.Document), { ssr: false });

@@ -3,7 +3,8 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Download, Share2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Maximize2, Copy, Check, ExternalLink } from 'lucide-react';
-import type { Annotation, AnnotationType } from '@prisma/client';
+import type { Annotation, AnnotationType } from '@/lib/db/types';
+import { repository } from '@/lib/db/repository';
 import FloatingMenu from '@/components/annotation/FloatingMenu';
 import Sidebar from '@/components/sidebar/Sidebar';
 import PDFViewerDynamic from '@/components/pdf/PDFViewerDynamic';
@@ -53,11 +54,10 @@ export default function ViewerClient() {
     const fetchPaper = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`/api/papers/${params.id}`);
-        const data = await response.json();
+        const found = await repository.getPaper(params.id as string);
 
-        if (data.success) {
-          setPaper(data.data);
+        if (found) {
+          setPaper(found as Paper);
           setError(null);
         } else {
           setError('论文不存在');

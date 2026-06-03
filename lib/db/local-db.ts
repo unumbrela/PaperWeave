@@ -9,58 +9,22 @@
  */
 
 import Dexie, { Table } from 'dexie'
+import type { Paper, Annotation, ResearchNote } from './types'
+
+export type { Paper, Annotation, ResearchNote, Author, Rect, AnnotationType, SourceType } from './types'
 
 /**
- * 缓存论文接口
+ * 缓存论文接口 —— 在共享 `Paper` 上叠加本地特有字段（PDF Blob、缓存时间）
  */
-export interface CachedPaper {
-  id: string
-  arxivId: string
-  title: string
-  abstract?: string
-  authors?: { name: string; affiliation?: string }[]
-  sourceType: 'ARXIV' | 'LOCAL' | 'DOI'
-  sourceUrl?: string
-  pdfPath?: string
-  publishedAt?: string
-  tags: string[]
-  direction?: string
-  notes?: string
-  summary?: string
-  methodology?: string
-  contribution?: string
-  citations: number
+export interface CachedPaper extends Paper {
+  /** PDF 原始二进制，纯本地模式下离线可读 */
   pdfBlob?: Blob
-  createdAt: string
+  /** 写入本地缓存的时间 */
   cachedAt: string
 }
 
-/**
- * 标注接口
- */
-export interface Annotation {
-  id: string
-  paperId: string
-  page: number
-  rects: any
-  selectedText: string
-  type: 'highlight' | 'underline' | 'comment' | 'note' | 'bookmark'
-  comment?: string
-  color?: string
-  createdAt: string
-}
-
-/**
- * 笔记接口
- */
-export interface Note {
-  id: string
-  paperId: string
-  title?: string
-  content: string
-  createdAt: string
-  updatedAt: string
-}
+/** 笔记接口 —— 即共享 `ResearchNote` */
+export type Note = ResearchNote
 
 /**
  * 阅读进度接口
