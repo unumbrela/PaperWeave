@@ -6,7 +6,7 @@ import { ToolShell } from "@/components/tool-shell";
 import { StreamOutput } from "@/components/stream-output";
 import { useStream } from "@/components/use-stream";
 import { consumeHandoff } from "@/lib/workflow/handoff";
-import { HandoffBanner } from "@/components/workflow/handoff-controls";
+import { HandoffBanner, SaveToLibrary } from "@/components/workflow/handoff-controls";
 import { cn } from "@/lib/utils";
 
 const TOOL = getTool("idea-generator")!;
@@ -22,6 +22,7 @@ export default function Page() {
   const [baseline, setBaseline] = useState("");
   const [resources, setResources] = useState("");
   const [handoffFrom, setHandoffFrom] = useState<string | null>(null);
+  const [sourcePaperId, setSourcePaperId] = useState<string | null>(null);
   const { text, loading, error, run, stop } = useStream();
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function Page() {
     if (h.fields.direction) setDirection(h.fields.direction);
     if (h.fields.references) setReferences(h.fields.references);
     if (h.fields.baseline) setBaseline(h.fields.baseline);
+    if (h.sourcePaperId) setSourcePaperId(h.sourcePaperId);
     setHandoffFrom(h.from);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
@@ -102,14 +104,27 @@ export default function Page() {
           </p>
         </div>
 
-        <StreamOutput
-          text={text}
-          loading={loading}
-          error={error}
-          onRetry={submit}
-          onStop={stop}
-          emptyHint="填入研究方向，生成可验证的候选 idea。"
-        />
+        <div className="flex flex-col gap-3">
+          <StreamOutput
+            text={text}
+            loading={loading}
+            error={error}
+            onRetry={submit}
+            onStop={stop}
+            emptyHint="填入研究方向，生成可验证的候选 idea。"
+          />
+          {sourcePaperId && text && !loading && (
+            <div className="flex justify-end">
+              <SaveToLibrary
+                paperId={sourcePaperId}
+                field="notes"
+                value={text}
+                append
+                label="回存为研究笔记"
+              />
+            </div>
+          )}
+        </div>
       </div>
     </ToolShell>
   );

@@ -6,7 +6,7 @@ import { ToolShell } from "@/components/tool-shell";
 import { StreamOutput } from "@/components/stream-output";
 import { useStream } from "@/components/use-stream";
 import { consumeHandoff } from "@/lib/workflow/handoff";
-import { HandoffBanner, SendToTool } from "@/components/workflow/handoff-controls";
+import { HandoffBanner, SendToTool, SaveToLibrary } from "@/components/workflow/handoff-controls";
 import { cn } from "@/lib/utils";
 
 const TOOL = getTool("markdown-summarize")!;
@@ -22,6 +22,7 @@ export default function Page() {
   const [markdown, setMarkdown] = useState("");
   const [focus, setFocus] = useState<(typeof FOCUS)[number]["value"]>("balanced");
   const [handoffFrom, setHandoffFrom] = useState<string | null>(null);
+  const [sourcePaperId, setSourcePaperId] = useState<string | null>(null);
   const { text, loading, error, run, stop } = useStream();
 
   useEffect(() => {
@@ -30,6 +31,7 @@ export default function Page() {
     const h = consumeHandoff("markdown-summarize");
     if (!h) return;
     if (h.fields.markdown) setMarkdown(h.fields.markdown);
+    if (h.sourcePaperId) setSourcePaperId(h.sourcePaperId);
     setHandoffFrom(h.from);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
@@ -112,11 +114,20 @@ export default function Page() {
             emptyHint="粘贴论文 Markdown，点击结构化总结。"
           />
           {text && !loading && (
-            <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2">
+              {sourcePaperId && (
+                <SaveToLibrary
+                  paperId={sourcePaperId}
+                  field="summary"
+                  value={text}
+                  label="回存为论文总结"
+                />
+              )}
               <SendToTool
                 targetSlug="idea-generator"
                 payload={{
                   from: TOOL.name,
+                  sourcePaperId: sourcePaperId ?? undefined,
                   fields: { references: text },
                 }}
                 label="把总结发往「Idea 生成器」"
