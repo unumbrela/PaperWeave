@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
 import { StreamOutput } from "@/components/stream-output";
 import { useStream } from "@/components/use-stream";
+import { consumeHandoff } from "@/lib/workflow/handoff";
+import { HandoffBanner } from "@/components/workflow/handoff-controls";
 import { cn } from "@/lib/utils";
 
 const TOOL = getTool("idea-generator")!;
@@ -19,7 +21,17 @@ export default function Page() {
   const [references, setReferences] = useState("");
   const [baseline, setBaseline] = useState("");
   const [resources, setResources] = useState("");
+  const [handoffFrom, setHandoffFrom] = useState<string | null>(null);
   const { text, loading, error, run } = useStream();
+
+  useEffect(() => {
+    const h = consumeHandoff("idea-generator");
+    if (!h) return;
+    if (h.fields.direction) setDirection(h.fields.direction);
+    if (h.fields.references) setReferences(h.fields.references);
+    if (h.fields.baseline) setBaseline(h.fields.baseline);
+    setHandoffFrom(h.from);
+  }, []);
 
   const submit = () => {
     if (direction.trim().length < 2) return;
@@ -35,6 +47,9 @@ export default function Page() {
     <ToolShell tool={TOOL}>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <div className="surface rounded-[20px] p-6">
+          {handoffFrom && (
+            <HandoffBanner from={handoffFrom} onDismiss={() => setHandoffFrom(null)} />
+          )}
           <label className="overline block mb-2">研究方向 / 关键词 *</label>
           <input
             value={direction}

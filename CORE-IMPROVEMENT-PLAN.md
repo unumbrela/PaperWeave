@@ -78,20 +78,21 @@
 **现状**：`markdown-convert → markdown-summarize → idea-generator` 三步要手动复制粘贴中转。
 
 **动作**：
-- [ ] 在每个工具输出区加"➡️ 发往下一环"按钮，用 `sessionStorage` 或 URL `useSearchParams` 传递 payload
-- [ ] 下游页面挂载时检测并自动填充上游输入（带"来自上一环"提示条，可清除）
-- [ ] 链路：`paper-search 选中论文 → library 入库 → 详情 AI 总结 → markdown-summarize 结构化 → idea-generator 生 idea`
+- [x] 新建 `lib/workflow/handoff.ts`（sessionStorage 一次性传递）+ `components/workflow/handoff-controls.tsx`（`SendToTool` 按钮 + `HandoffBanner` 提示条）
+- [x] 输出区"➡️ 发往下一环"：`markdown-convert →（发往结构化总结）→ markdown-summarize →（发往 Idea 生成器）→ idea-generator`
+- [x] 下游页（markdown-summarize / idea-generator）挂载时 `consumeHandoff` 自动填充 + "来自「XXX」"提示条（可关闭）
+- [x] 链路：`paper-search 选中 → library 入库（已通）→ 详情页一键送往下游`
 
-**验收**：从论文库选一篇，不复制粘贴，三次点击走到"生 idea"。
+**验收**：✅ 从论文库详情页点"做结构化总结/生成研究 idea"即带着论文上下文跳转并预填；读文献链路三步零复制粘贴贯通。`build` ✅。
 
 ## P1.2 论文库作为链路中枢
 **现状**：库里的论文与下游工具是断开的。
 
 **动作**：
-- [ ] 论文详情页加"用此论文生成 idea / 做结构化总结"入口，直接带着该论文上下文跳转
-- [ ] 下游工具产出（总结、idea）可"回存"到对应论文条目（写回 `summary` / `notes` 字段）
+- [x] 论文详情页加"用此论文生成 idea / 做结构化总结"入口，直接带着该论文上下文（标题/摘要/已有分析）跳转
+- [ ] 下游工具产出（总结、idea）可"回存"到对应论文条目（写回 `summary` / `notes` 字段）—— 待做（`repository.updatePaper` 已就绪，缺 UI 回写入口）
 
-**验收**：一篇论文被 ≥2 个下游工具消费，且产出沉淀回库。
+**验收**：✅ 一篇论文可被结构化总结 + idea 生成两个下游工具消费；产出回存待补。
 
 ---
 

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
 import { StreamOutput } from "@/components/stream-output";
 import { useStream } from "@/components/use-stream";
+import { consumeHandoff } from "@/lib/workflow/handoff";
+import { HandoffBanner, SendToTool } from "@/components/workflow/handoff-controls";
 import { cn } from "@/lib/utils";
 
 const TOOL = getTool("markdown-summarize")!;
@@ -19,7 +21,15 @@ const FOCUS = [
 export default function Page() {
   const [markdown, setMarkdown] = useState("");
   const [focus, setFocus] = useState<(typeof FOCUS)[number]["value"]>("balanced");
+  const [handoffFrom, setHandoffFrom] = useState<string | null>(null);
   const { text, loading, error, run } = useStream();
+
+  useEffect(() => {
+    const h = consumeHandoff("markdown-summarize");
+    if (!h) return;
+    if (h.fields.markdown) setMarkdown(h.fields.markdown);
+    setHandoffFrom(h.from);
+  }, []);
 
   const submit = () => {
     const trimmed = markdown.trim();
@@ -31,6 +41,9 @@ export default function Page() {
     <ToolShell tool={TOOL}>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <div className="surface rounded-[20px] p-6">
+          {handoffFrom && (
+            <HandoffBanner from={handoffFrom} onDismiss={() => setHandoffFrom(null)} />
+          )}
           <label className="overline block mb-2">论文 Markdown</label>
           <textarea
             value={markdown}
@@ -86,13 +99,27 @@ export default function Page() {
           </p>
         </div>
 
-        <StreamOutput
-          text={text}
-          loading={loading}
-          error={error}
-          onRetry={submit}
-          emptyHint="粘贴论文 Markdown，点击结构化总结。"
-        />
+        <div className="flex flex-col gap-3">
+          <StreamOutput
+            text={text}
+            loading={loading}
+            error={error}
+            onRetry={submit}
+            emptyHint="粘贴论文 Markdown，点击结构化总结。"
+          />
+          {text && !loading && (
+            <div className="flex justify-end">
+              <SendToTool
+                targetSlug="idea-generator"
+                payload={{
+                  from: TOOL.name,
+                  fields: { references: text },
+                }}
+                label="把总结发往「Idea 生成器」"
+              />
+            </div>
+          )}
+        </div>
       </div>
     </ToolShell>
   );

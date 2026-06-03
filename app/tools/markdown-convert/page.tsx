@@ -14,6 +14,7 @@ import {
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
 import { Markdown } from "@/components/markdown";
+import { SendToTool } from "@/components/workflow/handoff-controls";
 import { cn } from "@/lib/utils";
 
 const TOOL = getTool("markdown-convert")!;
@@ -578,6 +579,14 @@ function PreviewPane({
             <Download className="h-3.5 w-3.5" />
             <span className="serif-italic">.md</span>
           </button>
+          {hasOutput && (
+            <SendToTool
+              targetSlug="markdown-summarize"
+              payload={{ from: TOOL.name, fields: { markdown: body } }}
+              label="发往结构化总结"
+              className="px-2.5 py-1"
+            />
+          )}
         </div>
       </div>
 

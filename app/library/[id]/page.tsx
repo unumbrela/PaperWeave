@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { repository } from "@/lib/db/repository";
+import { SendToTool } from "@/components/workflow/handoff-controls";
 
 interface Author {
   name: string;
@@ -380,6 +381,38 @@ export default function PaperDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             </div>
           </div>
+        </div>
+
+        {/* 下一步：把这篇论文送往下游工具，打通工作流 */}
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-paper-2/50 px-5 py-4">
+          <span className="overline mr-1">下一步</span>
+          <SendToTool
+            targetSlug="markdown-summarize"
+            payload={{
+              from: paper.title.slice(0, 24) + (paper.title.length > 24 ? "…" : ""),
+              fields: {
+                markdown: [
+                  `# ${paper.title}`,
+                  paper.abstract ? `\n## Abstract\n\n${paper.abstract}` : "",
+                  paper.summary ? `\n## Summary\n\n${paper.summary}` : "",
+                  paper.methodology ? `\n## Methodology\n\n${paper.methodology}` : "",
+                  paper.contribution ? `\n## Contribution\n\n${paper.contribution}` : "",
+                ].join("\n"),
+              },
+            }}
+            label="做结构化总结"
+          />
+          <SendToTool
+            targetSlug="idea-generator"
+            payload={{
+              from: paper.title.slice(0, 24) + (paper.title.length > 24 ? "…" : ""),
+              fields: {
+                direction: paper.direction || paper.title,
+                references: [paper.title, paper.abstract, paper.summary].filter(Boolean).join("\n\n"),
+              },
+            }}
+            label="生成研究 idea"
+          />
         </div>
 
         {/* 后续内容保持不变 */}
