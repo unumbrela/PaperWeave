@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Settings, X, Plus, ExternalLink, Download, ChevronDown, Loader2, AlertCircle, Sparkles, ChevronRight, CheckSquare, Square, BookOpen, FileText, Layers, Copy, Check } from "lucide-react";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
@@ -50,6 +50,8 @@ export default function Page() {
     }
   }, []);
 
+  const searchAbortRef = useRef<AbortController | null>(null);
+
   const saveConfig = () => {
     localStorage.setItem("paperSearchConfig", JSON.stringify({
       apiConfig,
@@ -71,11 +73,15 @@ export default function Page() {
       return;
     }
     
+    // 取消上一次仍在进行的检索，避免请求堆叠与结果错乱
+    searchAbortRef.current?.abort();
+    const ctl = new AbortController();
+    searchAbortRef.current = ctl;
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      console.log('[PaperSearch] Sending request to /api/paper-search');
       const response = await fetch("/api/paper-search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -86,24 +92,27 @@ export default function Page() {
             "semantic-scholar": apiConfig["semantic-scholar"],
           },
         }),
+        signal: ctl.signal,
       });
-      
-      console.log('[PaperSearch] Response status:', response.status);
-      
+
       const data = await response.json();
-      console.log('[PaperSearch] Response data:', data);
-      
+
       if (data.success) {
         setResults(data.data);
         setSelectedPaperIds(new Set());
+        // 部分源失败：仍展示已得结果，并提示哪个源失败
+        if (Array.isArray(data.failedSources) && data.failedSources.length > 0) {
+          setError(`部分检索源未返回结果：${data.failedSources.join("、")}（已展示其余源的结果）`);
+        }
       } else {
         setError(data.error || "搜索失败");
       }
     } catch (err) {
+      if ((err as { name?: string })?.name === "AbortError") return;
       console.error('[PaperSearch] Error:', err);
       setError("网络错误，请重试: " + (err instanceof Error ? err.message : String(err)));
     } finally {
-      setIsLoading(false);
+      if (searchAbortRef.current === ctl) setIsLoading(false);
     }
   };
 

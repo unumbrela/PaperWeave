@@ -124,6 +124,7 @@ export async function searchOpenAlex(query: SearchQuery): Promise<PaperResult[]>
     }
   } catch (error) {
     console.error('OpenAlex search failed:', error);
+    throw error;
   }
   
   return results;
@@ -250,6 +251,7 @@ export async function searchArXiv(query: SearchQuery): Promise<PaperResult[]> {
     }
   } catch (error) {
     console.error('arXiv search failed:', error);
+    throw error;
   }
   
   return results;
@@ -307,40 +309,60 @@ export async function searchSemanticScholar(query: SearchQuery, apiKey?: string)
     }
   } catch (error) {
     console.error('Semantic Scholar search failed:', error);
+    throw error;
   }
   
   return results;
 }
 
-export async function searchPapers(query: SearchQuery, sources: string[], apiKeys?: Record<string, string>): Promise<PaperResult[]> {
+export interface SearchOutcome {
+  results: PaperResult[];
+  /** 未成功返回的检索源（网络/接口错误）；单源失败不影响其余源 */
+  failedSources: string[];
+}
+
+const SOURCE_LABELS: Record<string, string> = {
+  openalex: 'OpenAlex',
+  arxiv: 'arXiv',
+  'semantic-scholar': 'Semantic Scholar',
+};
+
+export async function searchPapers(
+  query: SearchQuery,
+  sources: string[],
+  apiKeys?: Record<string, string>,
+): Promise<SearchOutcome> {
   console.log('[searchPapers] Starting search with sources:', sources);
-  
+
   const allResults: PaperResult[] = [];
-  const tasks: Promise<PaperResult[]>[] = [];
-  
+  const failedSources: string[] = [];
+  const labeled: Array<{ source: string; task: Promise<PaperResult[]> }> = [];
+
   if (sources.includes('openalex')) {
-    tasks.push(searchOpenAlex(query));
+    labeled.push({ source: 'openalex', task: searchOpenAlex(query) });
   }
-  
   if (sources.includes('arxiv')) {
-    tasks.push(searchArXiv(query));
+    labeled.push({ source: 'arxiv', task: searchArXiv(query) });
   }
-  
   if (sources.includes('semantic-scholar')) {
-    tasks.push(searchSemanticScholar(query, apiKeys?.['semantic-scholar']));
+    labeled.push({ source: 'semantic-scholar', task: searchSemanticScholar(query, apiKeys?.['semantic-scholar']) });
   }
-  
-  if (tasks.length === 0) {
+
+  if (labeled.length === 0) {
     console.log('[searchPapers] No sources selected');
-    return [];
+    return { results: [], failedSources: [] };
   }
-  
-  const results = await Promise.all(tasks);
-  
-  for (const sourceResults of results) {
-    allResults.push(...sourceResults);
-  }
-  
+
+  // allSettled：任一源失败只记录该源，已成功的源照常返回结果
+  const settled = await Promise.allSettled(labeled.map((l) => l.task));
+  settled.forEach((outcome, i) => {
+    if (outcome.status === 'fulfilled') {
+      allResults.push(...outcome.value);
+    } else {
+      failedSources.push(SOURCE_LABELS[labeled[i].source] || labeled[i].source);
+    }
+  });
+
   console.log('[searchPapers] Total results before dedupe:', allResults.length);
   
   const seen = new Set<string>();
@@ -366,7 +388,7 @@ export async function searchPapers(query: SearchQuery, sources: string[], apiKey
   });
   
   const finalResults = filteredResults.slice(0, query.maxResults || 50);
-  console.log('[searchPapers] Final results:', finalResults.length);
-  
-  return finalResults;
+  console.log('[searchPapers] Final results:', finalResults.length, 'failed sources:', failedSources);
+
+  return { results: finalResults, failedSources };
 }

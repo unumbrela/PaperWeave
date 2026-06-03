@@ -92,7 +92,7 @@ function stripInstallComment(text: string): string {
 
 export default function Page() {
   const [form, setForm] = useState<ExampleForm>(DEFAULT_FORM);
-  const { text, loading, error, run } = useStream();
+  const { text, loading, error, run, stop } = useStream();
 
   const nameError = useMemo(() => {
     if (!form.name) return null;
@@ -246,6 +246,7 @@ export default function Page() {
             loading={loading}
             error={error}
             onRetry={submit}
+            onStop={stop}
             emptyHint="左侧填写需求，或从下方示例一键填入。"
           />
           {text && !loading && <InstallStrip name={resolvedName} body={cleanText} />}

@@ -44,6 +44,12 @@ export function useStream() {
     [],
   );
 
+  /** 停止生成：中断流但保留已生成的文本 */
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+    setLoading(false);
+  }, []);
+
   const reset = useCallback(() => {
     abortRef.current?.abort();
     setText("");
@@ -51,5 +57,5 @@ export function useStream() {
     setLoading(false);
   }, []);
 
-  return { text, loading, error, run, reset };
+  return { text, loading, error, run, stop, reset };
 }

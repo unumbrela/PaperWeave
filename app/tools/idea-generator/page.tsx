@@ -22,7 +22,7 @@ export default function Page() {
   const [baseline, setBaseline] = useState("");
   const [resources, setResources] = useState("");
   const [handoffFrom, setHandoffFrom] = useState<string | null>(null);
-  const { text, loading, error, run } = useStream();
+  const { text, loading, error, run, stop } = useStream();
 
   useEffect(() => {
     const h = consumeHandoff("idea-generator");
@@ -104,6 +104,7 @@ export default function Page() {
           loading={loading}
           error={error}
           onRetry={submit}
+          onStop={stop}
           emptyHint="填入研究方向，生成可验证的候选 idea。"
         />
       </div>

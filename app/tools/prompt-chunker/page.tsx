@@ -98,7 +98,7 @@ const EXAMPLES: ChunkExample[] = [
 
 export default function Page() {
   const [form, setForm] = useState<Form>(DEFAULT_FORM);
-  const { text, loading, error, run } = useStream();
+  const { text, loading, error, run, stop } = useStream();
 
   const canSubmit = !loading && form.task.trim().length > 0;
 
@@ -237,6 +237,7 @@ export default function Page() {
           loading={loading}
           error={error}
           onRetry={submit}
+          onStop={stop}
           emptyHint="粘贴任务，让拆解器把它切成小模型也能啃的块。"
         />
       </div>

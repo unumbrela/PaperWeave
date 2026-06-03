@@ -28,11 +28,11 @@ export async function POST(request: Request) {
     
     console.log('[Search API] Searching with params:', { query, sources });
     
-    const results = await searchPapers(query, sources, apiKeys);
-    
+    const { results, failedSources } = await searchPapers(query, sources, apiKeys);
+
     console.log('[Search API] Search complete, results:', results.length);
-    
-    return NextResponse.json({ success: true, data: results });
+
+    return NextResponse.json({ success: true, data: results, failedSources });
   } catch (error) {
     console.error('[Search API] Error:', error);
     return NextResponse.json(

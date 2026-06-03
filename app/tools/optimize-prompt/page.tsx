@@ -19,7 +19,7 @@ export default function Page() {
   const [prompt, setPrompt] = useState("");
   const [target, setTarget] =
     useState<(typeof TARGETS)[number]["value"]>("chat");
-  const { text, loading, error, run } = useStream();
+  const { text, loading, error, run, stop } = useStream();
 
   const submit = () => {
     if (!prompt.trim()) return;
@@ -91,6 +91,7 @@ export default function Page() {
           loading={loading}
           error={error}
           onRetry={submit}
+          onStop={stop}
           emptyHint="Paste a prompt, press 优化 Prompt."
         />
       </div>

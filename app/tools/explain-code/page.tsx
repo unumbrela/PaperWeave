@@ -34,7 +34,7 @@ export default function Page() {
   const [granularity, setGranularity] =
     useState<(typeof GRANULARITY)[number]["value"]>("section");
   const [reasoning, setReasoning] = useState(false);
-  const { text, loading, error, run } = useStream();
+  const { text, loading, error, run, stop } = useStream();
 
   const submit = () => {
     if (!code.trim()) return;
@@ -142,6 +142,7 @@ export default function Page() {
           loading={loading}
           error={error}
           onRetry={submit}
+          onStop={stop}
           emptyHint="Paste code, press 解释这段代码."
         />
       </div>
