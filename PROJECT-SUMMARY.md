@@ -101,6 +101,7 @@
 | **P2** | 体验流畅化 | 三态组件 `states.tsx`（骨架 / 空 / 错误重试），library 接入消除白屏；`useStream` 增 `stop()` 中断保留文本 + 「思考中」指示 + `friendlyError` 错误归类，7 个流式工具统一接入；PDF 阅读进度自动保存 / 恢复；检索 `AbortController` 取消 + `Promise.allSettled` 单源失败不拖垮整体。 |
 | **P3** | AI 接入层收敛 | 删死代码 `lib/services/ai.ts`（消除 `gpt-3.5-turbo` / `gemini-pro` 旧模型债务）；非流式 fallback 多供应商；6 个流式路由加「未配 key」前置守卫返回可读 503，不再中途断流。 |
 | **P4.2** | lint 清零（核心） | 核心路径（`lib/db`、`lib/ai`、`lib/workflow`、library、viewer、paper-search、papers/analyze API 等）现 **0 lint error**。 |
+| **P5（本轮）** | 核心页打磨 + 去重 + 拆分 | (A) library / library[id] / viewer 及子组件（Sidebar / FloatingMenu / PDFViewerDynamic）从原生灰蓝/暗色全量换为暖纸面 token，消除画风割裂；(B) 去掉 library[id] 用随机数伪造的 PDF 下载进度条，改为诚实状态；(C) 三页 `Paper`/`Author` 改用 `lib/db/types` 单一类型源，抽 `lib/ai/analyze.ts` 收敛 `/api/analyze` 与 `/api/analyze-paper` 的重复 prompt/解析；(D) 拆分三个巨型组件（详见 §五·4）。 |
 
 ---
 
@@ -109,8 +110,8 @@
 1. ~~定位张力~~（**已解决**）：原「资产」阶段 9 个前端炫技 / 通用工具已整体从主仓移除（注册表项 + 页面 + `components` / `lib/beautifier` 资产代码 + `app/api/optimize` + 全局泄漏的资产 CSS），主仓收敛为纯 7 环科研主线。被删代码可从 git 历史取回供独立 showcase 仓库使用。
 2. ~~链路回存缺口~~（**已解决**）：下游产出可一键"回存"到对应论文条目——`handoff` 携带 `sourcePaperId`，新增 `SaveToLibrary` 组件，结构化总结回写 `summary`、idea 追加进 `notes`（详情页新增「研究笔记」区展示）。从一篇论文出发「生成 → 回存」的工作流闭环已打通。
 3. **纯本地端到端待实测（P0.2 未竟）**：构建层已保证不触达 Prisma，但"删 `DATABASE_URL` 后走完 检索→入库→阅读→批注→笔记"尚未手动跑一遍确认；PDF 仍走服务端下载到 `public/papers/` 提供 URL，真离线 `pdfBlob` 入参已预留未启用。
-4. **巨型组件未拆（P4.1 未竟）**：`paper-search/page.tsx`（~1100 行）、`library/page.tsx`（~734 行）、`viewer/ViewerClient.tsx`（~506 行）仍未拆成 hooks + 子组件，维护成本高。
-5. **vendored 可视化代码 lint 未清**：核心已 0 error，但 explainer（transformer/gan/diffusion）、ganlab 等 vendored 代码仍有 68 errors；CI lint 暂为 `continue-on-error`，未翻硬门禁。
+4. ~~巨型组件未拆~~（**已解决** · P4.1）：`paper-search`（1109→431）、`library`（672→369）、`viewer/ViewerClient`（505→387）已拆出 7 个聚焦子组件（`paper-search/{ApiSettings,SearchForm,ResultCard}`、`library/{ImportModal,PaperCard}`、`viewer/{ViewerHeader,PdfToolbar}`，均 ≤286 行）；状态/处理器仍留页内，回归风险最小。
+5. **vendored 可视化代码 lint 未清**：核心已 0 error，但 explainer（transformer/gan/diffusion）、ganlab 等 vendored 代码仍有 lint errors；CI lint 暂为 `continue-on-error`，未翻硬门禁。
 6. **测试基本为零（P4.3 未竟）**：无 Vitest / Playwright，验收靠手动 `pnpm build` + 走查。关键纯逻辑（arXiv 解析、Markdown 转换链、注册表不变量、仓储层）与 1 条 happy-path E2E 待补。
 7. **全中文，无 i18n**：海外触达为零。
 8. **第三方版权**：`LICENSE`（MIT）已补；资产拆分后仅余 iGEM HPI Potsdam 主页（「可视化表达」环）仍内置第三方素材，公开发布前建议以"外链引用"替代"代码内置"规避授权风险。
