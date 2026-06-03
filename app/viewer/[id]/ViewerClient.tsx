@@ -2,33 +2,14 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Download, Share2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Maximize2, Copy, Check, ExternalLink } from 'lucide-react';
-import type { Annotation, AnnotationType } from '@/lib/db/types';
+import { ArrowLeft, Share2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Maximize2, Copy, Check } from 'lucide-react';
+import type { Paper, AnnotationType } from '@/lib/db/types';
 import { repository } from '@/lib/db/repository';
 import FloatingMenu from '@/components/annotation/FloatingMenu';
 import Sidebar from '@/components/sidebar/Sidebar';
 import PDFViewerDynamic from '@/components/pdf/PDFViewerDynamic';
 import { generateMarkdown, downloadMarkdown } from '@/lib/export/markdown';
 import { useAnnotations, useResearchNotes, useAIExplanation } from '@/lib/annotation/hooks';
-
-interface Paper {
-  id: string;
-  title: string;
-  abstract?: string;
-  authors: { name: string; affiliation?: string }[];
-  sourceType: 'ARXIV' | 'LOCAL' | 'DOI';
-  sourceUrl?: string;
-  arxivId?: string;
-  pdfPath?: string;
-  publishedAt?: string;
-  tags: string[];
-  direction?: string;
-  summary?: string;
-  methodology?: string;
-  contribution?: string;
-  createdAt: string;
-  citations?: number;
-}
 
 export default function ViewerClient() {
   const params = useParams();
@@ -57,7 +38,7 @@ export default function ViewerClient() {
         const found = await repository.getPaper(params.id as string);
 
         if (found) {
-          setPaper(found as Paper);
+          setPaper(found);
           setError(null);
         } else {
           setError('论文不存在');
@@ -123,14 +104,14 @@ export default function ViewerClient() {
 
   const calculateFitWidthScale = useCallback(() => {
     if (!pdfContainerRef.current) return;
-    
+
     const containerWidth = pdfContainerRef.current.offsetWidth;
     const padding = 32;
     const availableWidth = containerWidth - padding;
-    
+
     const standardPageWidth = 612;
     const targetScale = availableWidth / standardPageWidth;
-    
+
     return Math.min(Math.max(targetScale, 0.3), 2);
   }, []);
 
@@ -185,9 +166,9 @@ export default function ViewerClient() {
   const handleTextSelection = useCallback((event: MouseEvent) => {
     const selection = window.getSelection();
     if (!selection) return;
-    
+
     const selectedText = selection.toString().trim();
-    
+
     if (selectedText && selectedText.length > 0 && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
       const selectionNode = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
@@ -211,7 +192,7 @@ export default function ViewerClient() {
 
       const rect = range.getBoundingClientRect();
       setSelectionRects(rects);
-      
+
       setFloatingMenu({
         x: rect.left + rect.width / 2,
         y: rect.top,
@@ -236,7 +217,7 @@ export default function ViewerClient() {
       type,
       comment,
     });
-    
+
     console.log('[Viewer] Annotation created:', result);
     setSelectionRects([]);
     window.getSelection()?.removeAllRanges();
@@ -259,14 +240,14 @@ export default function ViewerClient() {
 
   const handleExport = () => {
     if (!paper) return;
-    
+
     const markdown = generateMarkdown({
-      paper: paper as unknown as import('@/lib/db/types').Paper,
+      paper,
       annotations,
       aiSummary,
       researchNotes,
     });
-    
+
     downloadMarkdown(markdown, `${paper.title.replace(/[^a-z0-9]/gi, '_')}_research_brief.md`);
   };
 
@@ -301,10 +282,10 @@ export default function ViewerClient() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-900">
+      <div className="h-screen flex items-center justify-center bg-paper">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-gray-400">正在加载论文...</p>
+          <div className="w-8 h-8 border-2 border-coral border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-ink-3">正在加载论文…</p>
         </div>
       </div>
     );
@@ -312,12 +293,12 @@ export default function ViewerClient() {
 
   if (!paper) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-900">
+      <div className="h-screen flex items-center justify-center bg-paper">
         <div className="text-center">
-          <p className="text-gray-400 mb-4">{error || '论文不存在'}</p>
+          <p className="text-ink-3 mb-4">{error || '论文不存在'}</p>
           <button
             onClick={() => router.push('/library')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="cta-gradient rounded-full px-5 py-2 text-sm font-medium focus-ring"
           >
             返回论文库
           </button>
@@ -327,62 +308,62 @@ export default function ViewerClient() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-900">
-      <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
+    <div className="h-screen flex flex-col bg-paper">
+      <div className="surface-strong border-b border-line px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.push(`/library/${paper.id}`)}
-            className="flex items-center gap-2 px-3 py-1.5 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+            className="flex items-center gap-2 rounded-full px-3 py-1.5 text-ink-2 hover:text-ink hover:bg-paper-3 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="text-sm">返回</span>
           </button>
-          <h1 className="text-white font-medium text-lg truncate max-w-xl mb-1">
+          <h1 className="serif text-ink text-lg truncate max-w-xl">
             {paper.title}
           </h1>
-          
+
           {paper.sourceUrl && (
             <div className="mt-2 w-full max-w-xl">
-              <div className="flex items-center gap-2 bg-gray-700/50 rounded-lg px-3 py-2 border border-gray-600">
+              <div className="flex items-center gap-2 rounded-lg px-3 py-2 border border-line bg-paper-2/70">
                 <a
                   href={paper.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 min-w-0 text-xs text-blue-400 truncate hover:text-blue-300 transition-colors"
+                  className="flex-1 min-w-0 text-xs text-ocean truncate hover:underline transition-colors"
                   title="打开链接"
                 >
                   {paper.sourceUrl}
                 </a>
                 <button
                   onClick={() => paper.sourceUrl && handleCopyLink('source', paper.sourceUrl)}
-                  className="flex-shrink-0 p-1 hover:bg-gray-600 rounded-md transition-colors"
+                  className="flex-shrink-0 p-1 rounded-md hover:bg-paper-3 transition-colors"
                   title="复制论文链接"
                 >
                   {copiedState['source'] ? (
-                    <Check className="w-4 h-4 text-green-400" />
+                    <Check className="w-4 h-4 text-sage" />
                   ) : (
-                    <Copy className="w-4 h-4 text-gray-400 hover:text-white" />
+                    <Copy className="w-4 h-4 text-ink-3 hover:text-ink" />
                   )}
                 </button>
               </div>
             </div>
           )}
-          
+
           {pdfFilePath && (
             <div className="mt-1 w-full max-w-xl">
-              <div className="flex items-center gap-2 bg-blue-500/10 rounded-lg px-3 py-2 border border-blue-500/20">
-                <span className="text-xs text-blue-400 truncate flex-1">
+              <div className="flex items-center gap-2 rounded-lg px-3 py-2 border border-line bg-ocean/8">
+                <span className="text-xs text-ocean truncate flex-1">
                   {pdfFilePath}
                 </span>
                 <button
                   onClick={() => handleCopyLink('pdf', pdfFilePath)}
-                  className="flex-shrink-0 p-1 hover:bg-blue-500/20 rounded-md transition-colors"
+                  className="flex-shrink-0 p-1 rounded-md hover:bg-ocean/12 transition-colors"
                   title="复制PDF链接"
                 >
                   {copiedState['pdf'] ? (
-                    <Check className="w-4 h-4 text-green-400" />
+                    <Check className="w-4 h-4 text-sage" />
                   ) : (
-                    <Copy className="w-4 h-4 text-blue-400 hover:text-blue-300" />
+                    <Copy className="w-4 h-4 text-ocean" />
                   )}
                 </button>
               </div>
@@ -393,13 +374,13 @@ export default function ViewerClient() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="px-3 py-1.5 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+            className="rounded-full px-3 py-1.5 text-sm text-ink-2 hover:text-ink hover:bg-paper-3 transition-colors"
           >
             {isSidebarOpen ? '隐藏侧边栏' : '显示侧边栏'}
           </button>
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className="flex items-center gap-2 rounded-full bg-ink px-4 py-1.5 text-paper-2 transition-all hover:brightness-110 focus-ring"
           >
             <Share2 className="w-4 h-4" />
             <span className="text-sm">导出</span>
@@ -408,32 +389,32 @@ export default function ViewerClient() {
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        <div className={`flex-1 flex flex-col overflow-hidden ${isSidebarOpen ? '' : ''}`}>
-          <div className="bg-gray-800/50 border-b border-gray-700 px-4 py-2 flex items-center justify-between">
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="bg-paper-2/60 border-b border-line px-4 py-2 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage <= 1}
-                className="p-2 hover:bg-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-2 rounded-lg hover:bg-paper-3 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <ChevronLeft className="w-5 h-5 text-gray-300" />
+                <ChevronLeft className="w-5 h-5 text-ink-2" />
               </button>
-              <span className="text-sm text-gray-400">
+              <span className="text-sm text-ink-3">
                 第 {currentPage} 页 / 共 {numPages} 页
               </span>
               <button
                 onClick={() => setCurrentPage(Math.min(numPages, currentPage + 1))}
                 disabled={currentPage >= numPages}
-                className="p-2 hover:bg-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-2 rounded-lg hover:bg-paper-3 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <ChevronRight className="w-5 h-5 text-gray-300" />
+                <ChevronRight className="w-5 h-5 text-ink-2" />
               </button>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 onClick={handleFitWidth}
-                className={`p-2 rounded-lg transition-colors ${fitMode === 'width' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'}`}
+                className={`p-2 rounded-lg transition-colors ${fitMode === 'width' ? 'bg-ink text-paper-2' : 'hover:bg-paper-3 text-ink-2'}`}
                 title="适应宽度"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -442,40 +423,40 @@ export default function ViewerClient() {
               </button>
               <button
                 onClick={handleFitPage}
-                className={`p-2 rounded-lg transition-colors ${fitMode === 'page' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'}`}
+                className={`p-2 rounded-lg transition-colors ${fitMode === 'page' ? 'bg-ink text-paper-2' : 'hover:bg-paper-3 text-ink-2'}`}
                 title="适应页面"
               >
                 <Maximize2 className="w-5 h-5" />
               </button>
-              <div className="w-px h-6 bg-gray-600 mx-2" />
+              <div className="w-px h-6 bg-line-strong mx-2" />
               <button
                 onClick={() => setScale(Math.max(0.3, scale - 0.1))}
-                className="p-2 hover:bg-gray-700 rounded-lg"
+                className="p-2 rounded-lg hover:bg-paper-3"
                 title="缩小"
               >
-                <ZoomOut className="w-5 h-5 text-gray-300" />
+                <ZoomOut className="w-5 h-5 text-ink-2" />
               </button>
-              <span className="text-sm text-gray-400 w-16 text-center">
+              <span className="text-sm text-ink-3 w-16 text-center">
                 {Math.round(scale * 100)}%
               </span>
               <button
                 onClick={() => setScale(Math.min(3, scale + 0.1))}
-                className="p-2 hover:bg-gray-700 rounded-lg"
+                className="p-2 rounded-lg hover:bg-paper-3"
                 title="放大"
               >
-                <ZoomIn className="w-5 h-5 text-gray-300" />
+                <ZoomIn className="w-5 h-5 text-ink-2" />
               </button>
               <button
                 onClick={() => setScale(1.0)}
-                className="p-2 hover:bg-gray-700 rounded-lg"
+                className="p-2 rounded-lg hover:bg-paper-3"
                 title="重置"
               >
-                <RotateCcw className="w-5 h-5 text-gray-300" />
+                <RotateCcw className="w-5 h-5 text-ink-2" />
               </button>
             </div>
           </div>
 
-          <div ref={pdfContainerRef} className="flex-1 overflow-auto bg-gray-900">
+          <div ref={pdfContainerRef} className="flex-1 overflow-auto bg-paper-3">
             {pdfFilePath ? (
               <PDFViewerDynamic
                 file={pdfFilePath}
@@ -488,8 +469,8 @@ export default function ViewerClient() {
             ) : (
               <div className="flex items-center justify-center h-full min-h-[600px]">
                 <div className="text-center">
-                  <div className="w-12 h-12 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                  <p className="text-gray-400">正在定位 PDF 文件...</p>
+                  <div className="w-12 h-12 border-3 border-coral border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                  <p className="text-ink-3">正在定位 PDF 文件…</p>
                 </div>
               </div>
             )}
