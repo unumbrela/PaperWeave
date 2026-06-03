@@ -18,13 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { 
-  getCachedPapers, 
-  cachePaper, 
-  isPaperCached,
-  removeCachedPaper
-} from "@/lib/paper/cache-service";
-import type { CachedPaper } from "@/lib/db/local-db";
+import { repository } from "@/lib/db/repository";
 
 interface Author {
   name: string;
@@ -82,22 +76,15 @@ export default function LibraryPage() {
   async function fetchPapers() {
     setLoading(true);
     try {
-      // 从数据库读取
-      const params = new URLSearchParams({
+      // 从本地 Dexie 仓储读取（单一真相源）
+      const data = await repository.listPapers({
         sortBy,
         sortOrder,
-        ...(selectedTag && { tags: selectedTag }),
+        ...(selectedTag && { tags: [selectedTag] }),
         ...(selectedDirection && { direction: selectedDirection }),
+        ...(searchQuery && { search: searchQuery }),
       });
-
-      const res = await fetch(`/api/papers?${params}`);
-      const data = await res.json();
-
-      if (data.success && data.data) {
-        setPapers(data.data as Paper[]);
-      } else {
-        setPapers([]);
-      }
+      setPapers(data as Paper[]);
     } catch (error) {
       console.error("Failed to fetch papers:", error);
       setPapers([]);
@@ -111,21 +98,10 @@ export default function LibraryPage() {
 
     setIsDeleting(true);
     try {
-      // 从数据库删除
-      const res = await fetch(`/api/papers/${deleteConfirm.paper.id}`, {
-        method: 'DELETE'
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        // 从本地缓存删除
-        await removeCachedPaper(deleteConfirm.paper.id);
-        // 从前端列表移除
-        setPapers(prev => prev.filter(p => p.id !== deleteConfirm.paper!.id));
-        setDeleteConfirm({ show: false, paper: null });
-      } else {
-        alert('删除失败: ' + data.message);
-      }
+      // 从本地仓储删除（级联删除标注/笔记/进度）
+      await repository.deletePaper(deleteConfirm.paper.id);
+      setPapers(prev => prev.filter(p => p.id !== deleteConfirm.paper!.id));
+      setDeleteConfirm({ show: false, paper: null });
     } catch (error) {
       console.error('删除论文失败:', error);
       alert('删除论文失败');
@@ -137,10 +113,9 @@ export default function LibraryPage() {
   async function handleArxivImport() {
     if (!arxivId.trim()) return;
 
-    // 检查本地缓存
-    const cached = await isPaperCached(arxivId.trim());
-    if (cached) {
-      setImportMessage("⚠️ 该论文已在本地缓存中");
+    // 检查本地是否已存在
+    if (await repository.arxivExists(arxivId.trim())) {
+      setImportMessage("⚠️ 该论文已在论文库中");
       return;
     }
 
@@ -148,6 +123,7 @@ export default function LibraryPage() {
     setImportMessage("");
 
     try {
+      // 服务端无状态助手：拉取元数据 + 下载 PDF，返回论文数据（不持久化）
       const res = await fetch("/api/papers/import/arxiv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -157,12 +133,11 @@ export default function LibraryPage() {
       const data = await res.json();
 
       if (data.success) {
-        const newPaper = data.data as Paper;
-        // 缓存到本地
-        await cachePaper({ ...newPaper, cachedAt: new Date().toISOString() } as CachedPaper);
+        // 落库到本地 Dexie（单一真相源）
+        const newPaper = await repository.savePaper(data.data as Partial<Paper> & { title: string });
         setImportMessage("✅ 导入成功！");
         setArxivId("");
-        setPapers((prev) => [newPaper, ...prev]);
+        setPapers((prev) => [newPaper as Paper, ...prev]);
         setTimeout(() => setShowImportModal(false), 1500);
       } else {
         setImportMessage(data.isDuplicate ? "⚠️ 该论文已存在" : "❌ " + data.message);
@@ -192,12 +167,11 @@ export default function LibraryPage() {
       const data = await res.json();
 
       if (data.success) {
-        const newPaper = data.data as Paper;
-        // 缓存到本地
-        await cachePaper({ ...newPaper, cachedAt: new Date().toISOString() } as CachedPaper);
+        // 落库到本地 Dexie（单一真相源）
+        const newPaper = await repository.savePaper(data.data as Partial<Paper> & { title: string });
         setImportMessage("✅ 导入成功！");
         setSelectedFile(null);
-        setPapers((prev) => [newPaper, ...prev]);
+        setPapers((prev) => [newPaper as Paper, ...prev]);
         setTimeout(() => setShowImportModal(false), 1500);
       } else {
         setImportMessage(data.isDuplicate ? "⚠️ 该论文已存在" : "❌ " + data.message);
@@ -210,20 +184,31 @@ export default function LibraryPage() {
   }
 
   async function handleAnalyze(paperId: string) {
+    const target = papers.find((p) => p.id === paperId);
+    if (!target) return;
     try {
+      // 服务端无状态 AI 助手：传入摘要文本，返回结构化分析（不持久化）
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paperId }),
+        body: JSON.stringify({ text: target.abstract || target.title }),
       });
 
       const data = await res.json();
 
       if (data.success) {
-        const updatedPaper = data.data as Paper;
-        setPapers((prev) =>
-          prev.map((p) => (p.id === paperId ? { ...p, ...updatedPaper } : p))
-        );
+        const { summary, methodology, contribution, notes } = data.data as {
+          summary?: string; methodology?: string; contribution?: string; notes?: string;
+        };
+        // 分析结果回写本地仓储
+        const updated = await repository.updatePaper(paperId, {
+          summary, methodology, contribution, notes,
+        });
+        if (updated) {
+          setPapers((prev) =>
+            prev.map((p) => (p.id === paperId ? { ...p, ...updated } : p))
+          );
+        }
       }
     } catch (error) {
       console.error("Failed to analyze paper:", error);

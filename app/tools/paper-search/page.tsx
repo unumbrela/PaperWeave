@@ -6,6 +6,7 @@ import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
 import { cn } from "@/lib/utils";
 import { RESEARCH_FIELDS, VENUES, SEARCH_SOURCES, VENUE_MAP, getVenuesForField, type SearchQuery, type PaperResult } from "@/lib/paper-search/types";
+import { repository } from "@/lib/db/repository";
 
 const TOOL = getTool("paper-search")!;
 
@@ -110,31 +111,27 @@ export default function Page() {
     if (importingIds.has(paper.id)) return;
     
     setImportingIds((prev) => new Set([...prev, paper.id]));
-    
+
     try {
-      const response = await fetch("/api/papers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: paper.title,
-          authors: paper.authors,
-          abstract: paper.abstract,
-          sourceType: paper.source,
-          sourceUrl: paper.url,
-          pdfPath: paper.pdfUrl,
-          arxivId: paper.source === "arxiv" ? paper.id : undefined,
-          publishedAt: paper.year ? `${paper.year}-01-01` : undefined,
-          tags: [paper.source, ...(paper.venue ? [paper.venue] : [])],
-          citations: paper.citations,
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error("导入失败");
+      const arxivId = paper.source === "arxiv" ? paper.id : undefined;
+      // 去重：已在本地库则跳过
+      if (arxivId && (await repository.arxivExists(arxivId))) {
+        setImportedIds((prev) => new Set([...prev, paper.id]));
+        return;
       }
-      
-      const data = await response.json();
-      console.log("Paper imported:", data);
+      // 直接落库到本地 Dexie（单一真相源）
+      await repository.savePaper({
+        title: paper.title,
+        authors: (paper.authors ?? []).map((name) => ({ name })),
+        abstract: paper.abstract,
+        sourceType: paper.source === "arxiv" ? "ARXIV" : "LOCAL",
+        sourceUrl: paper.url,
+        pdfPath: paper.pdfUrl,
+        arxivId,
+        publishedAt: paper.year ? `${paper.year}-01-01` : undefined,
+        tags: [paper.source, ...(paper.venue ? [paper.venue] : [])],
+        citations: paper.citations,
+      });
       setImportedIds((prev) => new Set([...prev, paper.id]));
     } catch (err) {
       console.error("Import error:", err);

@@ -1,35 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
-import fs from 'fs';
-import path from 'path';
 
-const getLocalPapersDir = () => {
-  const dir = path.join(process.cwd(), 'data', 'papers');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  return dir;
-};
+// 可选云同步端点：客户端以本地 Dexie 为单一真相源；本路由仅在配置了
+// DATABASE_URL（Postgres）时作为可选同步层。未配置时优雅降级，不再写本地 JSON 文件。
 
-const loadPapersFromFiles = (): any[] => {
-  const dir = getLocalPapersDir();
-  const papers: any[] = [];
-  
-  try {
-    const files = fs.readdirSync(dir);
-    files.forEach(file => {
-      if (file.endsWith('.json')) {
-        const filePath = path.join(dir, file);
-        const content = fs.readFileSync(filePath, 'utf-8');
-        papers.push(JSON.parse(content));
-      }
-    });
-  } catch (error) {
-    console.warn(`Failed to load papers from files: ${error}`);
-  }
-  
-  return papers;
-};
+const CLOUD_ENABLED = !!process.env.DATABASE_URL;
 
 function normalizeAuthors(authors: unknown) {
   if (Array.isArray(authors)) {
@@ -69,67 +44,34 @@ export async function GET(request: Request) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
 
-    let papers: any[] = [];
-    let total = 0;
-    let useLocalStorage = false;
-
-    try {
-      const where: any = {};
-      
-      if (direction) {
-        where.direction = direction;
-      }
-      if (sourceType) {
-        where.sourceType = sourceType;
-      }
-      if (tags) {
-        const tagList = tags.split(',').map((t: string) => t.trim());
-        where.tags = {
-          hasSome: tagList
-        };
-      }
-
-      const orderBy: any = {};
-      orderBy[sortBy] = sortOrder;
-
-      [papers, total] = await Promise.all([
-        prisma.paper.findMany({
-          where,
-          orderBy,
-          skip: (page - 1) * limit,
-          take: limit,
-        }),
-        prisma.paper.count({ where })
-      ]);
-    } catch (dbError) {
-      console.warn(`Failed to query PostgreSQL, using local file storage: ${dbError}`);
-      useLocalStorage = true;
-      
-      papers = loadPapersFromFiles();
-      
-      if (direction) {
-        papers = papers.filter(p => p.direction === direction);
-      }
-      if (sourceType) {
-        papers = papers.filter(p => p.sourceType === sourceType);
-      }
-      if (tags) {
-        const tagList = tags.split(',').map((t: string) => t.trim());
-        papers = papers.filter(p => tagList.some(tag => p.tags.includes(tag)));
-      }
-
-      papers.sort((a, b) => {
-        const aVal = a[sortBy as keyof typeof a] as string;
-        const bVal = b[sortBy as keyof typeof b] as string;
-        if (sortOrder === 'desc') {
-          return bVal.localeCompare(aVal);
-        }
-        return aVal.localeCompare(bVal);
+    // 未配置云端：客户端应直接读本地 Dexie，这里返回空集合即可
+    if (!CLOUD_ENABLED) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        pagination: { page, limit, total: 0, pages: 0 },
+        source: 'local',
       });
-
-      total = papers.length;
-      papers = papers.slice((page - 1) * limit, page * limit);
     }
+
+    const where: Record<string, unknown> = {};
+    if (direction) where.direction = direction;
+    if (sourceType) where.sourceType = sourceType;
+    if (tags) {
+      where.tags = { hasSome: tags.split(',').map((t: string) => t.trim()) };
+    }
+
+    const orderBy: Record<string, string> = { [sortBy]: sortOrder };
+
+    const [papers, total] = await Promise.all([
+      prisma.paper.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.paper.count({ where }),
+    ]);
 
     return NextResponse.json({
       success: true,
@@ -140,7 +82,7 @@ export async function GET(request: Request) {
         total,
         pages: Math.ceil(total / limit),
       },
-      source: useLocalStorage ? 'local' : 'database',
+      source: 'database',
     });
   } catch (error) {
     console.error('获取论文列表失败:', error);
@@ -162,76 +104,38 @@ export async function POST(request: Request) {
       );
     }
 
-    let paper = null;
-    let useLocalStorage = false;
-
-    if (body.arxivId) {
-      try {
-        const existing = await prisma.paper.findUnique({
-          where: { arxivId: body.arxivId }
-        });
-        if (existing) {
-          return NextResponse.json(
-            { success: false, message: '该 arXiv ID 已存在', isDuplicate: true, paper: existing },
-            { status: 409 }
-          );
-        }
-      } catch {
-        const papers = loadPapersFromFiles();
-        const existing = papers.find(p => p.arxivId === body.arxivId);
-        if (existing) {
-          return NextResponse.json(
-            { success: false, message: '该 arXiv ID 已存在', isDuplicate: true, paper: existing },
-            { status: 409 }
-          );
-        }
-      }
+    // 未配置云端：本地 Dexie 已是真相源，这里作为可选同步直接 no-op 成功返回
+    if (!CLOUD_ENABLED) {
+      return NextResponse.json({ success: true, message: '本地模式（已写入本地库）', data: body });
     }
 
-    const paperId = `paper-${Date.now()}`;
     const paperData = {
-      id: paperId,
-      arxivId: body.arxivId || '',
+      id: body.id || `paper-${Date.now()}`,
+      arxivId: body.arxivId || null,
       title: body.title,
       abstract: body.abstract,
       authors: normalizeAuthors(body.authors),
       sourceType: normalizeSourceType(body.sourceType),
       sourceUrl: body.sourceUrl,
       pdfPath: body.pdfPath,
-      publishedAt: body.publishedAt,
+      publishedAt: body.publishedAt ? new Date(body.publishedAt) : null,
       tags: body.tags || [],
       direction: body.direction,
       notes: body.notes,
       summary: body.summary,
       methodology: body.methodology,
       contribution: body.contribution,
-      citations: typeof body.citations === 'number' ? body.citations : Math.floor(Math.random() * 50000) + 500,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      citations: typeof body.citations === 'number' ? body.citations : 0,
     };
 
-    try {
-      paper = await prisma.paper.create({
-        data: {
-          ...paperData,
-          publishedAt: body.publishedAt ? new Date(body.publishedAt) : null,
-        }
-      });
-    } catch (dbError) {
-      console.warn(`Failed to save to PostgreSQL, using local file storage: ${dbError}`);
-      useLocalStorage = true;
-      
-      const dir = getLocalPapersDir();
-      const filePath = path.join(dir, `${paperId}.json`);
-      fs.writeFileSync(filePath, JSON.stringify(paperData, null, 2));
-      paper = paperData;
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: useLocalStorage ? '论文创建成功（使用本地文件存储）' : '论文创建成功',
-      data: paper,
+    // upsert：云同步幂等，重复推送不报错
+    const paper = await prisma.paper.upsert({
+      where: { id: paperData.id },
+      create: paperData,
+      update: paperData,
     });
+
+    return NextResponse.json({ success: true, message: '论文已同步到云端', data: paper });
   } catch (error) {
     console.error('创建论文失败:', error);
     return NextResponse.json(

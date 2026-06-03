@@ -16,6 +16,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { repository } from "@/lib/db/repository";
 
 interface Author {
   name: string;
@@ -66,11 +67,9 @@ export default function PaperDetailPage({ params }: { params: Promise<{ id: stri
   async function fetchPaper(id: string) {
     setLoading(true);
     try {
-      const res = await fetch(`/api/papers/${id}`);
-      const data = await res.json();
-
-      if (data.success) {
-        setPaper(data.data);
+      const found = await repository.getPaper(id);
+      if (found) {
+        setPaper(found as Paper);
       }
     } catch (error) {
       console.error("Failed to fetch paper:", error);
@@ -84,20 +83,12 @@ export default function PaperDetailPage({ params }: { params: Promise<{ id: stri
 
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/papers/${paper.id}`, {
-        method: 'DELETE'
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        router.push('/library');
-      } else {
-        alert('删除失败: ' + data.message);
-        setShowDeleteConfirm(false);
-      }
+      await repository.deletePaper(paper.id);
+      router.push('/library');
     } catch (error) {
       console.error('删除论文失败:', error);
       alert('删除论文失败');
+      setShowDeleteConfirm(false);
     } finally {
       setIsDeleting(false);
     }

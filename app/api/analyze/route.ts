@@ -20,36 +20,6 @@ function toPaperAnalysis(result: AIAnalysisResult) {
   };
 }
 
-const getPapersDir = () => {
-  const dir = path.join(process.cwd(), 'public', 'papers');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  return dir;
-};
-
-const loadPapersFromFiles = (): any[] => {
-  const dir = path.join(process.cwd(), 'data', 'papers');
-  const papers: any[] = [];
-  
-  try {
-    if (fs.existsSync(dir)) {
-      const files = fs.readdirSync(dir);
-      files.forEach(file => {
-        if (file.endsWith('.json')) {
-          const filePath = path.join(dir, file);
-          const content = fs.readFileSync(filePath, 'utf-8');
-          papers.push(JSON.parse(content));
-        }
-      });
-    }
-  } catch (error) {
-    console.warn(`Failed to load papers from files: ${error}`);
-  }
-  
-  return papers;
-};
-
 const extractTextFromPdf = async (pdfPath: string): Promise<string> => {
   try {
     const fullPath = path.join(process.cwd(), 'public', pdfPath);
@@ -118,16 +88,15 @@ export async function POST(request: Request) {
     
     if (paperId) {
       let paper = null;
-      
+
       try {
         paper = await prisma.paper.findUnique({
           where: { id: paperId }
         });
       } catch {
-        const papers = loadPapersFromFiles();
-        paper = papers.find(p => p.id === paperId);
+        paper = null;
       }
-      
+
       if (paper) {
         if (paper.abstract) {
           contentToAnalyze = paper.abstract;
@@ -178,6 +147,7 @@ export async function POST(request: Request) {
       notes: '未分析成功',
     };
 
+    // 可选云同步：仅当配置了 Postgres 时尝试回写；失败忽略（本地 Dexie 为准）
     if (paperId) {
       try {
         await prisma.paper.update({
@@ -190,24 +160,7 @@ export async function POST(request: Request) {
           },
         });
       } catch {
-        const papers = loadPapersFromFiles();
-        const paper = papers.find((item) => item.id === paperId);
-        if (paper) {
-          const dir = path.join(process.cwd(), 'data', 'papers');
-          const filePath = path.join(dir, `${paperId}.json`);
-          fs.writeFileSync(
-            filePath,
-            JSON.stringify(
-              {
-                ...paper,
-                ...paperAnalysis,
-                updatedAt: new Date().toISOString(),
-              },
-              null,
-              2,
-            ),
-          );
-        }
+        // 未配数据库或论文不在云端 —— 忽略，分析结果通过返回值交给客户端写入本地
       }
     }
     return NextResponse.json({ success: true, message: parsed ? '分析完成' : 'AI 输出无法解析为 JSON，标记为未分析成功', data: { id: paperId, ...paperAnalysis, raw } });

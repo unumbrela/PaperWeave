@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
-import prisma from '@/lib/db/prisma';
-import { uploadPdfToStorage } from '@/lib/services/storage';
 import fs from 'fs';
 import path from 'path';
+
+// 无状态助手：解析 PDF 文本 + 落地文件到 public/papers，返回论文数据。
+// 不再持久化到 Prisma / 本地 JSON —— 入库由客户端写入 Dexie（单一真相源）。
 
 const getPapersDir = () => {
   const dir = path.join(process.cwd(), 'public', 'papers');
@@ -90,39 +91,16 @@ export async function POST(request: Request) {
       authors: [],
       sourceType: 'LOCAL' as const,
       pdfPath: `/papers/${paperId}.pdf`,
-      tags: ['Computer Vision', 'Deep Learning'],
-      direction: '计算机视觉',
-      citations: Math.floor(Math.random() * 50000) + 500,
+      tags: ['本地上传'],
+      citations: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    
-    let paper = null;
-    let useLocalStorage = false;
-    
-    try {
-      paper = await prisma.paper.create({
-        data: paperData,
-      });
-      console.log(`[PDF Import] Successfully saved to PostgreSQL: ${file.name}`);
-    } catch (dbError) {
-      console.warn(`Failed to save to PostgreSQL, using local file storage: ${dbError}`);
-      useLocalStorage = true;
-      
-      const dataDir = path.join(process.cwd(), 'data', 'papers');
-      if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-      }
-      const metaFilePath = path.join(dataDir, `${paperId}.json`);
-      fs.writeFileSync(metaFilePath, JSON.stringify(paperData, null, 2));
-      paper = paperData;
-      console.log(`[PDF Import] Successfully saved to local file: ${file.name}`);
-    }
-    
+
     return NextResponse.json({
       success: true,
-      message: useLocalStorage ? '论文导入成功（使用本地文件存储）' : '论文导入成功',
-      data: paper,
+      message: 'PDF 解析成功',
+      data: paperData,
     });
   } catch (error) {
     console.error('[PDF Import] Failed:', error);

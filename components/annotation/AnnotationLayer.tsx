@@ -1,5 +1,5 @@
 'use client';
-import type { Annotation } from '@prisma/client';
+import type { Annotation } from '@/lib/db/types';
 
 interface AnnotationLayerProps {
   annotations: Annotation[];

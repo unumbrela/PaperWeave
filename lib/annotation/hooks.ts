@@ -1,15 +1,16 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import type { Annotation, AnnotationType } from '@prisma/client';
+import type { Annotation, AnnotationType, Rect } from '@/lib/db/types';
+import { ANNOTATION_COLORS } from '@/lib/db/types';
+import { repository } from '@/lib/db/repository';
 
-export const ANNOTATION_COLORS: Record<AnnotationType, string> = {
-  highlight: '#F6E7B2',
-  insight: '#CFE3FF',
-  todo: '#DCCBFF',
-  transferable: '#CBEFD8',
-};
+export { ANNOTATION_COLORS };
 
+/**
+ * 标注 hook —— 内部走本地 Dexie 仓储（单一真相源）。
+ * 返回接口保持稳定，调用方（ViewerClient）无需改动。
+ */
 export function useAnnotations(paperId: string) {
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -18,11 +19,8 @@ export function useAnnotations(paperId: string) {
     if (!paperId) return;
     setLoading(true);
     try {
-      const response = await fetch(`/api/annotations?paperId=${paperId}`);
-      const data = await response.json();
-      if (data.success) {
-        setAnnotations(data.data);
-      }
+      const data = await repository.listAnnotations(paperId);
+      setAnnotations(data);
     } catch (error) {
       console.error('获取标注失败:', error);
     } finally {
@@ -32,66 +30,55 @@ export function useAnnotations(paperId: string) {
 
   const createAnnotation = useCallback(async (data: {
     page: number;
-    rects: Array<{ x: number; y: number; width: number; height: number }>;
+    rects: Rect[];
     selectedText?: string;
     type: AnnotationType;
     comment?: string;
   }) => {
     if (!paperId) return null;
-    
-    const response = await fetch('/api/annotations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      const created = await repository.createAnnotation({
         paperId,
         page: data.page,
         rects: data.rects,
         selectedText: data.selectedText,
         type: data.type,
-        color: ANNOTATION_COLORS[data.type],
         comment: data.comment,
-      }),
-    });
-
-    const result = await response.json();
-    if (result.success) {
-      console.log('[Annotations Hook] Annotation created:', result.data);
-      setAnnotations(prev => [...prev, result.data]);
-      return result.data;
-    } else {
-      console.error('[Annotations Hook] Failed to create annotation:', result.message);
+        color: ANNOTATION_COLORS[data.type],
+      });
+      setAnnotations((prev) => [...prev, created]);
+      return created;
+    } catch (error) {
+      console.error('[Annotations Hook] 创建标注失败:', error);
+      return null;
     }
-    return null;
   }, [paperId]);
 
   const updateAnnotation = useCallback(async (id: string, data: {
     type?: AnnotationType;
     color?: string;
     comment?: string;
-    aiSummary?: any;
+    aiSummary?: unknown;
   }) => {
-    const response = await fetch('/api/annotations', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, ...data }),
-    });
-
-    const result = await response.json();
-    if (result.success) {
-      setAnnotations(prev => prev.map(a => a.id === id ? { ...a, ...result.data } : a));
-      return result.data;
+    try {
+      await repository.updateAnnotation(id, data);
+      setAnnotations((prev) => prev.map((a) => (a.id === id ? { ...a, ...data } : a)));
+      return true;
+    } catch (error) {
+      console.error('[Annotations Hook] 更新标注失败:', error);
+      return false;
     }
-    return null;
   }, []);
 
   const deleteAnnotation = useCallback(async (id: string) => {
-    const response = await fetch(`/api/annotations?id=${id}`, { method: 'DELETE' });
-    const result = await response.json();
-    if (result.success) {
-      setAnnotations(prev => prev.filter(a => a.id !== id));
+    try {
+      await repository.deleteAnnotation(id);
+      setAnnotations((prev) => prev.filter((a) => a.id !== id));
       return true;
+    } catch (error) {
+      console.error('[Annotations Hook] 删除标注失败:', error);
+      return false;
     }
-    return false;
   }, []);
 
   return {
@@ -104,6 +91,9 @@ export function useAnnotations(paperId: string) {
   };
 }
 
+/**
+ * 研究笔记 hook —— 内部走本地 Dexie 仓储。
+ */
 export function useResearchNotes(paperId: string) {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -111,11 +101,8 @@ export function useResearchNotes(paperId: string) {
   const fetchNotes = useCallback(async () => {
     if (!paperId) return;
     try {
-      const response = await fetch(`/api/research-notes?paperId=${paperId}`);
-      const data = await response.json();
-      if (data.success && data.data.length > 0) {
-        setNotes(data.data[0]?.content || '');
-      }
+      const note = await repository.getNote(paperId);
+      setNotes(note?.content || '');
     } catch (error) {
       console.error('获取笔记失败:', error);
     }
@@ -123,27 +110,10 @@ export function useResearchNotes(paperId: string) {
 
   const saveNotes = useCallback(async (content: string) => {
     if (!paperId) return;
-    
     setSaving(true);
     try {
-      let response = await fetch('/api/research-notes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paperId, content }),
-      });
-      
-      if (!response.ok) {
-        response = await fetch('/api/research-notes', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: `note-${paperId}`, content }),
-        });
-      }
-      
-      const data = await response.json();
-      if (data.success) {
-        setNotes(content);
-      }
+      await repository.saveNote(paperId, content);
+      setNotes(content);
     } catch (error) {
       console.error('保存笔记失败:', error);
     } finally {
@@ -160,13 +130,16 @@ export function useResearchNotes(paperId: string) {
   };
 }
 
+/**
+ * AI 解释 hook —— 仍走服务端 `/api/explain`（无状态 AI 助手，不涉及持久化）。
+ */
 export function useAIExplanation() {
-  const [explanation, setExplanation] = useState<any>(null);
+  const [explanation, setExplanation] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
 
   const explain = useCallback(async (text: string) => {
     if (!text.trim()) return;
-    
+
     setLoading(true);
     try {
       const response = await fetch('/api/explain', {
