@@ -1,5 +1,5 @@
 import { streamText } from "ai";
-import { deepseek, MODELS } from "@/lib/ai";
+import { deepseek, MODELS, isStreamingAIConfigured, aiNotConfiguredResponse } from "@/lib/ai";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -21,6 +21,7 @@ const FOCUS_HINT = {
 const MAX_CHARS = 16000;
 
 export async function POST(req: Request) {
+  if (!isStreamingAIConfigured()) return aiNotConfiguredResponse();
   let parsed;
   try {
     parsed = Body.parse(await req.json());

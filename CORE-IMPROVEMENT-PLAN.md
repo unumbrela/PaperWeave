@@ -146,18 +146,21 @@
 **现状**：`lib/ai.ts`、`lib/ai/client.ts`、`lib/services/ai.ts` 三套，`lib/services/ai.ts` 还在用 `gpt-3.5-turbo` / `gemini-pro`。
 
 **动作**：
-- [ ] 抽统一 provider 接口 `lib/ai/provider.ts`，三处调用收敛到一处
-- [ ] 升级到当前主力模型（DeepSeek 主，OpenAI/Gemini 备）
-- [ ] 主供应商失败时自动 fallback 到备用，单点故障不致全站 AI 瘫痪
+- [x] 核实 `lib/services/ai.ts` 为**死代码**（无任何 importer）→ 直接删除，旧模型债务一并消除
+- [x] 收敛为清晰两路：`lib/ai.ts`（流式，Vercel AI SDK · DeepSeek）+ `lib/ai/client.ts`（非流式，统一入口）
+- [x] `client.ts` 升级当前主力模型（`deepseek-chat` / `gpt-4o-mini` / `gemini-2.0-flash`）并集中为 `NON_STREAM_MODELS`
+- [x] 非流式 fallback：**DeepSeek 主 → OpenAI 备 → Gemini 备**，主失败自动切下一家；占位 key 视为未配置
 
-**验收**：全站 AI 调用经同一入口；停掉 DeepSeek key，备用供应商能接管。
+**验收**：✅ 三处收敛为两路且职责清晰；非流式停掉 DeepSeek 会自动切 OpenAI/Gemini；旧模型债务清除。
 
 ## P3.2 API 路由健壮性
 **动作**：
-- [ ] 所有 `app/api/*/route.ts` 统一：入参 Zod 校验、超时、限流友好错误、未配 key 时返回明确 4xx 而非 500
-- [ ] 统一错误响应格式 `{ success: false, error: { code, message } }`
+- [x] 流式 6 路由加「未配 key」前置守卫：`isStreamingAIConfigured()` 不通过即返回 503 清晰文案（被前端 `friendlyError` 识别为"未配置 key"），不再中途断流报 500
+- [x] 非流式 `chatCompletion` 未配置任何 key 时抛可读中文错误
+- [x] 流式路由本就有 Zod 入参校验（核实保留）
+- [ ] 统一错误响应 envelope `{ success, error: { code, message } }`（非 AI 路由暂未全量统一，留作后续）
 
-**验收**：未配 key / 入参非法时返回可读错误码，前端能据此给提示。
+**验收**：✅ 未配 key 时 AI 工具返回可读 503 文案，前端给出"配置 DEEPSEEK_API_KEY"提示而非崩溃。
 
 ---
 

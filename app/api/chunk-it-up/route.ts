@@ -1,5 +1,5 @@
 import { streamText } from "ai";
-import { deepseek, MODELS } from "@/lib/ai";
+import { deepseek, MODELS, isStreamingAIConfigured, aiNotConfiguredResponse } from "@/lib/ai";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -35,6 +35,7 @@ const EXECUTOR_LABEL = {
 } as const;
 
 export async function POST(req: Request) {
+  if (!isStreamingAIConfigured()) return aiNotConfiguredResponse();
   let parsed;
   try {
     parsed = Body.parse(await req.json());
