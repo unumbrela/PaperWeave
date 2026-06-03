@@ -3,7 +3,7 @@ import { convertPdf } from "@/lib/convert-pdf";
 import { convertHtml } from "@/lib/convert-html";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 60; // Vercel Hobby 上限 60s（Pro 可放宽到 300）
 
 const MAX_SIZE = 25 * 1024 * 1024;
 

@@ -10,11 +10,9 @@
 
 import { OpenAI } from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import type { ResolvedKeys } from './keys';
 
-const OPENAI_KEY = process.env.OPENAI_API_KEY;
-const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_URL = process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1';
-const GOOGLE_KEY = process.env.GOOGLE_API_KEY;
 
 /** 各供应商当前主力模型（非流式默认） */
 export const NON_STREAM_MODELS = {
@@ -25,8 +23,17 @@ export const NON_STREAM_MODELS = {
 
 type Message = { role: 'system' | 'user' | 'assistant'; content: string };
 
-const PLACEHOLDERS = new Set(['', 'your-openai-key', 'your-deepseek-key', 'your_deepseek_key', 'your-gemini-key']);
+const PLACEHOLDERS = new Set(['', 'your-openai-key', 'your-deepseek-key', 'your_deepseek_key', 'your-gemini-key', 'ci-placeholder']);
 const isReal = (k?: string): k is string => !!k && !PLACEHOLDERS.has(k);
+
+/** 把「访客自带 key」覆盖到环境变量之上，得到本次调用实际可用的 key */
+function effectiveKeys(override?: ResolvedKeys) {
+  return {
+    deepseek: override?.deepseek ?? process.env.DEEPSEEK_API_KEY,
+    openai: override?.openai ?? process.env.OPENAI_API_KEY,
+    gemini: override?.gemini ?? process.env.GOOGLE_API_KEY,
+  };
+}
 
 async function fetchWithTimeout(url: string, opts: RequestInit = {}, timeoutMs = 30000) {
   const controller = new AbortController();
@@ -38,12 +45,11 @@ async function fetchWithTimeout(url: string, opts: RequestInit = {}, timeoutMs =
   }
 }
 
-async function callDeepSeek(messages: Message[], model?: string, temperature = 0.3, max_tokens = 1000) {
-  if (!isReal(DEEPSEEK_KEY)) throw new Error('DeepSeek key not configured');
+async function callDeepSeek(messages: Message[], key: string, model?: string, temperature = 0.3, max_tokens = 1000) {
   const url = `${DEEPSEEK_URL.replace(/\/$/, '')}/chat/completions`;
   const res = await fetchWithTimeout(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEEPSEEK_KEY}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({ model: model ?? NON_STREAM_MODELS.deepseek, messages, temperature, max_tokens }),
   });
   if (!res.ok) {
@@ -54,9 +60,8 @@ async function callDeepSeek(messages: Message[], model?: string, temperature = 0
   return data?.choices?.[0]?.message?.content ?? '';
 }
 
-async function callOpenAI(messages: Message[], model?: string, temperature = 0.3, max_tokens = 1000) {
-  if (!isReal(OPENAI_KEY)) throw new Error('OpenAI key not configured');
-  const client = new OpenAI({ apiKey: OPENAI_KEY });
+async function callOpenAI(messages: Message[], key: string, model?: string, temperature = 0.3, max_tokens = 1000) {
+  const client = new OpenAI({ apiKey: key });
   const res = await client.chat.completions.create({
     model: model ?? NON_STREAM_MODELS.openai,
     messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
@@ -66,9 +71,8 @@ async function callOpenAI(messages: Message[], model?: string, temperature = 0.3
   return res.choices?.[0]?.message?.content ?? '';
 }
 
-async function callGemini(messages: Message[], _model?: string, temperature = 0.3, max_tokens = 1000) {
-  if (!isReal(GOOGLE_KEY)) throw new Error('Gemini key not configured');
-  const genAI = new GoogleGenerativeAI(GOOGLE_KEY);
+async function callGemini(messages: Message[], key: string, _model?: string, temperature = 0.3, max_tokens = 1000) {
+  const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
     model: NON_STREAM_MODELS.gemini,
     generationConfig: { temperature, maxOutputTokens: max_tokens },
@@ -86,16 +90,18 @@ async function callGemini(messages: Message[], _model?: string, temperature = 0.
 export async function chatCompletion(
   messages: Message[],
   options?: { model?: string; temperature?: number; max_tokens?: number },
+  keys?: ResolvedKeys,
 ): Promise<string> {
   const { model, temperature = 0.3, max_tokens = 1000 } = options ?? {};
+  const eff = effectiveKeys(keys);
 
   const attempts: Array<{ name: string; fn: () => Promise<string> }> = [];
-  if (isReal(DEEPSEEK_KEY)) attempts.push({ name: 'DeepSeek', fn: () => callDeepSeek(messages, model, temperature, max_tokens) });
-  if (isReal(OPENAI_KEY)) attempts.push({ name: 'OpenAI', fn: () => callOpenAI(messages, model, temperature, max_tokens) });
-  if (isReal(GOOGLE_KEY)) attempts.push({ name: 'Gemini', fn: () => callGemini(messages, model, temperature, max_tokens) });
+  if (isReal(eff.deepseek)) attempts.push({ name: 'DeepSeek', fn: () => callDeepSeek(messages, eff.deepseek!, model, temperature, max_tokens) });
+  if (isReal(eff.openai)) attempts.push({ name: 'OpenAI', fn: () => callOpenAI(messages, eff.openai!, model, temperature, max_tokens) });
+  if (isReal(eff.gemini)) attempts.push({ name: 'Gemini', fn: () => callGemini(messages, eff.gemini!, model, temperature, max_tokens) });
 
   if (attempts.length === 0) {
-    throw new Error('AI 服务未配置：请在 .env.local 设置 DEEPSEEK_API_KEY（或 OPENAI_API_KEY / GOOGLE_API_KEY）。');
+    throw new Error('AI 服务未配置：请在右上角「API Key」填入你自己的 key（本地开发可在 .env.local 设 DEEPSEEK_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY）。');
   }
 
   let lastErr: unknown = null;

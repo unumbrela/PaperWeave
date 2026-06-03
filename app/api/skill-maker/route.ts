@@ -1,5 +1,6 @@
 import { streamText } from "ai";
-import { deepseek, MODELS, isStreamingAIConfigured, aiNotConfiguredResponse } from "@/lib/ai";
+import { getDeepSeek, MODELS, aiNotConfiguredResponse } from "@/lib/ai";
+import { resolveKeys } from "@/lib/ai/keys";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -17,7 +18,8 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
-  if (!isStreamingAIConfigured()) return aiNotConfiguredResponse();
+  const { deepseek: dsKey } = resolveKeys(req);
+  if (!dsKey) return aiNotConfiguredResponse();
   let parsed;
   try {
     parsed = Body.parse(await req.json());
@@ -62,7 +64,7 @@ ${parsed.capability}
 严格按系统提示中的章节结构输出，不要多加别的段落，不要加 "这是你的 SKILL.md" 之类的前言。`;
 
   const result = streamText({
-    model: deepseek(MODELS.chat),
+    model: getDeepSeek(dsKey)(MODELS.chat),
     system,
     prompt,
     temperature: 0.3,

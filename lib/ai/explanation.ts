@@ -1,4 +1,5 @@
 import { chatCompletion } from './client';
+import type { ResolvedKeys } from './keys';
 
 export interface AIExplanationResult {
   coreIdea: string;
@@ -7,7 +8,7 @@ export interface AIExplanationResult {
   applications: string;
 }
 
-export async function getAIExplanation(text: string): Promise<AIExplanationResult> {
+export async function getAIExplanation(text: string, keys?: ResolvedKeys): Promise<AIExplanationResult> {
   const prompt = `
   Analyze the following text from a research paper and provide a structured explanation:
 
@@ -34,7 +35,7 @@ export async function getAIExplanation(text: string): Promise<AIExplanationResul
     const content = await chatCompletion([
       { role: 'system', content: 'You are a research assistant helping to understand academic papers. Provide clear, concise, and insightful explanations.' },
       { role: 'user', content: prompt },
-    ], { model: 'gpt-4o-mini', temperature: 0.3, max_tokens: 1000 });
+    ], { model: 'gpt-4o-mini', temperature: 0.3, max_tokens: 1000 }, keys);
 
     const parseSection = (sectionName: string): string => {
       const regex = new RegExp(`${sectionName}:\\n([\\s\\S]*?)(?=\\n[A-Z_]+:|$)`);

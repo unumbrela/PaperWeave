@@ -28,34 +28,50 @@ export default function PaperDetailPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true);
   const [pdfStatus, setPdfStatus] = useState<PdfStatus>("checking");
   const [localPdfPath, setLocalPdfPath] = useState<string | null>(null);
-  const [justDownloaded, setJustDownloaded] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    fetchPaper(id);
+    let cancelled = false;
+    (async () => {
+      try {
+        const found = await repository.getPaper(id);
+        if (cancelled) return;
+        if (found) setPaper(found);
+      } catch (error) {
+        console.error("Failed to fetch paper:", error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   useEffect(() => {
-    if (paper) {
-      checkAndDownloadPdf();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paper]);
-
-  async function fetchPaper(id: string) {
-    setLoading(true);
-    try {
-      const found = await repository.getPaper(id);
-      if (found) {
-        setPaper(found);
+    if (!paper) return;
+    let cancelled = false;
+    // 内联 async IIFE：await 在先，避免 effect 同步 setState 触发级联渲染
+    (async () => {
+      const blob = await repository.getPdfBlob(paper.id);
+      if (cancelled) return;
+      if (blob) {
+        setLocalPdfPath(URL.createObjectURL(blob));
+        setPdfStatus("downloaded");
+        return;
       }
-    } catch (error) {
-      console.error("Failed to fetch paper:", error);
-    } finally {
-      setLoading(false);
-    }
-  }
+      if (paper.pdfPath) {
+        setLocalPdfPath(paper.pdfPath);
+        setPdfStatus("downloaded");
+      } else {
+        setPdfStatus("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [paper]);
 
   async function deletePaper() {
     if (!paper) return;
@@ -77,30 +93,23 @@ export default function PaperDetailPage({ params }: { params: Promise<{ id: stri
     if (!paper) return;
 
     try {
-      setPdfStatus("checking");
+      // 纯客户端解析，不再走服务端下载落盘（Vercel 文件系统只读）：
+      // 优先本地离线缓存的 Blob；否则用 pdfPath（arXiv 走同源 /api/pdf-proxy，或远端链接）。
+      const blob = await repository.getPdfBlob(paper.id);
+      if (blob) {
+        setLocalPdfPath(URL.createObjectURL(blob));
+        setPdfStatus("downloaded");
+        return;
+      }
 
-      const res = await fetch("/api/papers/download-pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          paperId: paper.id,
-          pdfUrl: paper.pdfPath,
-          arxivId: paper.arxivId,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        // 服务端是同步下载：响应返回时文件已落盘，无需伪造进度条。
-        setJustDownloaded(!data.alreadyDownloaded);
-        setLocalPdfPath(data.pdfPath);
+      if (paper.pdfPath) {
+        setLocalPdfPath(paper.pdfPath);
         setPdfStatus("downloaded");
       } else {
         setPdfStatus("error");
       }
     } catch (error) {
-      console.error("PDF下载检查失败:", error);
+      console.error("PDF 准备失败:", error);
       setPdfStatus("error");
     }
   }
@@ -119,7 +128,7 @@ export default function PaperDetailPage({ params }: { params: Promise<{ id: stri
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-sage text-sm">
               <CheckCircle className="w-4 h-4" />
-              <span>{justDownloaded ? "已为你下载 PDF" : "PDF 已就绪"}</span>
+              <span>PDF 已就绪</span>
             </div>
             <div className="flex flex-wrap gap-3">
               <a
@@ -147,7 +156,10 @@ export default function PaperDetailPage({ params }: { params: Promise<{ id: stri
             <FileQuestion className="w-4 h-4" />
             <span>PDF 暂时无法获取</span>
             <button
-              onClick={checkAndDownloadPdf}
+              onClick={() => {
+                setPdfStatus("checking");
+                checkAndDownloadPdf();
+              }}
               className="ml-2 rounded-full border border-line bg-paper-2/70 px-3 py-1 text-ink-2 transition-colors hover:border-line-strong hover:text-ink focus-ring"
             >
               重试

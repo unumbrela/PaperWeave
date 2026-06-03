@@ -1,9 +1,10 @@
 import { streamText } from "ai";
-import { deepseek, MODELS, isStreamingAIConfigured, aiNotConfiguredResponse } from "@/lib/ai";
+import { getDeepSeek, MODELS, aiNotConfiguredResponse } from "@/lib/ai";
+import { resolveKeys } from "@/lib/ai/keys";
 import { z } from "zod";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 60; // Vercel Hobby 上限 60s（Pro 可放宽到 300）
 
 const Body = z.object({
   direction: z.string().min(2, "请填写研究方向或关键词"),
@@ -15,7 +16,8 @@ const Body = z.object({
 const MAX_REF_CHARS = 12000;
 
 export async function POST(req: Request) {
-  if (!isStreamingAIConfigured()) return aiNotConfiguredResponse();
+  const { deepseek: dsKey } = resolveKeys(req);
+  if (!dsKey) return aiNotConfiguredResponse();
   let parsed;
   try {
     parsed = Body.parse(await req.json());
@@ -56,7 +58,7 @@ export async function POST(req: Request) {
 按"可行性 × 创新性"给出建议先做哪一条，一句话说明理由。`;
 
   const result = streamText({
-    model: deepseek(MODELS.reasoner),
+    model: getDeepSeek(dsKey)(MODELS.reasoner),
     system,
     prompt,
     temperature: 0.5,

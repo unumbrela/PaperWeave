@@ -125,6 +125,16 @@ pnpm prisma migrate dev
 
 ---
 
+## 部署上线
+
+一键部署到 **Vercel**（Next.js 官方平台，免费 Hobby 足够），完整步骤（含 Cloudflare 买域名、接 DNS）见 [`DEPLOY.md`](./DEPLOY.md)。
+
+**AI = 访客自带 key**：公开部署时服务端默认不带任何 LLM key，访客在站内 **`/settings`**（右上角「API Key」）填入自己的 DeepSeek / OpenAI / Gemini key——只存本机 localStorage、经请求头转发、服务端不持久化。这样公开 demo **不花站长的钱、也不会被刷爆**；检索 / 阅读 / PDF 批注 / 模型可视化等功能**不需要 key 也能用**。
+
+> 已做好 serverless 适配：PDF 走同源代理 `/api/pdf-proxy`（不再落盘）、AI 路由 `maxDuration` ≤ 60s（Hobby 上限）。
+
+---
+
 ## 项目结构
 
 ```text

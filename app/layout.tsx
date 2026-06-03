@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Instrument_Serif, JetBrains_Mono, Fraunces } from "next/font/google";
 import Link from "next/link";
-import { User } from "lucide-react";
+import { User, KeyRound } from "lucide-react";
 import { MeshBackground } from "@/components/mesh-background";
 import "./globals.css";
 import "./tools/hpi-potsdam/landing.css";
@@ -85,6 +85,13 @@ function SiteNav() {
         <nav className="flex items-center gap-6 text-[13px] text-ink-3">
           <Link href="/" className="hover:text-ink transition-colors">
             工作流
+          </Link>
+          <Link
+            href="/settings"
+            className="flex items-center gap-1.5 hover:text-ink transition-colors"
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">API Key</span>
           </Link>
           <Link
             href="/library"

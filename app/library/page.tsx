@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { repository } from "@/lib/db/repository";
 import type { Paper } from "@/lib/db/types";
+import { userKeyHeaders } from "@/lib/ai/user-keys";
 import { LoadingState, EmptyState, ErrorState } from "@/components/states";
 import { ImportModal } from "@/components/library/ImportModal";
 import { PaperCard } from "@/components/library/PaperCard";
@@ -135,6 +136,12 @@ export default function LibraryPage() {
       if (data.success) {
         // 落库到本地 Dexie（单一真相源）
         const newPaper = await repository.savePaper(data.data as Partial<Paper> & { title: string });
+        // PDF 原始二进制直接存为本地 Blob（服务端不再落盘），阅读页可离线打开
+        try {
+          await repository.cachePdfBlob(newPaper.id, selectedFile);
+        } catch {
+          // 缓存失败不影响入库
+        }
         setImportMessage("✅ 导入成功！");
         setSelectedFile(null);
         setPapers((prev) => [newPaper, ...prev]);
@@ -156,7 +163,7 @@ export default function LibraryPage() {
       // 服务端无状态 AI 助手：传入摘要文本，返回结构化分析（不持久化）
       const res = await fetch("/api/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...userKeyHeaders() },
         body: JSON.stringify({ text: target.abstract || target.title }),
       });
 

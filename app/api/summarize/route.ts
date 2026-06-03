@@ -1,5 +1,6 @@
 import { streamText } from "ai";
-import { deepseek, MODELS, isStreamingAIConfigured, aiNotConfiguredResponse } from "@/lib/ai";
+import { getDeepSeek, MODELS, aiNotConfiguredResponse } from "@/lib/ai";
+import { resolveKeys } from "@/lib/ai/keys";
 import { extractFromUrl } from "@/lib/extract";
 import { z } from "zod";
 
@@ -18,7 +19,8 @@ const LENGTH_HINT = {
 } as const;
 
 export async function POST(req: Request) {
-  if (!isStreamingAIConfigured()) return aiNotConfiguredResponse();
+  const { deepseek: dsKey } = resolveKeys(req);
+  if (!dsKey) return aiNotConfiguredResponse();
   let parsed;
   try {
     parsed = Body.parse(await req.json());
@@ -70,7 +72,7 @@ export async function POST(req: Request) {
 ${page.text}`;
 
   const result = streamText({
-    model: deepseek(MODELS.chat),
+    model: getDeepSeek(dsKey)(MODELS.chat),
     system,
     prompt,
     temperature: 0.3,

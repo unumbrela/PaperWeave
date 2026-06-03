@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { userKeyHeaders } from "@/lib/ai/user-keys";
 
 export function useStream() {
   const [text, setText] = useState("");
@@ -19,7 +20,7 @@ export function useStream() {
       try {
         const res = await fetch(url, {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", ...userKeyHeaders() },
           body: JSON.stringify(body),
           signal: ctl.signal,
         });

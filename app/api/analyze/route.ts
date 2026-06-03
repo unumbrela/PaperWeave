@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { callAnalysis, parseAnalysis, toPaperFields, ANALYSIS_OUTPUT_SPEC } from '@/lib/ai/analyze';
+import { resolveKeys } from '@/lib/ai/keys';
 import prisma from '@/lib/db/prisma';
 
 const extractTextFromPdf = async (pdfPath: string): Promise<string> => {
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
 
     const prompt = `任务说明：请从给定的论文摘要或文本中提取关键信息，并以机器可解析的严格 JSON 返回。\n\n输入文本：\n${contentToAnalyze}\n\n${ANALYSIS_OUTPUT_SPEC}\n\n请严格输出 JSON，立即开始处理。`;
 
-    const raw = await callAnalysis(prompt);
+    const raw = await callAnalysis(prompt, resolveKeys(request));
     const parsed = parseAnalysis(raw);
 
     const paperAnalysis = parsed
