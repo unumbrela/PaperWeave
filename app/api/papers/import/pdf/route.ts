@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       for (let i = 1; i <= numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        extractedText += textContent.items.map((item: any) => item.str).join(' ') + '\n\n';
+        extractedText += textContent.items.map((item) => ('str' in item ? item.str : '')).join(' ') + '\n\n';
       }
       
       await pdf.destroy();

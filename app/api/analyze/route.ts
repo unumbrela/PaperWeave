@@ -38,7 +38,7 @@ const extractTextFromPdf = async (pdfPath: string): Promise<string> => {
       return await new Promise<string>((resolve) => {
         const rows: Record<number, string[]> = {};
         const reader = new PdfReader();
-        reader.parseBuffer(buffer, (err: any, item: any) => {
+        reader.parseBuffer(buffer, (err: unknown, item: { text?: string; y?: number } | null) => {
           if (err) {
             console.warn('pdfreader parse error:', err);
             resolve('');
@@ -120,16 +120,20 @@ export async function POST(request: Request) {
       { role: 'user', content: prompt },
     ], { model: process.env.DEEPSEEK_API_KEY ? 'deepseek-chat' : undefined, temperature: 0.2, max_tokens: 1000 });
 
-    let parsed: any = null;
+    type ParsedAnalysis = {
+      summary?: string; methodology?: string; contribution?: string;
+      keywords?: string[]; applications?: string[];
+    };
+    let parsed: ParsedAnalysis | null = null;
     try {
       parsed = JSON.parse(raw);
-    } catch (e) {
+    } catch {
       // 尝试从文本中抽取第一个 JSON 对象
       const m = raw.match(/\{[\s\S]*\}/);
       if (m) {
         try {
           parsed = JSON.parse(m[0]);
-        } catch (e2) {
+        } catch {
           parsed = null;
         }
       }

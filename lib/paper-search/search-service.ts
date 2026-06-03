@@ -111,7 +111,7 @@ export async function searchOpenAlex(query: SearchQuery): Promise<PaperResult[]>
         results.push({
           id: work.id?.replace('https://openalex.org/', '') || `openalex-${work.id}`,
           title: work.title,
-          authors: work.authorships?.map((a: any) => a.author?.display_name).filter(Boolean) || [],
+          authors: work.authorships?.map((a: { author?: { display_name?: string } }) => a.author?.display_name).filter(Boolean) || [],
           year: work.publication_year,
           venue: work.venue?.name,
           url: work.id,
@@ -296,7 +296,7 @@ export async function searchSemanticScholar(query: SearchQuery, apiKey?: string)
         results.push({
           id: paper.paperId,
           title: paper.title,
-          authors: paper.authors?.map((a: any) => a.name) || [],
+          authors: paper.authors?.map((a: { name?: string }) => a.name) || [],
           year: paper.year,
           venue: paper.venue,
           url: `https://www.semanticscholar.org/paper/${paper.paperId}`,

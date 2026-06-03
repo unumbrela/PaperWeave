@@ -261,7 +261,7 @@ export default function ViewerClient() {
     if (!paper) return;
     
     const markdown = generateMarkdown({
-      paper: paper as any,
+      paper: paper as unknown as import('@/lib/db/types').Paper,
       annotations,
       aiSummary,
       researchNotes,
