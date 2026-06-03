@@ -6,10 +6,6 @@ import { MeshBackground } from "@/components/mesh-background";
 import "./globals.css";
 import "./tools/hpi-potsdam/landing.css";
 import "./tools/hpi-potsdam/overrides.css";
-import "./tools/beautiful-aurora/aurora.css";
-import "./tools/bruno-folio/bruno.css";
-import "./tools/fluid-sim/fluid.css";
-import "./tools/hamish-portfolio/hamish.css";
 
 const inter = Inter({
   variable: "--font-inter",
