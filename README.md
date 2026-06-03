@@ -152,14 +152,13 @@ lib/
 - 暖纸面底 + 5 团慢速漂移的 radial blob + SVG `feTurbulence` 颗粒层
 - 衬线斜体做强调，等宽做技术标签，sans 主体
 - 极简卡片 + hairline 分隔，受 Raycast / Trae 启发
-- 所有设计组件被沉淀进 `tools/web-beautifier`，可即插即用
+- 全局暖色动态背景由 `components/mesh-background.tsx` 提供
 
 ---
 
 ## 路线图
 
-完整的改进与优化计划见 [`OPTIMIZATION-ROADMAP.md`](./OPTIMIZATION-ROADMAP.md)。
-项目阶段性总结见 [`PROJECT-SUMMARY.md`](./PROJECT-SUMMARY.md)。
+项目当前真实状态、已交付能力、关键设计决策与下一步行动，见 [`PROJECT-SUMMARY.md`](./PROJECT-SUMMARY.md)。
 
 ## 贡献
 
@@ -167,7 +166,8 @@ lib/
 
 ## License
 
-<!-- ⚠️ 待补：仓库目前缺少正式 LICENSE 文件，请尽快补一个（建议 MIT 或 Apache-2.0）。 -->
-本项目仅供学习与研究使用。仓库中涉及的第三方前端作品（Bruno Simon folio-2019、Pavel Dobryakov Fluid Simulation、HamishMW portfolio、HPI Potsdam iGEM 主页等）**版权归原作者所有**，建议在公开发布前以"外链引用"替代"代码内置"，规避授权风险（详见路线图 P0）。
+本项目以 [MIT License](./LICENSE) 开源。
+
+「可视化表达」环内置的 HPI Potsdam 2025 iGEM 主页素材**版权归原作者所有**，建议在公开发布前以"外链引用"替代"代码内置"，规避授权风险。（原先内置的 Bruno Simon folio-2019、Pavel Dobryakov Fluid Simulation、HamishMW portfolio 等复刻作品已随资产工具一并从主仓移除。）
 </content>
 </invoke>
