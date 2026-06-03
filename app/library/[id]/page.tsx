@@ -390,6 +390,7 @@ export default function PaperDetailPage({ params }: { params: Promise<{ id: stri
             targetSlug="markdown-summarize"
             payload={{
               from: paper.title.slice(0, 24) + (paper.title.length > 24 ? "…" : ""),
+              sourcePaperId: paper.id,
               fields: {
                 markdown: [
                   `# ${paper.title}`,
@@ -406,6 +407,7 @@ export default function PaperDetailPage({ params }: { params: Promise<{ id: stri
             targetSlug="idea-generator"
             payload={{
               from: paper.title.slice(0, 24) + (paper.title.length > 24 ? "…" : ""),
+              sourcePaperId: paper.id,
               fields: {
                 direction: paper.direction || paper.title,
                 references: [paper.title, paper.abstract, paper.summary].filter(Boolean).join("\n\n"),
@@ -461,6 +463,19 @@ export default function PaperDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* 研究笔记（含从「Idea 生成器」回存的产出） */}
+          {paper.notes && paper.notes.trim() && (
+            <div className="bg-white rounded-2xl border border-line shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-amber-600" />
+                研究笔记
+              </h2>
+              <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">
+                {paper.notes}
+              </p>
             </div>
           )}
 
