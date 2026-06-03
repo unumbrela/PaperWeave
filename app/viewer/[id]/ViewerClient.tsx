@@ -88,9 +88,27 @@ export default function ViewerClient() {
     return () => clearTimeout(debounce);
   }, [researchNotes, saveNotes]);
 
-  const handleDocumentLoadSuccess = (info: { numPages: number } | number) => {
+  // 自动保存阅读进度（翻页后防抖写入本地）
+  useEffect(() => {
+    if (!params.id || numPages < 1) return;
+    const debounce = setTimeout(() => {
+      repository.saveProgress(params.id as string, currentPage, numPages).catch(() => {});
+    }, 600);
+    return () => clearTimeout(debounce);
+  }, [params.id, currentPage, numPages]);
+
+  const handleDocumentLoadSuccess = async (info: { numPages: number } | number) => {
     const totalPages = typeof info === 'number' ? info : info.numPages;
     setNumPages(totalPages);
+    // 恢复上次阅读进度
+    try {
+      const saved = await repository.getProgress(params.id as string);
+      if (saved && saved.currentPage >= 1 && saved.currentPage <= totalPages) {
+        setCurrentPage(saved.currentPage);
+      }
+    } catch {
+      // 无进度记录，忽略
+    }
   };
 
   const handleFitWidth = () => {

@@ -19,6 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { repository } from "@/lib/db/repository";
+import { LoadingState, EmptyState, ErrorState } from "@/components/states";
 
 interface Author {
   name: string;
@@ -48,6 +49,7 @@ interface Paper {
 export default function LibraryPage() {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string>("");
   const [selectedDirection, setSelectedDirection] = useState<string>("");
@@ -75,6 +77,7 @@ export default function LibraryPage() {
 
   async function fetchPapers() {
     setLoading(true);
+    setError(null);
     try {
       // 从本地 Dexie 仓储读取（单一真相源）
       const data = await repository.listPapers({
@@ -85,8 +88,9 @@ export default function LibraryPage() {
         ...(searchQuery && { search: searchQuery }),
       });
       setPapers(data as Paper[]);
-    } catch (error) {
-      console.error("Failed to fetch papers:", error);
+    } catch (err) {
+      console.error("Failed to fetch papers:", err);
+      setError(err instanceof Error ? err.message : "读取本地论文库失败");
       setPapers([]);
     } finally {
       setLoading(false);
@@ -388,21 +392,27 @@ export default function LibraryPage() {
       {/* 论文列表 */}
       <div className="mx-auto max-w-6xl px-6 py-8">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-2 border-coral border-t-transparent rounded-full animate-spin" />
-          </div>
+          <LoadingState count={6} />
+        ) : error ? (
+          <ErrorState message={error} onRetry={fetchPapers} />
         ) : papers.length === 0 ? (
-          <div className="text-center py-20">
-            <BookOpen className="w-16 h-16 mx-auto text-ink-2 mb-4" />
-            <h3 className="text-xl font-medium text-ink mb-2">暂无论文</h3>
-            <p className="text-ink-3 mb-6">点击右上角按钮导入你的第一篇论文</p>
-            <button
-              onClick={() => setShowImportModal(true)}
-              className="px-6 py-2 bg-gradient-to-r from-[#ff5d4d] to-[#9b5de5] text-white rounded-lg text-sm font-medium"
-            >
-              立即导入
-            </button>
-          </div>
+          <EmptyState
+            icon={<BookOpen className="h-12 w-12" />}
+            title={searchQuery || selectedTag || selectedDirection ? "没有匹配的论文" : "论文库还是空的"}
+            hint={
+              searchQuery || selectedTag || selectedDirection
+                ? "换个关键词或清除筛选条件试试。"
+                : "从「论文调研搜索」入库，或点右上角按钮导入 arXiv / PDF。"
+            }
+            action={
+              <button
+                onClick={() => setShowImportModal(true)}
+                className="px-6 py-2 bg-gradient-to-r from-[#ff5d4d] to-[#9b5de5] text-white rounded-lg text-sm font-medium"
+              >
+                导入论文
+              </button>
+            }
+          />
         ) : (
           <div className="space-y-4">
             {papers.map((paper) => (

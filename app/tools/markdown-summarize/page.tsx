@@ -22,7 +22,7 @@ export default function Page() {
   const [markdown, setMarkdown] = useState("");
   const [focus, setFocus] = useState<(typeof FOCUS)[number]["value"]>("balanced");
   const [handoffFrom, setHandoffFrom] = useState<string | null>(null);
-  const { text, loading, error, run } = useStream();
+  const { text, loading, error, run, stop } = useStream();
 
   useEffect(() => {
     const h = consumeHandoff("markdown-summarize");
@@ -105,6 +105,7 @@ export default function Page() {
             loading={loading}
             error={error}
             onRetry={submit}
+            onStop={stop}
             emptyHint="粘贴论文 Markdown，点击结构化总结。"
           />
           {text && !loading && (

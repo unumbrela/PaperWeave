@@ -20,7 +20,7 @@ function SummarizeContent() {
   const [url, setUrl] = useState("");
   const [length, setLength] =
     useState<(typeof LENGTHS)[number]["value"]>("medium");
-  const { text, loading, error, run } = useStream();
+  const { text, loading, error, run, stop } = useStream();
 
   useEffect(() => {
     const incomingUrl = searchParams.get("url");
@@ -97,6 +97,7 @@ function SummarizeContent() {
           loading={loading}
           error={error}
           onRetry={submit}
+          onStop={stop}
           emptyHint="Paste a URL, press 生成摘要."
         />
       </div>

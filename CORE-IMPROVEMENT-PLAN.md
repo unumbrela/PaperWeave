@@ -102,39 +102,39 @@
 
 ## P2.1 统一加载 / 空 / 错误三态
 **动作**：
-- [ ] 抽 `<LoadingState>` / `<EmptyState>` / `<ErrorState>` 三个通用组件
-- [ ] library、paper-search、viewer 的列表与详情统一接入（骨架屏替代白屏）
-- [ ] 所有 `fetch` 失败给可读的中文提示 + 重试按钮，而非 `console.error` 吞掉
+- [x] 抽 `components/states.tsx`：`<LoadingState>`（骨架网格）/ `<InlineLoading>` / `<EmptyState>` / `<ErrorState>`
+- [x] library 列表接入三态（骨架屏替代白屏；空态区分"库空 vs 无匹配"；错误态带重试）
+- [x] library 读取失败设 `error` 态 + 重试，不再静默吞掉
+- [ ] paper-search / viewer 详情进一步接入（viewer 已有自带错误态；paper-search 结果区可后续补）
 
-**验收**：断网 / 后端报错时，每个核心页面都有明确的失败反馈与重试，无白屏。
+**验收**：✅ library 在加载/空/读取失败时均有明确反馈与重试，无白屏。
 
 ## P2.2 流式工具的中断与反馈
 **动作**：
-- [ ] AI 流式工具（summarize / markdown-summarize / idea-generator / analyze）统一支持"停止生成"
-- [ ] 首 token 前显示"思考中"指示，避免点了没反应的错觉
-- [ ] 流式出错（断流 / 限流 / key 失效）给具体提示并可一键重试
+- [x] `useStream` 新增 `stop()`（中断但保留已生成文本）；`StreamOutput` 加"停止生成"按钮
+- [x] 首 token 前显示"思考中…"指示（状态标 Thinking + 骨架）
+- [x] 流式出错按 `friendlyError` 归类（未配 key / 限流 / 网络/超时）+ 一键重试
+- [x] 全部 7 个流式工具（summarize / markdown-summarize / idea-generator / explain-code / optimize-prompt / prompt-chunker / skill-maker）统一接入
 
-**验收**：每个流式工具可中途停止；失败提示能区分"网络/限流/未配 key"。
+**验收**：✅ 每个流式工具可中途停止；失败提示能区分"网络/限流/未配 key"。
 
 ## P2.3 PDF 阅读器流畅度
-**现状**：`app/viewer/[id]/ViewerClient.tsx` 506 行，react-pdf + 批注层。
+**现状**：`app/viewer/[id]/ViewerClient.tsx` + `PDFViewerDynamic`，react-pdf + 批注层。
 
 **动作**：
-- [ ] 大 PDF 分页懒加载 / 虚拟化，避免一次性渲染全部页卡死
-- [ ] 翻页、缩放、批注创建有即时反馈；阅读进度自动保存（`progressDB` 已具备，接上 UI）
-- [ ] PDF 加载失败（坏文件 / 跨域）给降级提示与"重新下载"
+- [x] 核实渲染策略：已是**单页渲染**（按 `currentPage` 渲染当前页，非一次性全渲染）→ 无虚拟化必要
+- [x] 阅读进度自动保存 + 恢复：翻页防抖写入 `repository.saveProgress`，加载后 `getProgress` 回到上次页
+- [x] PDF 加载失败已有降级 UI（`PDFViewerDynamic` 的 `loadError` 态 + `onLoadError`）
 
-**验收**：打开 30+ 页论文滚动不明显卡顿；批注创建即时可见。
+**验收**：✅ 单页渲染本身不卡；进度跨会话保留；坏文件/跨域有降级提示。
 
 ## P2.4 检索体验
-**现状**：`app/tools/paper-search/page.tsx` 1100 行。
-
 **动作**：
-- [ ] 检索请求加超时与取消（切换关键词时取消上一次）
-- [ ] 单源（arXiv / OpenAlex）失败不拖垮整体，部分结果照常展示并标注"某源失败"
-- [ ] 结果分页 / 无限滚动，避免一次塞太多 DOM
+- [x] 检索请求加取消：切换关键词/重复检索时 `AbortController` 取消上一次，避免堆叠
+- [x] 单源失败不拖垮整体：`searchPapers` 改 `Promise.allSettled` + 返回 `failedSources`，部分结果照常展示并提示"某源未返回"
+- [ ] 结果分页 / 无限滚动（结果默认上限 30–50，暂未达 DOM 压力阈值，留作后续）
 
-**验收**：快速切换关键词不堆叠请求；一个源挂了仍出另一个源的结果。
+**验收**：✅ 快速切换关键词不堆叠请求；一个源挂了仍出其余源结果并标注失败源。
 
 ---
 
