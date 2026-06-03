@@ -16,7 +16,7 @@ function getFieldKeywords(field?: string) {
   return field ? fieldMap[field] || '' : '';
 }
 
-function buildKeywordQuery(query: SearchQuery) {
+export function buildKeywordQuery(query: SearchQuery) {
   return [
     query.keywords,
     getFieldKeywords(query.field),
@@ -30,11 +30,11 @@ function buildKeywordQuery(query: SearchQuery) {
     .trim();
 }
 
-function shouldKeepPaper(paper: PaperResult, query: SearchQuery) {
+export function shouldKeepPaper(paper: PaperResult, query: SearchQuery) {
   const haystack = `${paper.title} ${paper.abstract || ''} ${paper.authors.join(' ')} ${paper.venue || ''}`.toLowerCase();
 
   const mustHave = query.mustHaveKeywords
-    ?.split(/[,，;]/)
+    ?.split(/[,，;；]/)
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean);
   if (mustHave?.length && !mustHave.every((keyword) => haystack.includes(keyword))) {
@@ -42,7 +42,7 @@ function shouldKeepPaper(paper: PaperResult, query: SearchQuery) {
   }
 
   const excludes = query.excludeKeywords
-    ?.split(/[,，;]/)
+    ?.split(/[,，;；]/)
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean);
   if (excludes?.some((keyword) => haystack.includes(keyword))) {
@@ -52,7 +52,7 @@ function shouldKeepPaper(paper: PaperResult, query: SearchQuery) {
   return true;
 }
 
-function restoreOpenAlexAbstract(index?: Record<string, number[]>) {
+export function restoreOpenAlexAbstract(index?: Record<string, number[]>) {
   if (!index) return undefined;
   const words: Array<{ word: string; position: number }> = [];
   for (const [word, positions] of Object.entries(index)) {

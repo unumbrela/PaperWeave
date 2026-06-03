@@ -112,9 +112,14 @@ export async function getFileInfo(storagePath: string): Promise<{
     return null;
   }
   
-  const file = data[0];
+  const file = data[0] as {
+    size?: number;
+    metadata?: { size?: number };
+    updated_at?: string;
+    last_modified?: string;
+  };
   return {
-    size: (file as any).size || (file as any).metadata?.size || 0,
-    lastModified: new Date((file as any).updated_at || (file as any).last_modified || new Date()),
+    size: file.size || file.metadata?.size || 0,
+    lastModified: new Date(file.updated_at || file.last_modified || new Date()),
   };
 }

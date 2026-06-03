@@ -253,11 +253,16 @@ export default function ViewerClient() {
   };
 
   const [pdfFilePath, setPdfFilePath] = useState<string | null>(null);
+  // 当前展示的 PDF 是否来自本地离线缓存（Blob）。用于决定是否需要自动「暖缓存」。
+  const [pdfFromCache, setPdfFromCache] = useState(false);
 
   useEffect(() => {
     if (!paper) return;
+    const paperId = paper.id;
+    let objectUrl: string | null = null;
+    let cancelled = false;
 
-    const localCandidate = `/papers/${paper.id}.pdf`;
+    const localCandidate = `/papers/${paperId}.pdf`;
 
     const resolvePath = (remotePath?: string) => {
       if (remotePath) {
@@ -266,20 +271,65 @@ export default function ViewerClient() {
       return localCandidate;
     };
 
-    fetch(localCandidate, { method: 'HEAD' })
-      .then((res) => {
-        if (res.ok) {
-          setPdfFilePath(localCandidate);
-        } else {
-          setPdfFilePath(resolvePath(paper.pdfPath));
+    const resolve = async () => {
+      // 1) 优先用本地离线缓存的 Blob —— 断网也能读
+      try {
+        const blob = await repository.getPdfBlob(paperId);
+        if (blob && !cancelled) {
+          objectUrl = URL.createObjectURL(blob);
+          setPdfFilePath(objectUrl);
+          setPdfFromCache(true);
+          return;
         }
-      })
-      .catch(() => {
-        setPdfFilePath(resolvePath(paper.pdfPath));
-      });
+      } catch {
+        // 无缓存或读取失败，落到网络/服务端路径
+      }
+      if (cancelled) return;
+      setPdfFromCache(false);
 
-    console.log('[Viewer] Paper loaded:', paper);
+      // 2) 退回服务端已下载的 public/papers/*，再退回远端 pdfPath
+      try {
+        const res = await fetch(localCandidate, { method: 'HEAD' });
+        if (!cancelled) setPdfFilePath(res.ok ? localCandidate : resolvePath(paper.pdfPath));
+      } catch {
+        if (!cancelled) setPdfFilePath(resolvePath(paper.pdfPath));
+      }
+    };
+
+    resolve();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [paper]);
+
+  // 暖缓存：首次从网络/服务端成功拿到 PDF 后，后台静默存为本地 Blob，
+  // 下次（含断网）即可离线阅读。失败完全忽略，不影响当前阅读。
+  useEffect(() => {
+    if (!paper || !pdfFilePath || pdfFromCache) return;
+    if (pdfFilePath.startsWith('blob:')) return;
+    const paperId = paper.id;
+    let cancelled = false;
+
+    const warm = async () => {
+      try {
+        if (await repository.getPdfBlob(paperId)) return; // 已有缓存
+        const res = await fetch(pdfFilePath);
+        if (!res.ok || cancelled) return;
+        const blob = await res.blob();
+        if (blob.type && !blob.type.includes('pdf') && blob.size < 1024) return; // 非 PDF 兜底
+        if (!cancelled) await repository.cachePdfBlob(paperId, blob);
+      } catch {
+        // 暖缓存失败无所谓，下次再试
+      }
+    };
+
+    warm();
+    return () => {
+      cancelled = true;
+    };
+  }, [paper, pdfFilePath, pdfFromCache]);
 
   if (loading) {
     return (

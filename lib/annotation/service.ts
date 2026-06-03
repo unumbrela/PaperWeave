@@ -1,4 +1,5 @@
 import prisma from '@/lib/db/prisma';
+import { Prisma } from '@prisma/client';
 import type { Annotation, AnnotationType } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
@@ -17,7 +18,13 @@ export interface UpdateAnnotationData {
   type?: AnnotationType;
   color?: string;
   comment?: string;
-  aiSummary?: any;
+  aiSummary?: unknown;
+}
+
+/** 本地文件兜底标注（无数据库时落到 data/annotations/*.json 的松散结构） */
+interface LocalAnnotation {
+  id?: string;
+  [key: string]: unknown;
 }
 
 const getLocalAnnotationsDir = () => {
@@ -28,7 +35,7 @@ const getLocalAnnotationsDir = () => {
   return dir;
 };
 
-const loadAnnotationsFromFile = (paperId: string): any[] => {
+const loadAnnotationsFromFile = (paperId: string): LocalAnnotation[] => {
   const dir = getLocalAnnotationsDir();
   const filePath = path.join(dir, `${paperId}.json`);
   
@@ -44,7 +51,7 @@ const loadAnnotationsFromFile = (paperId: string): any[] => {
   return [];
 };
 
-const saveAnnotationsToFile = (paperId: string, annotations: any[]): void => {
+const saveAnnotationsToFile = (paperId: string, annotations: LocalAnnotation[]): void => {
   const dir = getLocalAnnotationsDir();
   const filePath = path.join(dir, `${paperId}.json`);
   fs.writeFileSync(filePath, JSON.stringify(annotations, null, 2));
@@ -121,8 +128,11 @@ export async function updateAnnotation(id: string, data: UpdateAnnotationData): 
     console.log('[Service] Updating annotation:', { id, data });
     const result = await prisma.annotation.update({
       where: { id },
+      // aiSummary 是 JSON 列；UpdateAnnotationData.aiSummary 为 unknown，
+      // 这里收敛到 Prisma 的 JSON 输入类型
       data: {
         ...data,
+        aiSummary: data.aiSummary as Prisma.InputJsonValue | undefined,
         updatedAt: new Date(),
       },
     });
@@ -131,23 +141,21 @@ export async function updateAnnotation(id: string, data: UpdateAnnotationData): 
   } catch (error) {
     console.warn('[Service] Database update failed, trying file storage:', error);
     
-    // 尝试文件存储模式 - 搜索所有标注文件
-    const fs = require('fs');
-    const path = require('path');
+    // 尝试文件存储模式 - 搜索所有标注文件（fs/path 已在模块顶部 import）
     const annotationsDir = getLocalAnnotationsDir();
-    
+
     if (!fs.existsSync(annotationsDir)) {
       console.error('[Service] Annotations directory does not exist');
       return null;
     }
-    
+
     const files = fs.readdirSync(annotationsDir);
     for (const file of files) {
       if (!file.endsWith('.json')) continue;
-      
+
       const filePath = path.join(annotationsDir, file);
-      const annotations = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-      const index = annotations.findIndex((a: any) => a.id === id);
+      const annotations: LocalAnnotation[] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      const index = annotations.findIndex((a) => a.id === id);
       
       if (index !== -1) {
         annotations[index] = {
@@ -188,8 +196,8 @@ export async function deleteAnnotation(id: string): Promise<boolean> {
       if (!file.endsWith('.json')) continue;
       
       const filePath = path.join(annotationsDir, file);
-      const annotations = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-      const filteredAnnotations = annotations.filter((a: any) => a.id !== id);
+      const annotations: LocalAnnotation[] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      const filteredAnnotations = annotations.filter((a) => a.id !== id);
       
       if (filteredAnnotations.length !== annotations.length) {
         fs.writeFileSync(filePath, JSON.stringify(filteredAnnotations, null, 2));

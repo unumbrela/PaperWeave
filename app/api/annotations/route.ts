@@ -95,7 +95,7 @@ export async function PUT(request: Request) {
       );
     }
     
-    const data: any = {};
+    const data: Record<string, unknown> = {};
     if (type) data.type = type;
     if (color) data.color = color;
     if (comment !== undefined) data.comment = comment;

@@ -1,15 +1,25 @@
-import type { Annotation, Paper } from '@/lib/db/types';
+import type { Annotation, Author, Paper } from '@/lib/db/types';
 import { getAnnotationTypeLabel } from '@/lib/annotation/service';
+
+/** AI「解释选区」结构化结果（各字段可缺省） */
+export interface AISummary {
+  coreIdea?: string;
+  relatedConcepts?: string;
+  whyItMatters?: string;
+  applications?: string;
+}
 
 export interface ExportData {
   paper: Paper;
   annotations: Annotation[];
-  aiSummary: any;
+  // 上游（useAIExplanation）以 unknown 传入，函数内窄化为 AISummary
+  aiSummary: unknown;
   researchNotes: string;
 }
 
 export function generateMarkdown(data: ExportData): string {
-  const { paper, annotations, aiSummary, researchNotes } = data;
+  const { paper, annotations, researchNotes } = data;
+  const aiSummary = data.aiSummary as AISummary | null | undefined;
   const authors = Array.isArray(paper.authors)
     ? paper.authors
     : typeof paper.authors === 'string'
@@ -22,7 +32,7 @@ export function generateMarkdown(data: ExportData): string {
   
   markdown += `## 1. 论文信息\n\n`;
   if (authors.length > 0) {
-    markdown += `**Authors:** ${authors.map((a: any) => a.name).join(', ')}\n\n`;
+    markdown += `**Authors:** ${authors.map((a: Author) => a.name).join(', ')}\n\n`;
   }
   if (paper.publishedAt) {
     markdown += `**Published:** ${new Date(paper.publishedAt).toLocaleDateString('zh-CN')}\n\n`;

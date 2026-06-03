@@ -47,7 +47,7 @@ export default function PDFViewer({ file, onError }: PDFViewerProps) {
     { id: 'underline', label: '下划线', icon: Underline },
     { id: 'comment', label: '评论', icon: MessageSquare },
     { id: 'bookmark', label: '书签', icon: Bookmark },
-  ]
+  ] as const
 
   return (
     <div className="flex flex-col h-full">
@@ -108,7 +108,7 @@ export default function PDFViewer({ file, onError }: PDFViewerProps) {
               return (
                 <button
                   key={tool.id}
-                  onClick={() => setActiveTool(tool.id as any)}
+                  onClick={() => setActiveTool(tool.id)}
                   className={`p-2 rounded-lg transition-colors ${
                     isActive
                       ? 'bg-blue-600 text-white'

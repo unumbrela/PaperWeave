@@ -14,6 +14,16 @@ export interface UpdateResearchNoteData {
   content?: string;
 }
 
+/** 本地文件兜底笔记（无数据库时落到 data/notes/*.json 的松散结构） */
+interface LocalNote {
+  id?: string;
+  paperId?: string;
+  title?: string | null;
+  content?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 const getLocalNotesDir = () => {
   const dir = path.join(process.cwd(), 'data', 'notes');
   if (!fs.existsSync(dir)) {
@@ -22,7 +32,7 @@ const getLocalNotesDir = () => {
   return dir;
 };
 
-const loadNotesFromFile = (paperId: string): any[] => {
+const loadNotesFromFile = (paperId: string): LocalNote[] => {
   const dir = getLocalNotesDir();
   const filePath = path.join(dir, `${paperId}.json`);
   
@@ -38,7 +48,7 @@ const loadNotesFromFile = (paperId: string): any[] => {
   return [];
 };
 
-const saveNotesToFile = (paperId: string, notes: any[]): void => {
+const saveNotesToFile = (paperId: string, notes: LocalNote[]): void => {
   const dir = getLocalNotesDir();
   const filePath = path.join(dir, `${paperId}.json`);
   fs.writeFileSync(filePath, JSON.stringify(notes, null, 2));
@@ -105,7 +115,7 @@ export async function getResearchNotesByPaperId(paperId: string): Promise<Resear
     });
     return notes;
   } catch {
-    return loadNotesFromFile(paperId) as ResearchNote[];
+    return loadNotesFromFile(paperId) as unknown as ResearchNote[];
   }
 }
 

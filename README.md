@@ -83,13 +83,18 @@ pnpm install
 pnpm dev          # http://localhost:3000
 ```
 
-构建 / 启动：
+构建 / 启动 / 校验：
 
 ```bash
 pnpm build
 pnpm start
-pnpm lint
+pnpm lint          # 硬门禁：核心链路 0 error
+pnpm test          # Vitest 单测（arXiv 解析 / 检索过滤 / OMML→LaTeX / 注册表 / 仓储层）
 ```
+
+> **零配置可用**：不配任何环境变量也能跑——论文库走纯本地 `IndexedDB`（Dexie），
+> 检索→入库→阅读→批注→笔记全程不触达数据库。PDF 首次在线打开后会**静默缓存为本地 Blob**，
+> 之后可离线阅读。`pnpm test` 中的仓储层用例为「不开云同步时绝不发起任何网络请求」盖了章。
 
 ### 环境变量
 
