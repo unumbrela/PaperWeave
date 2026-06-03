@@ -5,8 +5,7 @@ export type Phase =
   | "做验证"
   | "论文绘图"
   | "讲结果"
-  | "可视化表达"
-  | "资产";
+  | "可视化表达";
 
 export type Tool = {
   slug: string;
@@ -162,96 +161,6 @@ export const TOOLS: Tool[] = [
     gradient: "from-[#4cc9f0] to-[#7c3aed]",
     href: "/tools/hpi-potsdam",
   },
-
-  // ── 资产 · 即插即用网页美化 / 复刻案例 / 通用工具 ───────────
-  {
-    slug: "beautiful-aurora",
-    name: "The Beautiful Aurora",
-    description:
-      "黑底舞台 + 4 团 morphing blur 色块穿过标题，靠 blend mode 让字体颜色持续动态变化。即插即用。",
-    phases: ["资产"],
-    icon: "🌌",
-    gradient: "from-[#00c2ff] to-[#e54cff]",
-    href: "/tools/beautiful-aurora",
-  },
-  {
-    slug: "web-beautifier",
-    name: "Web Beautifier",
-    description:
-      "开箱即用的背景与动效组件集：Raycast / Trae 同款、Mesh Orbs 等，复制即用、零依赖。",
-    phases: ["资产"],
-    icon: "🪩",
-    gradient: "from-[#ff3d7f] to-[#3b6ef6]",
-    href: "/tools/web-beautifier",
-  },
-  {
-    slug: "toolbox-background",
-    name: "暖色动态背景",
-    description:
-      "当前首页的暖纸面动态背景：5 团 radial blob 慢速漂移 + grain 颗粒层，附中文拆解。",
-    phases: ["资产"],
-    icon: "🌤️",
-    gradient: "from-[#ffb4a2] to-[#a9d6ff]",
-    href: "/tools/toolbox-background",
-  },
-  {
-    slug: "fluid-sim",
-    name: "流体模拟 · Fluid Simulation",
-    description:
-      "原样移植 Pavel Dobryakov 的 16k-star 经典：GPU Navier–Stokes 实时流体 + Bloom + Sunrays。",
-    phases: ["资产"],
-    icon: "🌊",
-    gradient: "from-[#ff4f8b] to-[#4bb3ff]",
-    href: "/tools/fluid-sim",
-  },
-  {
-    slug: "hamish-portfolio",
-    name: "Hamish Portfolio · 位移球体",
-    description:
-      "从 HamishMW/portfolio 抽取核心 Intro：MeshPhongMaterial + Perlin noise 位移球体 + 片假名解码文字动画。",
-    phases: ["资产"],
-    icon: "🪐",
-    gradient: "from-[#0ea5e9] to-[#8b5cf6]",
-    href: "/tools/hamish-portfolio",
-  },
-  {
-    slug: "bruno-folio",
-    name: "Bruno Simon · 3D 沙盒",
-    description:
-      "Bruno Simon 传奇 3D 沙盒作品集 folio-2019：页面内嵌原站，配中文源码解读。",
-    phases: ["资产"],
-    icon: "🚗",
-    gradient: "from-[#f97316] to-[#facc15]",
-    href: "/tools/bruno-folio",
-  },
-  {
-    slug: "algorithm-visualizer",
-    name: "算法可视化",
-    description:
-      "交互式算法可视化集合：全排列决策树、链表反转、最长递增子序列等，逐步动画 + C++ 代码高亮。",
-    phases: ["资产"],
-    icon: "🌳",
-    gradient: "from-[#4CAF50] to-[#9C27B0]",
-    href: "/tools/algorithm-visualizer",
-  },
-  {
-    slug: "explain-code",
-    name: "代码解释器",
-    description: "粘贴代码，得到逐段讲解、复杂度分析与潜在坑位提示。",
-    phases: ["资产"],
-    icon: "🔎",
-    gradient: "from-[#b14bff] to-[#4b8bff]",
-    href: "/tools/explain-code",
-  },
-  {
-    slug: "optimize-prompt",
-    name: "提示词优化器",
-    description: "把粗糙 prompt 升级成结构化版本，附改动说明。",
-    phases: ["资产"],
-    icon: "✨",
-    gradient: "from-[#4b8bff] to-[#ff4f8b]",
-    href: "/tools/optimize-prompt",
-  },
 ];
 
 export const PHASES: ("全部" | Phase)[] = [
@@ -263,10 +172,9 @@ export const PHASES: ("全部" | Phase)[] = [
   "论文绘图",
   "讲结果",
   "可视化表达",
-  "资产",
 ];
 
-// 仅主线 7 环（不含「全部」「资产」）用于首页 Workflow 走廊
+// 仅主线 7 环（不含「全部」）用于首页 Workflow 走廊
 export const WORKFLOW_PHASES: Phase[] = [
   "查论文",
   "读文献",
