@@ -133,6 +133,8 @@ pnpm prisma migrate dev
 
 > 已做好 serverless 适配：PDF 走同源代理 `/api/pdf-proxy`（不再落盘）、AI 路由 `maxDuration` ≤ 60s（Hobby 上限）。
 
+**登录 + 跨设备同步（可选）**：配上 Supabase（`NEXT_PUBLIC_SUPABASE_URL` + `ANON_KEY`）即可启用 Google / 邮箱 / 手机号登录,登录后论文库 / 批注 / 笔记跨设备同步、清缓存不丢(Auth + Postgres + 行级隔离 RLS,无需运维服务器)。不配则隐藏登录入口、退回纯本地。设置步骤见 [`AUTH-SETUP.md`](./AUTH-SETUP.md)。
+
 ---
 
 ## 项目结构
