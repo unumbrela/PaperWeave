@@ -7,6 +7,7 @@ import {
 import { repository } from "@/lib/db/repository";
 import type { Paper } from "@/lib/db/types";
 import { userKeyHeaders } from "@/lib/ai/user-keys";
+import { LIBRARY_CHANGED_EVENT } from "@/lib/sync/cloud-sync";
 import { LoadingState, EmptyState, ErrorState } from "@/components/states";
 import { ImportModal } from "@/components/library/ImportModal";
 import { PaperCard } from "@/components/library/PaperCard";
@@ -38,6 +39,10 @@ export default function LibraryPage() {
 
   useEffect(() => {
     fetchPapers();
+    // 登录后云端拉取合并完成时刷新列表
+    const onChange = () => fetchPapers();
+    window.addEventListener(LIBRARY_CHANGED_EVENT, onChange);
+    return () => window.removeEventListener(LIBRARY_CHANGED_EVENT, onChange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedTag, selectedDirection, sortBy, sortOrder]);
 

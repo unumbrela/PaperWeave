@@ -3,6 +3,8 @@ import { Inter, Instrument_Serif, JetBrains_Mono, Fraunces } from "next/font/goo
 import Link from "next/link";
 import { User, KeyRound } from "lucide-react";
 import { MeshBackground } from "@/components/mesh-background";
+import { AuthProvider } from "@/lib/auth/auth-context";
+import { AccountButton } from "@/components/auth/AccountButton";
 import "./globals.css";
 import "./tools/hpi-potsdam/landing.css";
 import "./tools/hpi-potsdam/overrides.css";
@@ -53,11 +55,13 @@ export default function RootLayout({
     >
       <body className="min-h-full text-ink">
         <MeshBackground />
-        <div className="relative z-10 flex min-h-full flex-col">
-          <SiteNav />
-          <main className="flex-1 flex flex-col">{children}</main>
-          <SiteFooter />
-        </div>
+        <AuthProvider>
+          <div className="relative z-10 flex min-h-full flex-col">
+            <SiteNav />
+            <main className="flex-1 flex flex-col">{children}</main>
+            <SiteFooter />
+          </div>
+        </AuthProvider>
       </body>
     </html>
   );
@@ -102,6 +106,7 @@ function SiteNav() {
               <User className="w-4 h-4 text-white" />
             </div>
           </Link>
+          <AccountButton />
         </nav>
       </div>
     </header>

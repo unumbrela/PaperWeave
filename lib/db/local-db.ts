@@ -141,6 +141,13 @@ export const annotationDB = {
   },
 
   /**
+   * 按 id 获取单条标注
+   */
+  async getById(id: string): Promise<Annotation | undefined> {
+    return await db.annotations.get(id)
+  },
+
+  /**
    * 添加标注
    */
   async add(annotation: Annotation): Promise<void> {

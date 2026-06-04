@@ -21,26 +21,15 @@ import {
 } from './local-db'
 import type { Paper, Annotation, AnnotationType, ResearchNote, Rect } from './types'
 import { ANNOTATION_COLORS } from './types'
+import { cloudSync } from '@/lib/sync/cloud-sync'
 
 // ──────────────────────────────────────────────────────────
-// 云同步开关（可选）
+// 云同步（可选）
 // ──────────────────────────────────────────────────────────
-
-const CLOUD_SYNC_ENABLED =
-  process.env.NEXT_PUBLIC_ENABLE_CLOUD_SYNC === 'true'
-
-/** best-effort 推送到云端；任何失败都吞掉，绝不影响本地真相源 */
-function pushToCloud(path: string, method: string, body?: unknown): void {
-  if (!CLOUD_SYNC_ENABLED) return
-  // 不 await：本地已落库，云端同步异步进行
-  fetch(path, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  }).catch((err) => {
-    console.warn(`[repository] 云端同步失败（已忽略，本地仍为准）: ${path}`, err)
-  })
-}
+//
+// 登录后，写操作 best-effort 镜像到 Supabase（带 user_id + RLS）；未登录或未配置
+// 时 cloudSync 全部 no-op，退回纯本地 Dexie。所有 cloudSync 调用都不 await，
+// 本地已落库即返回，云端异步进行、失败不影响本地真相源。
 
 function genId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -146,8 +135,9 @@ export const repository = {
     }
 
     await paperDB.upsert(paper)
-    pushToCloud('/api/papers', 'POST', stripBlob(paper))
-    return stripBlob(paper)
+    const clean = stripBlob(paper)
+    void cloudSync.pushPaper(clean)
+    return clean
   },
 
   /** 局部更新论文字段（如 AI 分析结果回写） */
@@ -160,14 +150,15 @@ export const repository = {
       updatedAt: new Date().toISOString(),
     }
     await paperDB.upsert(merged)
-    pushToCloud(`/api/papers/${id}`, 'PUT', stripBlob(merged))
-    return stripBlob(merged)
+    const clean = stripBlob(merged)
+    void cloudSync.pushPaper(clean)
+    return clean
   },
 
   /** 删除论文（级联删除其标注 / 笔记 / 进度，由 paperDB.delete 事务保证） */
   async deletePaper(id: string): Promise<void> {
     await paperDB.delete(id)
-    pushToCloud(`/api/papers/${id}`, 'DELETE')
+    void cloudSync.deletePaper(id)
   },
 
   // ────────────────────────────────────────────────────────
@@ -224,7 +215,7 @@ export const repository = {
       createdAt: new Date().toISOString(),
     }
     await annotationDB.add(annotation)
-    pushToCloud('/api/annotations', 'POST', annotation)
+    void cloudSync.pushAnnotation(annotation)
     return annotation
   },
 
@@ -233,12 +224,13 @@ export const repository = {
     patch: Partial<Pick<Annotation, 'type' | 'color' | 'comment' | 'aiSummary'>>,
   ): Promise<void> {
     await annotationDB.update(id, { ...patch, updatedAt: new Date().toISOString() })
-    pushToCloud('/api/annotations', 'PUT', { id, ...patch })
+    const updated = await annotationDB.getById(id)
+    if (updated) void cloudSync.pushAnnotation(updated)
   },
 
   async deleteAnnotation(id: string): Promise<void> {
     await annotationDB.delete(id)
-    pushToCloud(`/api/annotations?id=${id}`, 'DELETE')
+    void cloudSync.deleteAnnotation(id)
   },
 
   // ────────────────────────────────────────────────────────
@@ -261,7 +253,7 @@ export const repository = {
       updatedAt: now,
     }
     await noteDB.upsert(note)
-    pushToCloud('/api/research-notes', 'POST', { paperId, content })
+    void cloudSync.pushNote(note)
     return note
   },
 
@@ -274,7 +266,8 @@ export const repository = {
   },
 
   async saveProgress(paperId: string, currentPage: number, totalPages: number) {
-    return progressDB.update(paperId, currentPage, totalPages)
+    await progressDB.update(paperId, currentPage, totalPages)
+    void cloudSync.pushProgress(paperId, currentPage, totalPages)
   },
 }
 
