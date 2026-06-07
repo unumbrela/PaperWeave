@@ -3,12 +3,9 @@ import { searchPapers } from '@/lib/paper-search/search-service';
 import type { SearchQuery } from '@/lib/paper-search/types';
 
 export async function POST(request: Request) {
-  console.log('[Search API] Request received');
-  
   try {
     const body = await request.json();
-    console.log('[Search API] Request body:', body);
-    
+
     const query: SearchQuery = {
       field: body.field,
       keywords: body.keywords,
@@ -19,18 +16,15 @@ export async function POST(request: Request) {
       startYear: body.startYear,
       endYear: body.endYear,
       venues: body.venues,
-      maxResults: body.maxResults || 30,
+      // 夹上限：防止构造大值放大上游与内存开销（各上游另有自身上限）
+      maxResults: Math.min(Math.max(Number(body.maxResults) || 30, 1), 100),
       sortBy: body.sortBy || 'relevance',
     };
     
     const sources = body.sources || ['openalex', 'arxiv'];
     const apiKeys = body.apiKeys;
-    
-    console.log('[Search API] Searching with params:', { query, sources });
-    
-    const { results, failedSources } = await searchPapers(query, sources, apiKeys);
 
-    console.log('[Search API] Search complete, results:', results.length);
+    const { results, failedSources } = await searchPapers(query, sources, apiKeys);
 
     return NextResponse.json({ success: true, data: results, failedSources });
   } catch (error) {
