@@ -34,8 +34,8 @@
 | 框架 | `Next.js 16`（App Router）+ `React 19` + `TypeScript 5` |
 | 样式 | `Tailwind v4` + 自研暖纸面设计系统 |
 | AI | `Vercel AI SDK v5` 流式输出，默认 **DeepSeek**；论文分析支持 **OpenAI / Gemini** 切换 |
-| 检索 | **OpenAlex** + **arXiv**（已通）；Semantic Scholar / IEEE / Scopus / PubMed / ACM / Web of Science（接入中） |
-| 持久化 | **本地** `Dexie`（IndexedDB，含 PDF Blob）+ **云端** `Prisma` + `PostgreSQL` + `Supabase Storage` |
+| 检索 | **OpenAlex** + **arXiv**（默认源，已通）；**Semantic Scholar** 已接入（可选，支持自带 API key）；IEEE / Scopus / PubMed / ACM / Web of Science 规划中 |
+| 持久化 | **本地** `Dexie`（IndexedDB，含 PDF Blob，单一真相源）+ **可选云端** `Supabase`（Auth + Postgres + 行级隔离 RLS）跨设备同步 |
 | 可视化 | `Three.js` / `@react-three/fiber`、`D3.js`、`TensorFlow.js`、`Framer Motion` |
 
 ---
@@ -108,20 +108,14 @@ OPENAI_API_KEY=your_openai_key          # 可选，论文分析备选
 GOOGLE_API_KEY=your_gemini_key          # 可选，论文分析备选
 AI_PROVIDER=openai                      # openai | gemini（论文分析走哪家）
 
-# ── 数据库与存储（论文库云端同步，可选）──────────
-DATABASE_URL=postgresql://...           # PostgreSQL（Prisma）
-NEXT_PUBLIC_SUPABASE_URL=...            # Supabase（PDF 文件存储）
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+# ── 登录与跨设备同步（可选，配上才显示登录入口）──────────
+NEXT_PUBLIC_SUPABASE_URL=...            # Supabase 项目 URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...       # Supabase anon key
 ```
 
-> 只想跑前端工具和模型可视化？**只配 `DEEPSEEK_API_KEY` 即可**，论文库会自动退化到纯本地 IndexedDB 模式。
+> 只想跑前端工具和模型可视化？**只配 `DEEPSEEK_API_KEY` 即可**；不配任何 env 也能跑——论文库走纯本地 IndexedDB 模式。
 
-数据库初始化（需要云端论文库时）：
-
-```bash
-pnpm prisma generate
-pnpm prisma migrate dev
-```
+需要跨设备同步时，去 Supabase 控制台执行 [`supabase/schema.sql`](./supabase/schema.sql) 建表（4 张表 + 行级隔离 RLS），详见 [`AUTH-SETUP.md`](./AUTH-SETUP.md)。
 
 ---
 
@@ -141,25 +135,27 @@ pnpm prisma migrate dev
 
 ```text
 app/
-  api/                  # 流式与数据接口
-    paper-search/       # 多源论文检索
-    papers/             # 论文库 CRUD + arXiv/PDF 导入
-    annotations/  research-notes/
+  api/                  # 流式与数据接口（全部无状态：解析 / 代理 / 调 LLM）
+    paper-search/       # 多源论文检索（OpenAlex + arXiv）
+    papers/import/      # arXiv / PDF 导入（纯内存解析，不持久化）
+    pdf-proxy/          # 同源 PDF 代理（带 SSRF 防护）
     analyze/  analyze-paper/   # AI 论文分析
-    summarize/  markdown-convert/  chunk-it-up/  skill-maker/
+    summarize/  markdown-convert/  markdown-summarize/
+    idea-generator/  chunk-it-up/  skill-maker/  explain/
   tools/                # 各工具页（注册表驱动）
   library/  viewer/     # 论文库 + PDF 阅读器
+  settings/             # 访客自带 key（BYOK）设置页
   layout.tsx  page.tsx  globals.css
 components/
-  tool-card.tsx  tool-shell.tsx  coming-soon.tsx
-  pdf-viewer/  annotation/  sidebar/
+  tool-card.tsx  tool-shell.tsx
+  pdf/  annotation/  sidebar/  auth/
   cnn/  transformer-explainer/  gan-explainer/  diffusion-explainer/  ...
 lib/
   tools-registry.ts     # 工具元数据单一事实源 + Phase 枚举
-  db/                   # local-db(Dexie) + prisma
-  services/             # arxiv / storage / ai
-  paper-search/  paper/  annotation/  research-note/
-  ai.ts  ai/            # LLM client wrappers
+  db/                   # repository.ts（Dexie 单一真相源）+ types.ts
+  sync/  supabase/  auth/   # 可选云同步（Supabase Auth + Postgres + RLS）
+  paper-search/  annotation/  workflow/  export/
+  ai.ts  ai/            # LLM client wrappers（流式 + 非流式 fallback）
 ```
 
 ---
