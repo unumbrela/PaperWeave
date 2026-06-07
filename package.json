@@ -11,17 +11,13 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "postinstall": "prisma generate"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^2.0.29",
     "@ai-sdk/react": "^3.0.170",
     "@google/generative-ai": "^0.24.1",
     "@opendocsg/pdf2md": "^0.2.6",
-    "@prisma/adapter-pg": "^7.8.0",
-    "@prisma/client": "^7.8.0",
-    "@prisma/config": "^7.8.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.0",
     "@react-three/postprocessing": "^3.0.4",
@@ -46,7 +42,6 @@
     "papaparse": "^5.5.3",
     "pdfjs-dist": "^5.4.296",
     "pdfreader": "^3.0.8",
-    "pg": "^8.21.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
@@ -70,7 +65,6 @@
     "@types/d3": "^7.4.3",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",
-    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "^0.184.0",
@@ -80,17 +74,13 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "fake-indexeddb": "^6",
-    "prisma": "^7.8.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
       "core-js",
-      "prisma",
       "sharp",
       "unrs-resolver"
     ]
