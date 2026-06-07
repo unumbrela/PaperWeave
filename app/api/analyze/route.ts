@@ -1,106 +1,39 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 import { callAnalysis, parseAnalysis, toPaperFields, ANALYSIS_OUTPUT_SPEC } from '@/lib/ai/analyze';
-import { resolveKeys } from '@/lib/ai/keys';
-import prisma from '@/lib/db/prisma';
+import { resolveKeys, hasAnyKey } from '@/lib/ai/keys';
 
-const extractTextFromPdf = async (pdfPath: string): Promise<string> => {
-  try {
-    const fullPath = path.join(process.cwd(), 'public', pdfPath);
+// 无状态 AI 助手：传入论文文本，返回结构化分析。结果由客户端写入本地 Dexie
+// （单一真相源），服务端不落盘、不读盘、不连数据库——与全站本地优先架构一致。
+// （历史上这里还有一条 Prisma + 读取 public/<pdfPath> 的分支，既无前端调用、又存在
+//  路径穿越读任意文件的隐患，已移除。）
 
-    if (!fs.existsSync(fullPath)) {
-      console.warn(`PDF file not found: ${fullPath}`);
-      return '';
-    }
-
-    const buffer = fs.readFileSync(fullPath);
-
-    // Avoid importing pdfjs at module top-level to prevent worker setup on server.
-    // Use a lightweight Node PDF parser when running on the server to extract text.
-    try {
-      const { PdfReader } = await import('pdfreader');
-      return await new Promise<string>((resolve) => {
-        const rows: Record<number, string[]> = {};
-        const reader = new PdfReader();
-        reader.parseBuffer(buffer, (err: unknown, item: { text?: string; y?: number } | null) => {
-          if (err) {
-            console.warn('pdfreader parse error:', err);
-            resolve('');
-            return;
-          }
-          if (!item) {
-            // end of file
-            const lines = Object.keys(rows)
-              .sort((a, b) => Number(a) - Number(b))
-              .map((k) => (rows[Number(k)] || []).join(' '));
-            resolve(lines.join('\n\n').substring(0, 5000));
-            return;
-          }
-          if (item.text) {
-            const y = Math.round(item.y || 0);
-            rows[y] = rows[y] || [];
-            rows[y].push(item.text.trim());
-          }
-        });
-      });
-    } catch (e) {
-      console.warn('pdfreader not available or failed, skipping PDF text extraction:', e);
-      return '';
-    }
-  } catch (error) {
-    console.warn(`Failed to extract text from PDF: ${error}`);
-    return '';
-  }
-};
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { text, paperId } = body;
+    const { text } = body;
 
-    if (!text && !paperId) {
+    if (!text || typeof text !== 'string' || !text.trim()) {
       return NextResponse.json(
-        {
-          success: false,
-          message: '请提供要分析的文本内容或论文 ID',
-        },
-        { status: 400 }
+        { success: false, message: '请提供要分析的文本内容' },
+        { status: 400 },
       );
     }
 
-    let contentToAnalyze = text || '';
-
-    if (paperId) {
-      let paper = null;
-
-      try {
-        paper = await prisma.paper.findUnique({
-          where: { id: paperId }
-        });
-      } catch {
-        paper = null;
-      }
-
-      if (paper) {
-        if (paper.abstract) {
-          contentToAnalyze = paper.abstract;
-        }
-
-        if (paper.pdfPath) {
-          const pdfText = await extractTextFromPdf(paper.pdfPath);
-          if (pdfText) {
-            contentToAnalyze = (contentToAnalyze + '\n\n' + pdfText).substring(0, 5000);
-          }
-        }
-      }
+    const keys = resolveKeys(request);
+    if (!hasAnyKey(keys)) {
+      return NextResponse.json(
+        { success: false, message: 'AI 服务未配置：请在右上角「API Key」填入你自己的 key' },
+        { status: 503 },
+      );
     }
 
-    console.log(`[AI Analyze] Analyzing content (${contentToAnalyze.length} chars) for ${paperId ? `paper ${paperId}` : 'text'}`);
-
+    const contentToAnalyze = text.slice(0, 5000);
     const prompt = `任务说明：请从给定的论文摘要或文本中提取关键信息，并以机器可解析的严格 JSON 返回。\n\n输入文本：\n${contentToAnalyze}\n\n${ANALYSIS_OUTPUT_SPEC}\n\n请严格输出 JSON，立即开始处理。`;
 
-    const raw = await callAnalysis(prompt, resolveKeys(request));
+    const raw = await callAnalysis(prompt, keys);
     const parsed = parseAnalysis(raw);
 
     const paperAnalysis = parsed
@@ -112,32 +45,19 @@ export async function POST(request: Request) {
           notes: '未分析成功',
         };
 
-    // 可选云同步：仅当配置了 Postgres 时尝试回写；失败忽略（本地 Dexie 为准）
-    if (paperId) {
-      try {
-        await prisma.paper.update({
-          where: { id: paperId },
-          data: {
-            summary: paperAnalysis.summary,
-            methodology: paperAnalysis.methodology,
-            contribution: paperAnalysis.contribution,
-            notes: paperAnalysis.notes,
-          },
-        });
-      } catch {
-        // 未配数据库或论文不在云端 —— 忽略，分析结果通过返回值交给客户端写入本地
-      }
-    }
-    return NextResponse.json({ success: true, message: parsed ? '分析完成' : 'AI 输出无法解析为 JSON，标记为未分析成功', data: { id: paperId, ...paperAnalysis, raw } });
+    return NextResponse.json({
+      success: true,
+      message: parsed ? '分析完成' : 'AI 输出无法解析为 JSON，标记为未分析成功',
+      data: { ...paperAnalysis, raw },
+    });
   } catch (error) {
     console.error('[AI Analyze] Failed:', error);
     return NextResponse.json(
       {
         success: false,
         message: `分析失败: ${error instanceof Error ? error.message : '未知错误'}`,
-        details: error instanceof Error ? (error.stack || '') : '',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
