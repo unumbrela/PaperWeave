@@ -88,7 +88,7 @@ export async function searchOpenAlex(query: SearchQuery): Promise<PaperResult[]>
     }
     
     if (query.venues && query.venues.length > 0) {
-      const venueFilter = query.venues.map(v => `venue.name.search:${v}`).join('|');
+      const venueFilter = query.venues.map(v => `primary_location.source.display_name.search:${v}`).join('|');
       filters.push(`(${venueFilter})`);
     }
     
@@ -113,7 +113,8 @@ export async function searchOpenAlex(query: SearchQuery): Promise<PaperResult[]>
           title: work.title,
           authors: work.authorships?.map((a: { author?: { display_name?: string } }) => a.author?.display_name).filter(Boolean) || [],
           year: work.publication_year,
-          venue: work.venue?.name,
+          // OpenAlex 的刊名在 primary_location.source.display_name（旧 host_venue 已废弃；work.venue 不存在）
+          venue: work.primary_location?.source?.display_name,
           url: work.id,
           pdfUrl: work.open_access?.oa_url,
           abstract: work.abstract || restoreOpenAlexAbstract(work.abstract_inverted_index),
@@ -169,10 +170,18 @@ export async function searchArXiv(query: SearchQuery): Promise<PaperResult[]> {
       return results;
     }
     
-    const url = `https://export.arxiv.org/api/query?search_query=${searchQuery}&max_results=${query.maxResults || 20}&sortBy=submittedDate&sortOrder=desc`;
+    // arXiv 的 sortBy 仅支持 relevance / lastUpdatedDate / submittedDate；
+    // sortOrder 只接受 ascending / descending（传 "desc" 会被 arXiv 直接 400）。
+    const arxivSortBy = query.sortBy === 'year' ? 'submittedDate' : query.sortBy === 'relevance' ? 'relevance' : 'submittedDate';
+    const url = `https://export.arxiv.org/api/query?search_query=${searchQuery}&max_results=${query.maxResults || 20}&sortBy=${arxivSortBy}&sortOrder=descending`;
     console.log('[arXiv Search] URL:', url);
-    
-    const response = await fetch(url);
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (compatible; PaperWeave/1.0; +https://github.com/unumbrela/toolbox)',
+      },
+    });
     if (!response.ok) {
       throw new Error(`arXiv API error: ${response.status}`);
     }
