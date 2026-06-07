@@ -164,7 +164,7 @@ export default function ViewerClient() {
     setError('PDF加载失败');
   };
 
-  const handleTextSelection = useCallback((event: MouseEvent) => {
+  const handleTextSelection = useCallback(() => {
     const selection = window.getSelection();
     if (!selection) return;
 
@@ -200,7 +200,7 @@ export default function ViewerClient() {
         text: selectedText,
       });
     }
-  }, []);
+  }, [scale]);
 
   useEffect(() => {
     document.addEventListener('mouseup', handleTextSelection);
@@ -287,13 +287,9 @@ export default function ViewerClient() {
       if (cancelled) return;
       setPdfFromCache(false);
 
-      // 2) 退回服务端已下载的 public/papers/*，再退回远端 pdfPath
-      try {
-        const res = await fetch(localCandidate, { method: 'HEAD' });
-        if (!cancelled) setPdfFilePath(res.ok ? localCandidate : resolvePath(paper.pdfPath));
-      } catch {
-        if (!cancelled) setPdfFilePath(resolvePath(paper.pdfPath));
-      }
+      // 2) 无本地缓存：直接用 pdfPath（arXiv 走同源 /api/pdf-proxy，或远端链接）。
+      //    PDF 已不再落盘到 public/papers（serverless 只读 FS），故无需再探测本地静态路径。
+      setPdfFilePath(resolvePath(paper.pdfPath));
     };
 
     resolve();

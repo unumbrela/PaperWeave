@@ -48,7 +48,6 @@ export default function Page() {
         // 挂载时一次性从 localStorage 水合配置，非级联渲染
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setApiConfig(config.apiConfig || {});
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedSources(config.sources || ["openalex", "arxiv"]);
       } catch {
         console.error("Failed to load search config");

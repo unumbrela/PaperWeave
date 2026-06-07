@@ -118,7 +118,7 @@ export function ResultCard({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    paper.pdfUrl && onCopyLink(paper.id + "-pdf", paper.pdfUrl);
+                    if (paper.pdfUrl) onCopyLink(paper.id + "-pdf", paper.pdfUrl);
                   }}
                   className="flex-shrink-0 p-1 hover:bg-ocean/12 rounded-md transition-colors"
                   title="复制PDF链接"

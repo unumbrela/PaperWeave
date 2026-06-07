@@ -27,13 +27,11 @@ export default function PDFViewerDynamic({
   annotations,
   onLoadSuccess,
   onLoadError,
-  containerRef,
 }: PDFViewerDynamicProps) {
   const [mounted, setMounted] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [workerReady, setWorkerReady] = useState(false);
-  const [pageDimensions, setPageDimensions] = useState<{ width: number; height: number } | null>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
