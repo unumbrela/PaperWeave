@@ -25,7 +25,7 @@ git push
 4. **环境变量（Environment Variables）—— 推荐全部留空**：
    - 走「访客自带 key」模式：不填任何 LLM key，访客在站内 `/settings` 填自己的。
    - 如果你**想让 AI 默认可用、并愿意自己付费**，再加 `DEEPSEEK_API_KEY=<你的 key>`（注意：这会用你的额度，建议同时在 DeepSeek 后台设月度预算上限）。
-   - 数据库相关（`DATABASE_URL` / Supabase）**不要填**：论文库是纯本地 IndexedDB，零配置即用。
+   - 登录 / 跨设备同步（`NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY`）**可留空**：不填则隐藏登录入口，论文库走纯本地 IndexedDB，零配置即用；需要跨设备同步再按 `AUTH-SETUP.md` 配 Supabase。
 5. 点 **Deploy**，等 1–2 分钟。完成后会给一个 `https://<项目名>.vercel.app` 链接。
 
 > 之后每次 `git push` 到 main，Vercel 会自动重新部署。
