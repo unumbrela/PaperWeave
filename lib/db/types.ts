@@ -1,17 +1,17 @@
 /**
  * 共享领域类型 —— 论文工作流的「单一类型事实源」
  *
- * 本地 Dexie(IndexedDB) 与可选云端 Prisma 都对齐这里的字段。
- * UI / hooks / 仓储层一律从这里取类型，不再直接依赖 `@prisma/client`，
+ * 本地 Dexie(IndexedDB) 与可选云端 Supabase Postgres 都对齐这里的字段。
+ * UI / hooks / 仓储层一律从这里取类型，不依赖任何 ORM 客户端，
  * 从而让前端在「不配数据库」时也能完整编译与运行。
  *
  * 注意：所有时间字段统一为 ISO **字符串**（与浏览器本地存储、JSON 传输的运行时
- * 实际形态一致；Prisma 的 Date 经 JSON 序列化后本就是字符串）。
+ * 实际形态一致）。
  */
 
 export type SourceType = 'ARXIV' | 'LOCAL' | 'DOI';
 
-/** 标注类型 —— 科研语义四分类（与 prisma/schema.prisma 的 AnnotationType 枚举一致） */
+/** 标注类型 —— 科研语义四分类（与 supabase/schema.sql 的 annotation_type 对齐） */
 export type AnnotationType = 'highlight' | 'insight' | 'todo' | 'transferable';
 
 export interface Author {
