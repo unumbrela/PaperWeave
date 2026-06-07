@@ -106,4 +106,27 @@ describe('searchPapers (allSettled 容错 + 去重)', () => {
     expect(outcome.results).toEqual([]);
     expect(outcome.failedSources).toEqual([]);
   });
+
+  it('arXiv 请求 URL 使用合法的 sortOrder=descending（回归：传 desc 会被 arXiv 400）', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        calls.push(url);
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve('<feed></feed>'),
+        } as Response);
+      }),
+    );
+
+    await searchPapers({ keywords: 'diffusion model' }, ['arxiv']);
+
+    const arxivUrl = calls.find((u) => u.includes('export.arxiv.org'));
+    expect(arxivUrl).toBeDefined();
+    expect(arxivUrl).toContain('sortOrder=descending');
+    expect(arxivUrl).not.toContain('sortOrder=desc&');
+    expect(arxivUrl?.endsWith('sortOrder=desc')).toBe(false);
+  });
 });
