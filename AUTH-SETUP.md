@@ -14,7 +14,12 @@
 1. https://supabase.com → 登录 → **New project**，选区域（建议离用户近的，如 Singapore）。
 2. 项目建好后 → **Project Settings → API**，记下两个值：
    - **Project URL**（形如 `https://xxxx.supabase.co`）
+   
+   https://uexyuahaylzguvqbqulf.supabase.co
+   
    - **anon public** key
+   
+   eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVleHl1YWhheWx6Z3V2cWJxdWxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjI0NzAsImV4cCI6MjA5NjEzODQ3MH0.JbpgAVnwggg2gwCinDBvYbN1nNooETulp0jqYiyvI8k
 
 ## 2. 建表 + 开启行级隔离（2 分钟）
 
@@ -71,4 +76,4 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY = <anon public key>
 
 ## 本地开发
 
-在 `.env.local` 加同样两条 `NEXT_PUBLIC_SUPABASE_*` 即可在本地测试登录；不加则本地为纯本地模式。
+在 `.env.local` 加同样两条 `NEXT_PUBLIC_SUPABASE_*` 即可在本地测试登录；不加则本地为纯本地模式。 
