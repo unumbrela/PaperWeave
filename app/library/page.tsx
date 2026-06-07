@@ -117,7 +117,7 @@ export default function LibraryPage() {
       } else {
         setImportMessage(data.isDuplicate ? "⚠️ 该论文已存在" : "❌ " + data.message);
       }
-    } catch (error) {
+    } catch {
       setImportMessage("❌ 导入失败，请重试");
     } finally {
       setImporting(false);
@@ -154,7 +154,7 @@ export default function LibraryPage() {
       } else {
         setImportMessage(data.isDuplicate ? "⚠️ 该论文已存在" : "❌ " + data.message);
       }
-    } catch (error) {
+    } catch {
       setImportMessage("❌ 导入失败，请重试");
     } finally {
       setImporting(false);

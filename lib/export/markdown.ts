@@ -1,5 +1,4 @@
 import type { Annotation, Author, Paper } from '@/lib/db/types';
-import { getAnnotationTypeLabel } from '@/lib/annotation/service';
 
 /** AI「解释选区」结构化结果（各字段可缺省） */
 export interface AISummary {
@@ -107,7 +106,7 @@ export function generateMarkdown(data: ExportData): string {
   const todos = byType('todo');
   if (todos.length > 0) {
     markdown += `## 6. 后续 TODO\n\n`;
-    todos.forEach((annotation, index) => {
+    todos.forEach((annotation) => {
       markdown += `- [ ] ${annotation.selectedText || '(无文本)'}\n`;
       if (annotation.comment) {
         markdown += `  - ${annotation.comment}\n`;
