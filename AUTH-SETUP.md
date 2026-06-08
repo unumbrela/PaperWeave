@@ -56,6 +56,21 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY = <anon public key>
 
 保存后 **Redeploy** 一次。完成后右上角会出现「登录」按钮。
 
+### （可选）开启后端检索缓存 + 热门检索 + 只读分享
+
+`supabase/schema.sql` 里还建了两张「全站共享、**不带 RLS policy，仅 service-role 可读写**」的表：
+- `search_cache` —— 缓存热门检索结果、统计「🔥 热门检索」
+- `shares` —— 托管「只读分享」快照（公开论文 / 论文库链接 `/share/[token]`）
+
+要启用，再加**一条仅服务端**的环境变量：
+
+```
+SUPABASE_SERVICE_ROLE_KEY = <service_role key（Project Settings → API）>
+```
+
+> ⚠️ service-role key 拥有完全权限，**只能放服务端**（Vercel 环境变量即可），**永远不要加 `NEXT_PUBLIC_` 前缀、不要进前端**。
+> 不配这条 → 检索照常直连上游、热门检索区与分享入口自动隐藏，毫不受影响。
+
 ---
 
 ## 工作原理（你不用改代码）

@@ -84,3 +84,67 @@ begin
          using (user_id = auth.uid()) with check (user_id = auth.uid());', t);
   end loop;
 end $$;
+
+-- ── 检索结果缓存（全站共享，非用户私有）──────────────────────
+-- 与上面四张「用户私有 + RLS」的表不同：这是服务端用 service-role 读写的
+-- 公共缓存，加速热门检索、累积「热门检索词」。RLS 开启但**不建任何 policy**，
+-- 于是匿名/登录用户都碰不到它，只有 service-role（绕过 RLS）能读写。
+create table if not exists public.search_cache (
+  query_hash    text primary key,                 -- lib/paper-search/cache.ts 的 cacheKey()（sha256）
+  label         text not null default '',         -- 人类可读查询摘要（热门检索展示用）
+  results       jsonb not null default '[]'::jsonb,
+  failed_sources jsonb not null default '[]'::jsonb,
+  hit_count     integer not null default 0,       -- 命中次数（热度）
+  created_at    timestamptz not null default now(),
+  expires_at    timestamptz not null              -- 过期即视为未命中（默认 14 天）
+);
+
+create index if not exists idx_search_cache_hits    on public.search_cache(hit_count desc);
+create index if not exists idx_search_cache_expires on public.search_cache(expires_at);
+
+alter table public.search_cache enable row level security;
+-- 故意不建 policy：仅 service-role 可访问。
+
+-- 原子自增命中次数（避免读-改-写竞态）；缓存命中时由后端 fire-and-forget 调用。
+create or replace function public.increment_search_hit(p_query_hash text)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.search_cache
+     set hit_count = hit_count + 1
+   where query_hash = p_query_hash;
+$$;
+
+-- ── 只读分享快照（公开论文 / 论文库）─────────────────────────
+-- 同样是「服务端 service-role 读写、无 RLS policy」的表：客户端永远碰不到，
+-- 由 /api/share* 路由代为读写。snapshot 是点击分享那一刻的 JSON 副本，
+-- 与本地后续编辑解耦（见 lib/share/snapshot.ts）。owner_id 可空（纯本地用户也能分享）。
+create table if not exists public.shares (
+  token       text primary key,                 -- lib/share/snapshot.ts 的 genShareToken()
+  kind        text not null,                    -- 'paper' | 'library'
+  title       text not null default '',
+  snapshot    jsonb not null,
+  owner_id    uuid references auth.users(id) on delete set null,
+  view_count  integer not null default 0,
+  created_at  timestamptz not null default now(),
+  expires_at  timestamptz                        -- null = 永不过期
+);
+
+create index if not exists idx_shares_created on public.shares(created_at desc);
+
+alter table public.shares enable row level security;
+-- 故意不建 policy：仅 service-role 可访问（公开读取经 /api/share/[token] 服务端代理）。
+
+-- 原子自增浏览量（公开页打开时由后端 fire-and-forget 调用）。
+create or replace function public.increment_share_view(p_token text)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.shares
+     set view_count = view_count + 1
+   where token = p_token;
+$$;

@@ -18,6 +18,8 @@ import { cn } from "@/lib/utils";
 import { repository } from "@/lib/db/repository";
 import type { Paper, Author } from "@/lib/db/types";
 import { SendToTool } from "@/components/workflow/handoff-controls";
+import { ShareButton } from "@/components/share/ShareButton";
+import { buildPaperSnapshot } from "@/lib/share/snapshot";
 
 type PdfStatus = "checking" | "downloaded" | "error";
 
@@ -251,13 +253,25 @@ export default function PaperDetailPage({ params }: { params: Promise<{ id: stri
               返回论文库
             </button>
 
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-ink-3 transition-colors hover:text-coral"
-            >
-              <Trash2 className="w-4 h-4" />
-              删除论文
-            </button>
+            <div className="flex items-center gap-2">
+              <ShareButton
+                build={async () => {
+                  const [annotations, note] = await Promise.all([
+                    repository.listAnnotations(paper!.id),
+                    repository.getNote(paper!.id),
+                  ]);
+                  return buildPaperSnapshot(paper!, annotations, note);
+                }}
+                label="分享"
+              />
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-ink-3 transition-colors hover:text-coral"
+              >
+                <Trash2 className="w-4 h-4" />
+                删除论文
+              </button>
+            </div>
           </div>
         </div>
       </div>

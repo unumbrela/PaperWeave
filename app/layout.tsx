@@ -39,10 +39,34 @@ const fraunces = Fraunces({
   display: "swap",
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.z1ha0.com";
+const SITE_DESC =
+  "把查文献、读文献、生 idea、做验证、论文绘图、讲结果、可视化表达串成一条研究工作流。PaperWeave 不替你写论文，但让其他每一步都顺起来。";
+
 export const metadata: Metadata = {
-  title: "PaperWeave · 研究型论文助手",
-  description:
-    "把查文献、读文献、生 idea、做验证、论文绘图、讲结果、可视化表达串成一条研究工作流。PaperWeave 不替你写论文，但让其他每一步都顺起来。",
+  metadataBase: new URL(SITE_URL),
+  title: { default: "PaperWeave · 研究型论文助手", template: "%s · PaperWeave" },
+  description: SITE_DESC,
+  applicationName: "PaperWeave",
+  keywords: [
+    "论文检索", "文献阅读", "arXiv", "OpenAlex", "研究工作流",
+    "AI 论文助手", "引用网络", "语义检索", "RAG", "PaperWeave",
+  ],
+  authors: [{ name: "PaperWeave" }],
+  openGraph: {
+    type: "website",
+    siteName: "PaperWeave",
+    title: "PaperWeave · 研究型论文助手",
+    description: SITE_DESC,
+    locale: "zh_CN",
+    url: SITE_URL,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "PaperWeave · 研究型论文助手",
+    description: SITE_DESC,
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({

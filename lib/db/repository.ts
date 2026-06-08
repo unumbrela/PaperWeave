@@ -194,6 +194,11 @@ export const repository = {
     return list.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   },
 
+  /** 全部标注（跨论文，统计看板用） */
+  async listAllAnnotations(): Promise<Annotation[]> {
+    return annotationDB.getAll()
+  },
+
   async createAnnotation(data: {
     paperId: string
     page: number
