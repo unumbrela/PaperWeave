@@ -44,8 +44,28 @@
 
 ### 🔎 论文检索与论文库
 - 多源聚合检索（OpenAlex + arXiv），预设领域包（CV / NLP / 多模态 / 机器人 / 强化学习 …）+ 自定义关键词
+- **后端检索缓存**（可选）：配上 Supabase service-role 后，热门查询命中 Postgres 缓存直接返回（14 天 TTL），并在检索页展示「🔥 热门检索」——不配则透明降级为直连上游
 - 结果直接组织成**论文库卡片网格**，一键入库
 - 论文库 `/library`：元数据 + 全文 + 结构化总结 + 笔记 + 标签，本地优先、可云端同步
+
+### 🕸️ 引用网络图谱
+- 对任一 OpenAlex 论文，一键展开**引用网络**：参考文献（它引用谁）+ 被引文献（谁引用它）汇成一张 **D3 力导向图**
+- 圆越大被引越多，支持缩放 / 拖拽 / 点击直达；从检索结果卡片对 OpenAlex 论文点「引用网络」即可带入
+
+### 📑 引文导出 · 多篇对比 · 问你的论文库
+- **BibTeX / 引文导出**：论文库每篇一键导出 BibTeX + APA / MLA / GB-T 7714；整库可一键导出 `.bib`（纯本地、无需 key）
+- **多篇论文对比表** `/tools/paper-compare`：从库勾选 2-6 篇，AI 生成「研究问题/方法/数据集/指标/创新点/局限」横向对比矩阵，导出 Markdown
+- **问你的论文库（语义检索 RAG）** `/tools/library-qa`：对入库论文建 **embedding 语义索引**（OpenAI / Gemini，向量在本机 Dexie 缓存、重复提问不重复计费），自然语言提问 → 检索 top-k → LLM 归纳出**带 [n] 引用、可溯源到具体论文**的答案
+
+### 📊 统计看板 · 🔗 只读分享
+- **统计看板** `/library/stats`：论文库的来源 / 年份 / 月度入库 / 批注分类分布、主题标签云、被引 Top5——纯本地（Dexie）、零配置即用
+- **只读分享**（可选）：配上 Supabase service-role 后，单篇论文（含批注 + 笔记）或整库可一键生成**公开只读链接** `/share/[token]`（点击那刻的 JSON 快照，与本地后续编辑解耦，30 天有效）；未配置则分享入口自动隐藏
+
+### 🛡️ 可靠性与可观测性
+- **流式输出**：RAG 答案 / 多篇对比逐字流式（多供应商 DeepSeek→OpenAI→Gemini，首 token 前自动 fallback）
+- **路由加固**：关键路由 `zod` 入参校验；免 key 公开路由（检索 / 引用图 / PDF 代理 / 分享）按 IP **内存滑动窗口限流**；OpenAlex 上游调用带超时
+- **可观测性**：结构化 JSON 访问日志 + `/api/metrics` 聚合（调用量 / 错误率 / 平均耗时 / 缓存命中率 / 各 LLM 供应商占比，可用 `METRICS_TOKEN` 加门禁）
+- **SEO/社交**：`sitemap.xml`（注册表驱动自动收录）+ `robots.txt` + 动态 OpenGraph 卡片
 
 ### 📖 PDF 阅读器 + 批注
 - 内置 PDF 阅读器 `/viewer/[id]`，支持高亮 / 批注 / 笔记
@@ -89,7 +109,8 @@ pnpm dev          # http://localhost:3000
 pnpm build
 pnpm start
 pnpm lint          # 硬门禁：核心链路 0 error
-pnpm test          # Vitest 单测（arXiv 解析 / 检索过滤 / OMML→LaTeX / 注册表 / 仓储层）
+pnpm test          # Vitest 单测（arXiv / 检索过滤 / OMML→LaTeX / 注册表 / 仓储层 / 检索缓存 / 引用构图 / 引文 / 对比 prompt / RAG 检索 / 分享快照 / 库统计 / 限流 / 指标）
+pnpm test:e2e      # Playwright 浏览器级 happy-path（检索→入库→论文库；拦截 API 注入 fixture，不依赖外网）
 ```
 
 > **零配置可用**：不配任何环境变量也能跑——论文库走纯本地 `IndexedDB`（Dexie），
@@ -104,13 +125,20 @@ pnpm test          # Vitest 单测（arXiv 解析 / 检索过滤 / OMML→LaTeX 
 # ── AI（论文分析与流式工具）────────────────────
 DEEPSEEK_API_KEY=your_deepseek_key      # 默认 LLM
 DEEPSEEK_API_URL=https://api.deepseek.com/v1
-OPENAI_API_KEY=your_openai_key          # 可选，论文分析备选
-GOOGLE_API_KEY=your_gemini_key          # 可选，论文分析备选
+OPENAI_API_KEY=your_openai_key          # 可选，论文分析备选；语义检索 RAG 的 embedding 主供应商
+GOOGLE_API_KEY=your_gemini_key          # 可选，论文分析备选；语义检索 RAG 的 embedding 备选（DeepSeek 无 embedding 接口）
 AI_PROVIDER=openai                      # openai | gemini（论文分析走哪家）
 
 # ── 登录与跨设备同步（可选，配上才显示登录入口）──────────
 NEXT_PUBLIC_SUPABASE_URL=...            # Supabase 项目 URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...       # Supabase anon key
+
+# ── 后端检索缓存 / 只读分享（可选，仅服务端）──────────────
+SUPABASE_SERVICE_ROLE_KEY=...           # ⚠️ service-role key，只放服务端，永不加 NEXT_PUBLIC_ 前缀
+
+# ── 其它可选 ────────────────────────────────────────
+NEXT_PUBLIC_SITE_URL=https://your.domain  # 站点绝对地址（sitemap / canonical / OG 用，默认占位域名）
+METRICS_TOKEN=...                          # 配上则 /api/metrics 需 ?token= 才可访问（不配则公开只读聚合数）
 ```
 
 > 只想跑前端工具和模型可视化？**只配 `DEEPSEEK_API_KEY` 即可**；不配任何 env 也能跑——论文库走纯本地 IndexedDB 模式。
@@ -135,10 +163,15 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...       # Supabase anon key
 
 ```text
 app/
-  api/                  # 流式与数据接口（全部无状态：解析 / 代理 / 调 LLM）
-    paper-search/       # 多源论文检索（OpenAlex + arXiv）
+  api/                  # 流式与数据接口（解析 / 代理 / 调 LLM；缓存层可选）
+    paper-search/       # 多源论文检索（OpenAlex + arXiv）+ hot/（热门检索词）
+    citation-graph/     # 引用网络聚合（OpenAlex referenced_works + cites）
+    compare-papers/     # 多篇论文 AI 横向对比
+    library-qa/         # 语义检索 RAG：embed/（向量化）+ answer/（带引用归纳）
+    share/              # 只读分享：建快照 + status + [token] 读取（service-role）
+    metrics/            # 聚合指标快照（调用量/错误率/耗时/命中率）
     papers/import/      # arXiv / PDF 导入（纯内存解析，不持久化）
-    pdf-proxy/          # 同源 PDF 代理（带 SSRF 防护）
+    pdf-proxy/          # 同源 PDF 代理（带 SSRF 防护 + 限流）
     analyze/  analyze-paper/   # AI 论文分析
     summarize/  markdown-convert/  markdown-summarize/
     idea-generator/  chunk-it-up/  skill-maker/  explain/

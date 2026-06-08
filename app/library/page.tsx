@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
-  Search, Filter, Upload, BookOpen, ChevronDown, ChevronUp, Trash2,
+  Search, Filter, Upload, BookOpen, ChevronDown, ChevronUp, Trash2, Quote, BarChart3,
 } from "lucide-react";
 import { repository } from "@/lib/db/repository";
 import type { Paper } from "@/lib/db/types";
+import { toBibTeXMany } from "@/lib/export/citations";
+import { ShareButton } from "@/components/share/ShareButton";
+import { buildLibrarySnapshot } from "@/lib/share/snapshot";
 import { userKeyHeaders } from "@/lib/ai/user-keys";
 import { LIBRARY_CHANGED_EVENT } from "@/lib/sync/cloud-sync";
 import { LoadingState, EmptyState, ErrorState } from "@/components/states";
@@ -192,6 +196,19 @@ export default function LibraryPage() {
     }
   }
 
+  function handleExportBib() {
+    if (papers.length === 0) return;
+    const blob = new Blob([toBibTeXMany(papers)], { type: "application/x-bibtex" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "paperweave-library.bib";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   function handleModeChange(mode: "arxiv" | "pdf") {
     setImportMode(mode);
     setImportMessage("");
@@ -286,6 +303,32 @@ export default function LibraryPage() {
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-3 pointer-events-none" />
               </div>
+
+              <Link
+                href="/library/stats"
+                className="flex items-center gap-2 rounded-full border border-line bg-paper-2/80 px-4 py-2 text-sm text-ink-2 transition-colors hover:border-line-strong hover:text-ink focus-ring"
+                title="论文库统计看板"
+              >
+                <BarChart3 className="w-4 h-4" />
+                统计
+              </Link>
+
+              <button
+                onClick={handleExportBib}
+                disabled={papers.length === 0}
+                className="flex items-center gap-2 rounded-full border border-line bg-paper-2/80 px-4 py-2 text-sm text-ink-2 transition-colors hover:border-line-strong hover:text-ink disabled:opacity-40 focus-ring"
+                title="把整库导出为 BibTeX (.bib)"
+              >
+                <Quote className="w-4 h-4" />
+                导出 .bib
+              </button>
+
+              {papers.length > 0 && (
+                <ShareButton
+                  build={async () => buildLibrarySnapshot(papers)}
+                  label="分享库"
+                />
+              )}
 
               <button
                 onClick={() => setShowImportModal(true)}

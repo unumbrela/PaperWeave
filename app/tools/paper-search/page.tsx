@@ -10,6 +10,7 @@ import { repository } from "@/lib/db/repository";
 import { ApiSettings } from "@/components/paper-search/ApiSettings";
 import { SearchForm } from "@/components/paper-search/SearchForm";
 import { ResultCard } from "@/components/paper-search/ResultCard";
+import { HotQueries } from "@/components/paper-search/HotQueries";
 
 const TOOL = getTool("paper-search")!;
 
@@ -327,6 +328,8 @@ export default function Page() {
           onSearch={handleSearch}
           onOpenSettings={() => setShowSettings(!showSettings)}
         />
+
+        <HotQueries onPick={(kw) => setSearchQuery((prev) => ({ ...prev, keywords: kw }))} />
 
         <div className="surface rounded-[20px] min-h-[500px] flex flex-col overflow-hidden">
           <div className="flex items-center justify-between border-b border-line px-5 py-3">

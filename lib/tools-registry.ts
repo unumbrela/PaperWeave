@@ -30,6 +30,16 @@ export const TOOLS: Tool[] = [
     gradient: "from-[#ff4f8b] to-[#b14bff]",
     href: "/tools/paper-search",
   },
+  {
+    slug: "citation-graph",
+    name: "引用网络图谱",
+    description:
+      "输入一篇论文（OpenAlex），用 D3 力导向图展开它的引用网络：参考文献 + 被引文献一张图，圆越大被引越多。从检索结果一键直达。",
+    phases: ["查论文", "可视化表达"],
+    icon: "🕸️",
+    gradient: "from-[#b14bff] to-[#4bb3ff]",
+    href: "/tools/citation-graph",
+  },
 
   // ── 读文献 ──────────────────────────────────────────────
   {
@@ -60,6 +70,26 @@ export const TOOLS: Tool[] = [
     icon: "📚",
     gradient: "from-[#6b8ed6] to-[#4bb3ff]",
     href: "/tools/markdown-summarize",
+  },
+  {
+    slug: "paper-compare",
+    name: "多篇论文对比表",
+    description:
+      "从论文库勾选 2-6 篇，AI 生成「研究问题/方法/数据集/指标/创新点/局限」横向对比矩阵，一键导出 Markdown，综述写作刚需。",
+    phases: ["读文献"],
+    icon: "📊",
+    gradient: "from-[#4bb3ff] to-[#6b8ed6]",
+    href: "/tools/paper-compare",
+  },
+  {
+    slug: "library-qa",
+    name: "问你的论文库",
+    description:
+      "对入库论文建语义索引，用自然语言提问（embedding 检索 + LLM 归纳），返回带引用、可溯源到具体论文的答案。",
+    phases: ["读文献"],
+    icon: "💬",
+    gradient: "from-[#b14bff] to-[#6b8ed6]",
+    href: "/tools/library-qa",
   },
 
   // ── 生 idea ─────────────────────────────────────────────

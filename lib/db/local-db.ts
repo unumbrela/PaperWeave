@@ -38,6 +38,20 @@ export interface ReadProgress {
 }
 
 /**
+ * 论文向量（RAG 语义检索缓存）—— 纯本地、不入云。
+ * 复合主键 [paperId+model]：同一篇论文在不同 embedding 模型下各存一份，
+ * 避免混维度比较；textHash 用于判断论文文本是否变化、需重嵌。
+ */
+export interface PaperEmbedding {
+  paperId: string
+  /** 形如 "openai:text-embedding-3-small" */
+  model: string
+  textHash: string
+  vector: number[]
+  updatedAt: string
+}
+
+/**
  * 数据库类
  */
 class PaperDB extends Dexie {
@@ -45,15 +59,22 @@ class PaperDB extends Dexie {
   annotations!: Table<Annotation>
   notes!: Table<Note>
   readProgress!: Table<ReadProgress>
+  embeddings!: Table<PaperEmbedding>
 
   constructor() {
     super('paper_workspace')
-    
+
     this.version(1).stores({
       papers: 'id, arxivId, title, createdAt',
       annotations: 'id, paperId, page, createdAt',
       notes: 'id, paperId, updatedAt',
       readProgress: 'id, paperId, lastReadAt'
+    })
+
+    // v2：新增 RAG 向量缓存表（复合主键 [paperId+model]）。
+    // Dexie 自动继承 v1 未变更的表，只需声明新增表。
+    this.version(2).stores({
+      embeddings: '[paperId+model], paperId, model'
     })
   }
 }
@@ -102,11 +123,12 @@ export const paperDB = {
    * 删除论文（同时删除关联的标注和笔记）
    */
   async delete(id: string): Promise<void> {
-    await db.transaction('rw', [db.papers, db.annotations, db.notes, db.readProgress], async () => {
+    await db.transaction('rw', [db.papers, db.annotations, db.notes, db.readProgress, db.embeddings], async () => {
       await db.papers.delete(id)
       await db.annotations.where('paperId').equals(id).delete()
       await db.notes.where('paperId').equals(id).delete()
       await db.readProgress.where('paperId').equals(id).delete()
+      await db.embeddings.where('paperId').equals(id).delete()
     })
   },
 
@@ -138,6 +160,13 @@ export const annotationDB = {
    */
   async getByPaperId(paperId: string): Promise<Annotation[]> {
     return await db.annotations.where('paperId').equals(paperId).toArray()
+  },
+
+  /**
+   * 获取全部标注（统计看板用）
+   */
+  async getAll(): Promise<Annotation[]> {
+    return await db.annotations.toArray()
   },
 
   /**
@@ -246,4 +275,20 @@ export const progressDB = {
       .limit(limit)
       .toArray()
   }
+}
+
+/**
+ * 论文向量操作（RAG 语义检索缓存）
+ */
+export const embeddingDB = {
+  /** 取某个 embedding 模型下已缓存的全部论文向量。 */
+  async getByModel(model: string): Promise<PaperEmbedding[]> {
+    return await db.embeddings.where('model').equals(model).toArray()
+  },
+
+  /** 批量写入/更新向量。 */
+  async bulkPut(items: PaperEmbedding[]): Promise<void> {
+    if (items.length === 0) return
+    await db.embeddings.bulkPut(items)
+  },
 }
