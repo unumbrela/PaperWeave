@@ -2,7 +2,7 @@
 
 import {
   ExternalLink, Download, Loader2, Sparkles, ChevronRight,
-  CheckSquare, Square, FileText, Copy, Check, Plus,
+  CheckSquare, Square, FileText, Copy, Check, Plus, Network,
 } from "lucide-react";
 import type { PaperResult } from "@/lib/paper-search/types";
 import { cn } from "@/lib/utils";
@@ -183,6 +183,19 @@ export function ResultCard({
             <FileText className="w-3 h-3" />
             速读
           </button>
+
+          {paper.source === "openalex" && (
+            <a
+              href={`/tools/citation-graph?id=${encodeURIComponent(paper.id)}&title=${encodeURIComponent(paper.title)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-plum/8 text-plum hover:bg-plum/16 text-[12px] transition-colors"
+              title="查看引用网络"
+            >
+              <Network className="w-3 h-3" />
+              引用网络
+            </a>
+          )}
 
           <button
             onClick={onImport}

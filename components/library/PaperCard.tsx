@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import type { Paper, Author } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
+import { CitationButton } from "./CitationButton";
 
 function formatDate(dateString: string) {
   return new Date(dateString).toLocaleDateString("zh-CN", {
@@ -83,16 +84,19 @@ export function PaperCard({
               >
                 {paper.title}
               </Link>
-              {paper.sourceUrl && (
-                <a
-                  href={paper.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-shrink-0 p-1 rounded hover:bg-paper-3 transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4 text-ink-3" />
-                </a>
-              )}
+              <div className="flex flex-shrink-0 items-center gap-1">
+                <CitationButton paper={paper} />
+                {paper.sourceUrl && (
+                  <a
+                    href={paper.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded p-1 hover:bg-paper-3 transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4 text-ink-3" />
+                  </a>
+                )}
+              </div>
             </div>
 
             <p className="text-sm text-ink-4 mt-1 truncate">{renderAuthors(paper.authors)}</p>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { lookup } from 'node:dns/promises';
+import { enforceRateLimit } from '@/lib/api/http';
 
 // PDF 代理 —— serverless 友好地把远端 PDF（arXiv / 开放获取）以同源、带 CORS 的方式
 // 透传给前端。替代「下载到 public/papers 再静态服务」的旧做法（Vercel 文件系统只读，
@@ -64,6 +65,9 @@ async function resolvesToBlockedIp(hostname: string): Promise<boolean> {
 }
 
 export async function GET(request: Request) {
+  const limited = enforceRateLimit(request, 'pdf-proxy', { windowMs: 60_000, max: 40 });
+  if (limited) return limited;
+
   const raw = new URL(request.url).searchParams.get('url');
   if (!raw) {
     return NextResponse.json({ error: '缺少 url 参数' }, { status: 400 });
