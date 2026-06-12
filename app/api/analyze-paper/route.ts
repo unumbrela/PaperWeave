@@ -7,7 +7,6 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { title, abstract, authors } = body;
 
-    console.log('[Analyze Paper API] Analyzing:', title);
 
     if (!title && !abstract) {
       return NextResponse.json(

@@ -14,12 +14,21 @@ import type { Paper, Annotation, ResearchNote } from './types'
 export type { Paper, Annotation, ResearchNote, Author, Rect, AnnotationType, SourceType } from './types'
 
 /**
- * 缓存论文接口 —— 在共享 `Paper` 上叠加本地特有字段（PDF Blob、缓存时间）
+ * 缓存论文接口 —— 在共享 `Paper` 上叠加本地特有字段（缓存时间）
  */
 export interface CachedPaper extends Paper {
-  /** PDF 原始二进制，纯本地模式下离线可读 */
-  pdfBlob?: Blob
   /** 写入本地缓存的时间 */
+  cachedAt: string
+}
+
+/**
+ * 离线 PDF 二进制 —— 与论文元数据**分表**存放（v3 起）。
+ * 此前 Blob 内嵌在 papers 记录上，列表的 toArray() 会把所有 PDF 二进制
+ * 一并载入内存；拆表后列表只读元数据，Blob 仅在阅读时按需取。
+ */
+export interface PdfBlobEntry {
+  paperId: string
+  blob: Blob
   cachedAt: string
 }
 
@@ -60,6 +69,7 @@ class PaperDB extends Dexie {
   notes!: Table<Note>
   readProgress!: Table<ReadProgress>
   embeddings!: Table<PaperEmbedding>
+  pdfBlobs!: Table<PdfBlobEntry>
 
   constructor() {
     super('paper_workspace')
@@ -76,6 +86,31 @@ class PaperDB extends Dexie {
     this.version(2).stores({
       embeddings: '[paperId+model], paperId, model'
     })
+
+    // v3：PDF Blob 拆出独立表（见 PdfBlobEntry 注释），并把存量记录上的
+    // 内嵌 pdfBlob 迁移过去，迁移后从 papers 记录中删除该字段。
+    this.version(3)
+      .stores({
+        pdfBlobs: 'paperId'
+      })
+      .upgrade(async (tx) => {
+        const papers = await tx.table('papers').toArray()
+        for (const p of papers) {
+          if (p.pdfBlob) {
+            await tx.table('pdfBlobs').put({
+              paperId: p.id,
+              blob: p.pdfBlob,
+              cachedAt: p.cachedAt || new Date().toISOString(),
+            })
+          }
+        }
+        await tx
+          .table('papers')
+          .toCollection()
+          .modify((p) => {
+            delete p.pdfBlob
+          })
+      })
   }
 }
 
@@ -123,13 +158,18 @@ export const paperDB = {
    * 删除论文（同时删除关联的标注和笔记）
    */
   async delete(id: string): Promise<void> {
-    await db.transaction('rw', [db.papers, db.annotations, db.notes, db.readProgress, db.embeddings], async () => {
-      await db.papers.delete(id)
-      await db.annotations.where('paperId').equals(id).delete()
-      await db.notes.where('paperId').equals(id).delete()
-      await db.readProgress.where('paperId').equals(id).delete()
-      await db.embeddings.where('paperId').equals(id).delete()
-    })
+    await db.transaction(
+      'rw',
+      [db.papers, db.annotations, db.notes, db.readProgress, db.embeddings, db.pdfBlobs],
+      async () => {
+        await db.papers.delete(id)
+        await db.annotations.where('paperId').equals(id).delete()
+        await db.notes.where('paperId').equals(id).delete()
+        await db.readProgress.where('paperId').equals(id).delete()
+        await db.embeddings.where('paperId').equals(id).delete()
+        await db.pdfBlobs.delete(id)
+      },
+    )
   },
 
   /**
@@ -275,6 +315,22 @@ export const progressDB = {
       .limit(limit)
       .toArray()
   }
+}
+
+/**
+ * 离线 PDF 二进制操作（独立表，列表查询不触达）
+ */
+export const pdfBlobDB = {
+  /** 取某论文的离线 PDF；无缓存返回 undefined。 */
+  async get(paperId: string): Promise<Blob | undefined> {
+    const entry = await db.pdfBlobs.get(paperId)
+    return entry?.blob
+  },
+
+  /** 写入/覆盖某论文的离线 PDF。 */
+  async put(paperId: string, blob: Blob): Promise<void> {
+    await db.pdfBlobs.put({ paperId, blob, cachedAt: new Date().toISOString() })
+  },
 }
 
 /**

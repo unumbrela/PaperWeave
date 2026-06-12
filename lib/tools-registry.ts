@@ -40,6 +40,16 @@ export const TOOLS: Tool[] = [
     gradient: "from-[#b14bff] to-[#4bb3ff]",
     href: "/tools/citation-graph",
   },
+  {
+    slug: "research-genealogy",
+    name: "研究方向发展族谱",
+    description:
+      "图谱看单篇，族谱看方向：配套 Claude Code skill 深度调研一个方向的发展脉络（奠基 → 路线分叉 → 前沿，引文边均经核验），产出的 lineage.json 在本页渲染成可点击的族谱树。",
+    phases: ["查论文", "可视化表达"],
+    icon: "🌳",
+    gradient: "from-[#2e9e6b] to-[#b14bff]",
+    href: "/tools/research-genealogy",
+  },
 
   // ── 读文献 ──────────────────────────────────────────────
   {
@@ -85,7 +95,7 @@ export const TOOLS: Tool[] = [
     slug: "library-qa",
     name: "问你的论文库",
     description:
-      "对入库论文建语义索引，用自然语言提问（embedding 检索 + LLM 归纳），返回带引用、可溯源到具体论文的答案。",
+      "对入库论文建语义索引，用自然语言提问（embedding 检索 + LLM 归纳），返回带引用、可溯源到具体论文的答案。无 embedding key 时自动降级本地关键词检索。",
     phases: ["读文献"],
     icon: "💬",
     gradient: "from-[#b14bff] to-[#6b8ed6]",
@@ -124,6 +134,18 @@ export const TOOLS: Tool[] = [
     icon: "🧰",
     gradient: "from-[#ff4f8b] to-[#4b8bff]",
     href: "/tools/skill-maker",
+  },
+
+  // ── 论文绘图 ─────────────────────────────────────────────
+  {
+    slug: "figure-generator",
+    name: "论文绘图代码生成器",
+    description:
+      "描述想画的图（可附数据），生成可直接运行的出版级绘图代码：matplotlib / seaborn / plotly / TikZ，内置色盲友好配色、期刊单双栏尺寸与投稿自查清单。",
+    phases: ["论文绘图"],
+    icon: "📈",
+    gradient: "from-[#10b981] to-[#4bb3ff]",
+    href: "/tools/figure-generator",
   },
 
   // ── 讲结果 ──────────────────────────────────────────────
@@ -166,7 +188,6 @@ export const TOOLS: Tool[] = [
     icon: "⚔️",
     gradient: "from-[#10b981] to-[#f4c25a]",
     href: "/tools/gan-explainer",
-    comingSoon: false,
   },
   {
     slug: "diffusion-explainer",
@@ -177,7 +198,6 @@ export const TOOLS: Tool[] = [
     icon: "🌀",
     gradient: "from-[#8b5cf6] to-[#f4c25a]",
     href: "/tools/diffusion-explainer",
-    comingSoon: false,
   },
 
   // ── 可视化表达 ───────────────────────────────────────────

@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { buildDoc, textHash, cosineSim, topK } from "@/lib/library-qa/retrieval";
+import {
+  buildDoc,
+  textHash,
+  cosineSim,
+  topK,
+  tokenize,
+  keywordTopK,
+} from "@/lib/library-qa/retrieval";
 import type { Paper } from "@/lib/db/types";
 
 const paper = (over: Partial<Paper>): Paper => ({
@@ -75,5 +82,51 @@ describe("topK", () => {
 
   it("k=0 返回空", () => {
     expect(topK([1, 0], items, 0)).toHaveLength(0);
+  });
+});
+
+describe("tokenize（关键词降级的词元化）", () => {
+  it("拉丁词小写化、过滤单字符，保留连字符复合词", () => {
+    expect(tokenize("Mamba U-Net a I")).toEqual(["mamba", "u-net"]);
+  });
+
+  it("中文切二元组，单字 run 保留单字", () => {
+    expect(tokenize("对比学习")).toEqual(["对比", "比学", "学习"]);
+    expect(tokenize("好")).toEqual(["好"]);
+  });
+
+  it("中英混排两类词元都有", () => {
+    const t = tokenize("用 diffusion 做图像分割");
+    expect(t).toContain("diffusion");
+    expect(t).toContain("图像");
+    expect(t).toContain("分割");
+  });
+});
+
+describe("keywordTopK（BM25 降级检索）", () => {
+  const docs = [
+    { item: "seg", text: "Medical image segmentation with U-Net 医学图像分割" },
+    { item: "llm", text: "Large language model alignment via RLHF 大语言模型对齐" },
+    { item: "cl", text: "Contrastive learning for vision 对比学习 表征" },
+  ];
+
+  it("英文查询命中正确文档且分数归一化到 1", () => {
+    const r = keywordTopK("image segmentation", docs, 2);
+    expect(r[0].item).toBe("seg");
+    expect(r[0].score).toBe(1);
+  });
+
+  it("中文查询经二元组命中", () => {
+    const r = keywordTopK("哪些论文用了对比学习？", docs, 3);
+    expect(r[0].item).toBe("cl");
+  });
+
+  it("无重叠词元返回空，不硬凑结果", () => {
+    expect(keywordTopK("quantum computing 量子", docs, 3)).toHaveLength(0);
+  });
+
+  it("空查询 / 空文档返回空", () => {
+    expect(keywordTopK("", docs, 3)).toHaveLength(0);
+    expect(keywordTopK("segmentation", [], 3)).toHaveLength(0);
   });
 });

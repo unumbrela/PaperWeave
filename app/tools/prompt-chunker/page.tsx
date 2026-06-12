@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
 import { StreamOutput } from "@/components/stream-output";
 import { useStream } from "@/components/use-stream";
+import { consumeHandoff } from "@/lib/workflow/handoff";
+import { HandoffBanner } from "@/components/workflow/handoff-controls";
 import { cn } from "@/lib/utils";
 
 const TOOL = getTool("prompt-chunker")!;
@@ -98,7 +100,18 @@ const EXAMPLES: ChunkExample[] = [
 
 export default function Page() {
   const [form, setForm] = useState<Form>(DEFAULT_FORM);
+  const [handoffFrom, setHandoffFrom] = useState<string | null>(null);
   const { text, loading, error, run, stop } = useStream();
+
+  useEffect(() => {
+    // 挂载时一次性消费上游 handoff（如 Idea 生成器发来的验证计划）并水合输入
+    /* eslint-disable react-hooks/set-state-in-effect */
+    const h = consumeHandoff("prompt-chunker");
+    if (!h) return;
+    if (h.fields.task) setForm((f) => ({ ...f, task: h.fields.task }));
+    setHandoffFrom(h.from);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   const canSubmit = !loading && form.task.trim().length > 0;
 
@@ -127,6 +140,9 @@ export default function Page() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] mt-8">
         {/* LEFT: input */}
         <div className="surface rounded-[20px] p-6 space-y-5">
+          {handoffFrom && (
+            <HandoffBanner from={handoffFrom} onDismiss={() => setHandoffFrom(null)} />
+          )}
           <div>
             <label className="overline block mb-2">原始复杂任务</label>
             <textarea

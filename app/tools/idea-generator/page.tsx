@@ -6,7 +6,7 @@ import { ToolShell } from "@/components/tool-shell";
 import { StreamOutput } from "@/components/stream-output";
 import { useStream } from "@/components/use-stream";
 import { consumeHandoff } from "@/lib/workflow/handoff";
-import { HandoffBanner, SaveToLibrary } from "@/components/workflow/handoff-controls";
+import { HandoffBanner, SaveToLibrary, SendToTool } from "@/components/workflow/handoff-controls";
 import { cn } from "@/lib/utils";
 
 const TOOL = getTool("idea-generator")!;
@@ -113,14 +113,36 @@ export default function Page() {
             onStop={stop}
             emptyHint="填入研究方向，生成可验证的候选 idea。"
           />
-          {sourcePaperId && text && !loading && (
-            <div className="flex justify-end">
-              <SaveToLibrary
-                paperId={sourcePaperId}
-                field="notes"
-                value={text}
-                append
-                label="回存为研究笔记"
+          {text && !loading && (
+            <div className="flex flex-wrap justify-end gap-2">
+              {sourcePaperId && (
+                <SaveToLibrary
+                  paperId={sourcePaperId}
+                  field="notes"
+                  value={text}
+                  append
+                  label="回存为研究笔记"
+                />
+              )}
+              <SendToTool
+                targetSlug="prompt-chunker"
+                payload={{
+                  from: TOOL.name,
+                  sourcePaperId: sourcePaperId ?? undefined,
+                  fields: { task: `把下面这个研究 idea 的最小验证实验拆成可执行计划：\n\n${text}` },
+                }}
+                label="发往「研究任务规划器」"
+              />
+              <SendToTool
+                targetSlug="figure-generator"
+                payload={{
+                  from: TOOL.name,
+                  sourcePaperId: sourcePaperId ?? undefined,
+                  fields: {
+                    description: `为下面这个研究 idea 的最小验证实验设计结果图（先想清楚要传达的结论，再选图型）：\n\n${text}`,
+                  },
+                }}
+                label="为验证实验设计图表"
               />
             </div>
           )}

@@ -4,9 +4,9 @@
  * 设计原则（见 CORE-IMPROVEMENT-PLAN.md · P0）：
  *   1. **本地 Dexie(IndexedDB) 为唯一真相源**：列表、详情、入库、标注、笔记、
  *      阅读进度，全部读写本地。clone 即用、零配置、可离线。
- *   2. **云端为可选同步层**：仅当显式开启 `NEXT_PUBLIC_ENABLE_CLOUD_SYNC=true`
- *      时，写操作会「fire-and-forget」地推送到服务端 `/api/*`（失败不影响本地）。
- *      默认关闭，避免未配数据库时走进会报错的 Prisma 路径。
+ *   2. **云端为可选同步层**：仅当用户已登录（Supabase Auth）时，写操作会
+ *      「fire-and-forget」地镜像到 Supabase Postgres（失败不影响本地）。
+ *      未登录 / 未配置 Supabase 时 cloudSync 全部 no-op，不发起任何网络请求。
  *
  * 所有 UI / hooks 只调用本模块，**不再** 直接 `fetch('/api/papers')` 或混用
  * `cache-service`，从根上消除「本地有云端没有 / 列表与详情不一致」的脏状态。
@@ -17,6 +17,7 @@ import {
   annotationDB,
   noteDB,
   progressDB,
+  pdfBlobDB,
   type CachedPaper,
 } from './local-db'
 import type { Paper, Annotation, AnnotationType, ResearchNote, Rect } from './types'
@@ -83,13 +84,13 @@ export const repository = {
       return sortOrder === 'desc' ? -cmp : cmp
     })
 
-    // 列表不需要 PDF 二进制：剥离 Blob，避免把大对象灌进 UI 状态
-    return papers.map(stripBlob)
+    // PDF 二进制在独立表（pdfBlobs），列表查询天然不触达大对象
+    return papers.map(stripLocal)
   },
 
   async getPaper(id: string): Promise<Paper | undefined> {
     const p = await paperDB.getById(id)
-    return p ? stripBlob(p) : undefined
+    return p ? stripLocal(p) : undefined
   },
 
   async getPaperByArxivId(arxivId: string): Promise<Paper | undefined> {
@@ -130,12 +131,12 @@ export const repository = {
       citations: typeof input.citations === 'number' ? input.citations : 0,
       createdAt: input.createdAt || now,
       updatedAt: now,
-      pdfBlob: input.pdfBlob,
       cachedAt: now,
     }
 
     await paperDB.upsert(paper)
-    const clean = stripBlob(paper)
+    if (input.pdfBlob) await pdfBlobDB.put(id, input.pdfBlob)
+    const clean = stripLocal(paper)
     void cloudSync.pushPaper(clean)
     return clean
   },
@@ -150,7 +151,7 @@ export const repository = {
       updatedAt: new Date().toISOString(),
     }
     await paperDB.upsert(merged)
-    const clean = stripBlob(merged)
+    const clean = stripLocal(merged)
     void cloudSync.pushPaper(clean)
     return clean
   },
@@ -167,22 +168,16 @@ export const repository = {
 
   /** 读取已离线缓存的 PDF 二进制；无缓存返回 undefined。 */
   async getPdfBlob(id: string): Promise<Blob | undefined> {
-    const p = await paperDB.getById(id)
-    return p?.pdfBlob
+    return pdfBlobDB.get(id)
   },
 
   /**
-   * 把 PDF 二进制写入本地缓存，使该论文可在断网时阅读。
-   * Blob 永不出本地（不 pushToCloud），与「Dexie 单一真相源」一致。
+   * 把 PDF 二进制写入本地缓存（独立表，不混进元数据记录），
+   * 使该论文可在断网时阅读。Blob 永不出本地（不 pushToCloud）。
    */
   async cachePdfBlob(id: string, blob: Blob): Promise<void> {
-    const existing = await paperDB.getById(id)
-    if (!existing) return
-    await paperDB.upsert({
-      ...(existing as CachedPaper),
-      pdfBlob: blob,
-      cachedAt: new Date().toISOString(),
-    })
+    if (!(await paperDB.exists(id))) return
+    await pdfBlobDB.put(id, blob)
   },
 
   // ────────────────────────────────────────────────────────
@@ -276,10 +271,9 @@ export const repository = {
   },
 }
 
-/** 去掉 Blob 字段，返回可安全 JSON 化的纯 Paper */
-function stripBlob(p: CachedPaper): Paper {
-  const { pdfBlob: _pdfBlob, cachedAt: _cachedAt, ...rest } = p
-  void _pdfBlob
+/** 去掉本地缓存元字段，返回可安全 JSON 化的纯 Paper */
+function stripLocal(p: CachedPaper): Paper {
+  const { cachedAt: _cachedAt, ...rest } = p
   void _cachedAt
   return rest
 }
