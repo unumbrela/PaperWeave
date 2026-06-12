@@ -57,11 +57,11 @@
 | --- | --- |
 | 框架 | Next.js 16（App Router）· React 19 · TypeScript 5 |
 | 样式 | Tailwind CSS v4 + 自研暖纸面设计系统 |
-| AI | Vercel AI SDK 流式输出；非流式 **DeepSeek → OpenAI → Gemini** 三级自动 fallback；embedding 走 OpenAI / Gemini |
+| AI | 流式与非流式全部走 **DeepSeek → OpenAI → Gemini** 三级自动 fallback（任一家 key 即可用全部 AI 工具）；embedding 走 OpenAI / Gemini |
 | 检索 | OpenAlex + arXiv 聚合（带超时与限流） |
 | 持久化 | **本地** Dexie / IndexedDB（单一真相源，含 PDF Blob）＋ **可选云端** Supabase（Auth + Postgres + 行级隔离 RLS）跨设备同步 |
 | 可视化 | D3.js · Three.js / React Three Fiber · TensorFlow.js |
-| 测试 | Vitest（140 条单测）· Playwright（浏览器级 E2E）· GitHub Actions 四道硬门禁（lint / tsc / test / build） |
+| 测试 | Vitest（145 条单测）· Playwright（浏览器级 E2E）· GitHub Actions 四道硬门禁（lint / tsc / test / build） |
 
 ### 设计要点
 
@@ -86,8 +86,8 @@ pnpm dev          # http://localhost:3000
 
 | 变量 | 作用 | 不配置时 |
 | --- | --- | --- |
-| `DEEPSEEK_API_KEY` | 流式 AI 工具默认可用 | 访客在 `/settings` 自带 key |
-| `OPENAI_API_KEY` / `GOOGLE_API_KEY` | 非流式 fallback、embedding | 同上 |
+| `DEEPSEEK_API_KEY` | AI 工具首选供应商（idea 生成可用 reasoner 深度推理） | 访客在 `/settings` 自带 key |
+| `OPENAI_API_KEY` / `GOOGLE_API_KEY` | 与 DeepSeek 等效的 fallback（任一家即可用全部 AI 工具）、embedding | 同上 |
 | `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 登录 + 跨设备云同步 | 隐藏登录入口，纯本地模式 |
 | `SUPABASE_SERVICE_ROLE_KEY` | 检索缓存 / 热门检索 / 只读分享 | 缓存降级直连，分享入口隐藏 |
 | `METRICS_TOKEN` | 给 `/api/metrics` 加门禁 | 指标接口公开 |

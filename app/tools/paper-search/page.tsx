@@ -99,9 +99,17 @@ export default function Page() {
       if (data.success) {
         setResults(data.data);
         setSelectedPaperIds(new Set());
-        // 部分源失败：仍展示已得结果，并提示哪个源失败
-        if (Array.isArray(data.failedSources) && data.failedSources.length > 0) {
-          setError(`部分检索源未返回结果：${data.failedSources.join("、")}（已展示其余源的结果）`);
+        const failed: string[] = Array.isArray(data.failedSources) ? data.failedSources : [];
+        if (failed.length > 0) {
+          if (data.data.length === 0) {
+            // 全源失败：明确告知是上游问题而非"没有匹配论文"，并给出路
+            setError(
+              `所有检索源（${failed.join("、")}）均未返回结果：可能是网络问题或上游限流，请稍后重试，或在设置里换一个检索源。`,
+            );
+          } else {
+            // 部分源失败：仍展示已得结果，并提示哪个源失败
+            setError(`部分检索源未返回结果：${failed.join("、")}（已展示其余源的结果）`);
+          }
         }
       } else {
         setError(data.error || "搜索失败");
@@ -115,17 +123,22 @@ export default function Page() {
     }
   };
 
-  const handleImport = async (paper: PaperResult) => {
-    if (importingIds.has(paper.id)) return;
+  /** 单篇入库；返回是否成功（已存在视为成功），供批量入库统计成败。 */
+  const handleImport = async (paper: PaperResult): Promise<boolean> => {
+    if (importingIds.has(paper.id)) return true;
 
     setImportingIds((prev) => new Set([...prev, paper.id]));
 
     try {
       const arxivId = paper.source === "arxiv" ? paper.id : undefined;
-      // 去重：已在本地库则跳过
+      // 去重：已在本地库则跳过（arXiv 按 arxivId；其他来源按标题精确匹配）
       if (arxivId && (await repository.arxivExists(arxivId))) {
         setImportedIds((prev) => new Set([...prev, paper.id]));
-        return;
+        return true;
+      }
+      if (!arxivId && (await repository.findPaperByTitle(paper.title))) {
+        setImportedIds((prev) => new Set([...prev, paper.id]));
+        return true;
       }
       // 直接落库到本地 Dexie（单一真相源）
       await repository.savePaper({
@@ -141,8 +154,13 @@ export default function Page() {
         citations: paper.citations,
       });
       setImportedIds((prev) => new Set([...prev, paper.id]));
+      return true;
     } catch (err) {
       console.error("Import error:", err);
+      setError(
+        `「${paper.title}」入库失败：${err instanceof Error ? err.message : "本地存储写入异常"}，请重试。`,
+      );
+      return false;
     } finally {
       setImportingIds((prev) => {
         const next = new Set(prev);
@@ -170,8 +188,15 @@ export default function Page() {
   };
 
   const handleBatchImport = async () => {
+    const failed: string[] = [];
     for (const paper of selectedPapers) {
-      await handleImport(paper);
+      if (!(await handleImport(paper))) failed.push(paper.title);
+    }
+    // 汇总成败：失败的逐篇列出（覆盖循环中逐篇设置的单条错误）
+    if (failed.length > 0) {
+      setError(
+        `批量入库完成：${selectedPapers.length - failed.length} 篇成功，${failed.length} 篇失败（${failed.join("、")}），请重试失败项。`,
+      );
     }
   };
 

@@ -36,19 +36,19 @@ export async function POST(request: Request) {
     const raw = await callAnalysis(prompt, keys);
     const parsed = parseAnalysis(raw);
 
-    const paperAnalysis = parsed
-      ? toPaperFields(parsed)
-      : {
-          summary: '未分析成功',
-          methodology: '未分析成功',
-          contribution: '未分析成功',
-          notes: '未分析成功',
-        };
+    // 解析失败时如实报错，绝不返回「未分析成功」占位字段——
+    // 否则客户端会把垃圾数据持久化进本地库，覆盖真实笔记位。
+    if (!parsed) {
+      return NextResponse.json(
+        { success: false, message: 'AI 输出无法解析为结构化结果，请重试', raw },
+        { status: 422 },
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      message: parsed ? '分析完成' : 'AI 输出无法解析为 JSON，标记为未分析成功',
-      data: { ...paperAnalysis, raw },
+      message: '分析完成',
+      data: { ...toPaperFields(parsed), raw },
     });
   } catch (error) {
     console.error('[AI Analyze] Failed:', error);

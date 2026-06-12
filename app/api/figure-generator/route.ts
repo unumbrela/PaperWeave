@@ -1,6 +1,5 @@
-import { streamText } from "ai";
-import { getDeepSeek, MODELS, aiNotConfiguredResponse } from "@/lib/ai";
-import { resolveKeys } from "@/lib/ai/keys";
+import { streamChat, aiNotConfiguredResponse } from "@/lib/ai/stream";
+import { resolveKeys, hasAnyKey } from "@/lib/ai/keys";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -27,8 +26,8 @@ const TARGET_HINT = {
 } as const;
 
 export async function POST(req: Request) {
-  const { deepseek: dsKey } = resolveKeys(req);
-  if (!dsKey) return aiNotConfiguredResponse();
+  const keys = resolveKeys(req);
+  if (!hasAnyKey(keys)) return aiNotConfiguredResponse();
   let parsed;
   try {
     parsed = Body.parse(await req.json());
@@ -66,12 +65,16 @@ ${parsed.data.trim() ? `\n**数据（严格使用，不得改动数值）**：\n
 ## 投稿自查清单
 - [ ] 列 4–6 条该图在投稿前应自查的具体项（如「导出 PDF 后放大 400% 检查文字不糊」）。`;
 
-  const result = streamText({
-    model: getDeepSeek(dsKey)(MODELS.chat),
-    system,
-    prompt,
-    temperature: 0.3,
-  });
+  const stream = await streamChat(
+    [
+      { role: "system", content: system },
+      { role: "user", content: prompt },
+    ],
+    { temperature: 0.3, max_tokens: 4000 },
+    keys,
+  );
 
-  return result.toTextStreamResponse();
+  return new Response(stream, {
+    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+  });
 }

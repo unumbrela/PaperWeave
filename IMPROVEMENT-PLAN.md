@@ -73,3 +73,20 @@
 3. **i18n**（至少英文 README）。
 4. **iGEM 素材外链化**。
 5. **限流/指标上 Redis**（有真实流量后再说）。
+
+---
+
+## 4. 第二轮（2026-06）：「任一家 key 即可用」收口
+
+上一轮把 `streamChat()`（DeepSeek→OpenAI→Gemini 流式 fallback）只接到了 RAG 与多篇对比，
+本轮发现并消除了其余环节的同类死路：
+
+| 项 | 严重度 | 动作 |
+| --- | --- | --- |
+| 6 个流式路由（summarize / idea-generator / markdown-summarize / figure-generator / chunk-it-up / skill-maker）硬编码 DeepSeek-only，只有 OpenAI/Gemini key 的用户直接 503 | 死路 | ✅ 全部迁移到 `lib/ai/stream.ts` 的 `streamChat()`；新增 `deepseekModel` 档位参数保留 idea-generator 的 reasoner；删除孤儿 `lib/ai.ts` |
+| `/api/analyze` JSON 解析失败仍返回 `success:true` + 四个「未分析成功」占位字段，被客户端持久化进本地库 | 数据完整性 | ✅ 失败如实返回 422；论文库卡片补「分析中」状态与失败提示，失败不落库 |
+| 检索页入库失败只 console.error；非 arXiv（OpenAlex）来源无去重，重复点击重复入库 | 体验 | ✅ 新增按标题（忽略大小写）去重 `repository.findPaperByTitle`；单篇/批量入库失败均有页面提示 |
+| 检索全源失败时文案误导（「已展示其余源的结果」但结果为空） | 体验 | ✅ 区分「全源失败」与「部分失败」，前者明示上游问题并给出路 |
+| E2E 只有 happy-path | 工程 | ✅ 新增 `e2e/ai-tools.spec.ts`（流式渲染 / 零 key 提示 / 全源失败文案）+ `test/stream-chat.test.ts`（fallback 矩阵）+ 标题去重单测；单测 140→145 |
+
+备注：`ai` / `@ai-sdk/deepseek` 依赖在源码中已零引用，留待下次依赖清理时移除。
