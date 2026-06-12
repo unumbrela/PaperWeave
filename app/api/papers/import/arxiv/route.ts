@@ -37,7 +37,6 @@ export async function POST(request: Request) {
       );
     }
     
-    console.log(`[arXiv Import] Fetching metadata for ${cleanId}`);
     let metadata;
     try {
       metadata = await fetchArxivMetadata(arxivId);

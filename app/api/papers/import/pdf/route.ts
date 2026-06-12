@@ -43,11 +43,9 @@ export async function POST(request: Request) {
       );
     }
     
-    console.log(`[PDF Import] Reading file: ${file.name}`);
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
-    console.log(`[PDF Import] Extracting text from PDF`);
     let extractedText = '';
     
     try {

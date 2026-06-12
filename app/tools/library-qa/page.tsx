@@ -9,12 +9,14 @@ import { Markdown } from "@/components/markdown";
 import { repository } from "@/lib/db/repository";
 import { embeddingDB, type PaperEmbedding } from "@/lib/db/local-db";
 import { userKeyHeaders } from "@/lib/ai/user-keys";
-import { buildDoc, textHash, topK } from "@/lib/library-qa/retrieval";
+import { buildDoc, textHash, topK, keywordTopK } from "@/lib/library-qa/retrieval";
 import type { Paper } from "@/lib/db/types";
 
 const TOOL = getTool("library-qa")!;
 const TOP_K = 4;
 const EMBED_BATCH = 64;
+
+type RetrievalMode = "semantic" | "keyword";
 
 interface Source {
   n: number;
@@ -22,6 +24,9 @@ interface Source {
   title: string;
   score: number;
 }
+
+/** 服务端没有可用的 embedding key（503）—— 触发本地关键词检索降级。 */
+class EmbeddingUnavailableError extends Error {}
 
 /** 调 embedding 路由，分批以避免单次过大；要求全程同一 model。 */
 async function embed(texts: string[]): Promise<{ model: string; vectors: number[][] }> {
@@ -35,7 +40,10 @@ async function embed(texts: string[]): Promise<{ model: string; vectors: number[
       body: JSON.stringify({ texts: chunk }),
     });
     const data = await res.json();
-    if (!data.success) throw new Error(data.error || "向量化失败");
+    if (!data.success) {
+      if (res.status === 503) throw new EmbeddingUnavailableError(data.error || "embedding 不可用");
+      throw new Error(data.error || "向量化失败");
+    }
     model = data.model;
     vectors.push(...data.vectors);
   }
@@ -47,6 +55,7 @@ export default function Page() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [sources, setSources] = useState<Source[]>([]);
+  const [mode, setMode] = useState<RetrievalMode | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -68,59 +77,84 @@ export default function Page() {
     setError(null);
     setAnswer("");
     setSources([]);
+    setMode(null);
 
     try {
-      // 1) 向量化问题，借此确定当前 embedding 模型（向量空间）
-      setStatus("正在向量化问题…");
-      const q = await embed([question]);
-      const queryVec = q.vectors[0];
-      const model = q.model;
+      const docs = papers.map((p) => ({ paper: p, doc: buildDoc(p) }));
+      let ranked: Array<{ paper: Paper; score: number }> = [];
+      let usedMode: RetrievalMode = "semantic";
 
-      // 2) 读本地向量缓存（同模型），找出需要（重）嵌入的论文
-      const cached = await embeddingDB.getByModel(model);
-      const cachedMap = new Map(cached.map((e) => [e.paperId, e]));
-      const docs = papers.map((p) => ({ paper: p, doc: buildDoc(p), hash: "" }));
-      docs.forEach((d) => (d.hash = textHash(d.doc)));
-      const stale = docs.filter((d) => cachedMap.get(d.paper.id)?.textHash !== d.hash);
+      try {
+        // ── 语义检索（首选）────────────────────────────────
+        // 1) 向量化问题，借此确定当前 embedding 模型（向量空间）
+        setStatus("正在向量化问题…");
+        const q = await embed([question]);
+        const queryVec = q.vectors[0];
+        const model = q.model;
 
-      // 3) 增量嵌入缺失/变更的论文，写回本地缓存
-      if (stale.length > 0) {
-        setStatus(`正在向量化 ${stale.length} 篇论文…`);
-        const { vectors } = await embed(stale.map((d) => d.doc));
-        const now = new Date().toISOString();
-        const rows: PaperEmbedding[] = stale.map((d, i) => ({
-          paperId: d.paper.id,
-          model,
-          textHash: d.hash,
-          vector: vectors[i],
-          updatedAt: now,
-        }));
-        await embeddingDB.bulkPut(rows);
-        rows.forEach((r) => cachedMap.set(r.paperId, r));
+        // 2) 读本地向量缓存（同模型），找出需要（重）嵌入的论文
+        const cached = await embeddingDB.getByModel(model);
+        const cachedMap = new Map(cached.map((e) => [e.paperId, e]));
+        const hashed = docs.map((d) => ({ ...d, hash: textHash(d.doc) }));
+        const stale = hashed.filter((d) => cachedMap.get(d.paper.id)?.textHash !== d.hash);
+
+        // 3) 增量嵌入缺失/变更的论文，写回本地缓存
+        if (stale.length > 0) {
+          setStatus(`正在向量化 ${stale.length} 篇论文…`);
+          const { vectors } = await embed(stale.map((d) => d.doc));
+          const now = new Date().toISOString();
+          const rows: PaperEmbedding[] = stale.map((d, i) => ({
+            paperId: d.paper.id,
+            model,
+            textHash: d.hash,
+            vector: vectors[i],
+            updatedAt: now,
+          }));
+          await embeddingDB.bulkPut(rows);
+          rows.forEach((r) => cachedMap.set(r.paperId, r));
+        }
+
+        // 4) 余弦检索 top-k
+        setStatus("检索相关论文…");
+        const items = papers
+          .map((p) => ({ paper: p, vector: cachedMap.get(p.id)?.vector || [] }))
+          .filter((it) => it.vector.length > 0);
+        ranked = topK(queryVec, items, TOP_K)
+          .filter((r) => r.score > 0)
+          .map((r) => ({ paper: r.item.paper, score: r.score }));
+      } catch (err) {
+        // ── 关键词检索降级（无 embedding key）──────────────
+        // 纯本地 BM25：零网络、零费用，质量弱于语义检索但可用。
+        if (!(err instanceof EmbeddingUnavailableError)) throw err;
+        usedMode = "keyword";
+        setStatus("本地关键词检索…");
+        ranked = keywordTopK(
+          question,
+          docs.map((d) => ({ item: d.paper, text: d.doc })),
+          TOP_K,
+        ).map((r) => ({ paper: r.item, score: r.score }));
       }
-
-      // 4) 余弦检索 top-k
-      setStatus("检索相关论文…");
-      const items = papers
-        .map((p) => ({ paper: p, vector: cachedMap.get(p.id)?.vector || [] }))
-        .filter((it) => it.vector.length > 0);
-      const ranked = topK(queryVec, items, TOP_K).filter((r) => r.score > 0);
 
       if (ranked.length === 0) {
-        setError("没有检索到相关论文。");
+        setError(
+          usedMode === "keyword"
+            ? "关键词检索没有命中论文。换个更具体的关键词试试；或在右上角填入 OpenAI / Gemini key 启用语义检索。"
+            : "没有检索到相关论文。",
+        );
         return;
       }
+      setMode(usedMode);
 
       const contexts = ranked.map((r, i) => ({
         n: i + 1,
-        title: r.item.paper.title,
-        text: buildDoc(r.item.paper),
+        title: r.paper.title,
+        text: buildDoc(r.paper),
       }));
       setSources(
         ranked.map((r, i) => ({
           n: i + 1,
-          id: r.item.paper.id,
-          title: r.item.paper.title,
+          id: r.paper.id,
+          title: r.paper.title,
           score: r.score,
         })),
       );
@@ -178,7 +212,8 @@ export default function Page() {
             </button>
           </div>
           <p className="mt-2 text-[12px] text-ink-4">
-            语义检索需要 OpenAI 或 Gemini 的 key（在右上角「API Key」填）。向量在本机缓存，重复提问不重复计费。
+            配 OpenAI / Gemini key 走语义检索（向量本机缓存，重复提问不重复计费）；
+            没配则自动降级为本地关键词检索，零费用、答案生成只需任意一家 key（含 DeepSeek）。
           </p>
         </div>
 
@@ -213,6 +248,18 @@ export default function Page() {
                 <div className="mb-4">
                   <div className="overline mb-2 flex items-center gap-1.5 text-ink-3">
                     <FileText className="h-3.5 w-3.5" /> 引用来源
+                    {mode && (
+                      <span
+                        className="ml-1 rounded-full border border-line bg-paper-2/60 px-2 py-0.5 text-[10px] normal-case tracking-normal text-ink-3"
+                        title={
+                          mode === "semantic"
+                            ? "embedding 向量余弦相似度检索"
+                            : "未配 embedding key，已降级为本地 BM25 关键词检索（零费用）"
+                        }
+                      >
+                        {mode === "semantic" ? "语义检索" : "关键词检索"}
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {sources.map((s) => (

@@ -25,9 +25,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Generate Prisma client
-        run: pnpm prisma generate
-
       # Lint 已是硬门禁：核心链路 0 error；vendored 可视化代码（transformer /
       # gan / diffusion explainer + ganlab）在 eslint.config.mjs 的 ignores 内，
       # 不阻塞 CI（其 any/require 历史债务后续在独立 showcase 仓清偿）。
@@ -65,9 +62,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Generate Prisma client
-        run: pnpm prisma generate
 
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium

@@ -64,3 +64,81 @@ export function topK<T extends { vector: number[] }>(
     .sort((a, b) => b.score - a.score)
     .slice(0, Math.max(0, k));
 }
+
+// ──────────────────────────────────────────────────────────
+// 关键词检索降级 —— 无 embedding key 时的零依赖方案（BM25）
+//
+// DeepSeek 暂无 embedding 接口；只配了 DeepSeek key 的用户走这条路：
+// 纯前端、零网络、零费用，质量弱于语义检索但「能用」。
+// ──────────────────────────────────────────────────────────
+
+/**
+ * 把文本切成检索词元：拉丁词（≥2 字符，含连字符复合词）+ 中文二元组。
+ * 中文不依赖分词器——二元组（bigram）是检索界久经考验的零依赖近似。
+ */
+export function tokenize(text: string): string[] {
+  const lower = text.toLowerCase();
+  const tokens: string[] = [];
+  for (const m of lower.matchAll(/[a-z0-9]+(?:[-_][a-z0-9]+)*/g)) {
+    if (m[0].length >= 2) tokens.push(m[0]);
+  }
+  const cjkRuns = lower.match(/[㐀-䶿一-鿿]+/g) || [];
+  for (const run of cjkRuns) {
+    if (run.length === 1) {
+      tokens.push(run);
+      continue;
+    }
+    for (let i = 0; i + 1 < run.length; i++) tokens.push(run.slice(i, i + 2));
+  }
+  return tokens;
+}
+
+const BM25_K1 = 1.5;
+const BM25_B = 0.75;
+
+/**
+ * BM25 关键词检索，取 top-k（仅返回得分 > 0 的项）。
+ * 分数按本次结果的最大值归一化到 (0,1]，便于与余弦相似度共用同一展示口径。
+ */
+export function keywordTopK<T>(
+  question: string,
+  items: Array<{ item: T; text: string }>,
+  k: number,
+): ScoredItem<T>[] {
+  const qTokens = [...new Set(tokenize(question))];
+  if (qTokens.length === 0 || items.length === 0) return [];
+
+  const docs = items.map(({ item, text }) => {
+    const tokens = tokenize(text);
+    const tf = new Map<string, number>();
+    for (const t of tokens) tf.set(t, (tf.get(t) || 0) + 1);
+    return { item, tf, len: tokens.length };
+  });
+  const avgLen = docs.reduce((s, d) => s + d.len, 0) / docs.length || 1;
+
+  // 每个查询词元的文档频率 → IDF
+  const idf = new Map<string, number>();
+  for (const q of qTokens) {
+    const df = docs.reduce((n, d) => n + (d.tf.has(q) ? 1 : 0), 0);
+    idf.set(q, Math.log(1 + (docs.length - df + 0.5) / (df + 0.5)));
+  }
+
+  const scored = docs.map((d) => {
+    let score = 0;
+    for (const q of qTokens) {
+      const f = d.tf.get(q);
+      if (!f) continue;
+      const norm = f * (BM25_K1 + 1);
+      const denom = f + BM25_K1 * (1 - BM25_B + (BM25_B * d.len) / avgLen);
+      score += (idf.get(q) || 0) * (norm / denom);
+    }
+    return { item: d.item, score };
+  });
+
+  const ranked = scored
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, Math.max(0, k));
+  const max = ranked[0]?.score || 1;
+  return ranked.map((r) => ({ item: r.item, score: r.score / max }));
+}

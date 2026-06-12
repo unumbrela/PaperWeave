@@ -1,141 +1,159 @@
-# PaperWeave · 项目总结与状态
+# PaperWeave · 项目地图（面向 Agent / 开发者）
 
-> 最后更新：2026-06-04（对齐 P0–P5 + 本轮 P0.2 零配置盖章 / P4.3 测试+CI 硬门禁 落地后的真实代码状态）
-
-本文档复盘项目当前的**真实**状态、已交付能力与关键设计决策。它以"代码现状"为唯一依据校正——凡文档与代码冲突，以代码为准。
+> 本文档是给 AI Agent 与新接手开发者的**代码现状地图**：架构、关键模块、约定与不变量、已知问题。凡描述与代码冲突，以代码为准。
+> 最后核对：2026-06-11（基于当时 HEAD `0605146`，约 3.0 万行 TS/TSX，361 个 git 跟踪文件）。
 
 ---
 
-## 一、项目定位
+## 1. 一句话定位
 
-**PaperWeave 是一个研究型论文助手，主张"不替你写论文，但让写论文之外的每一步都顺起来"。**
+研究型论文助手 Web 应用（Next.js 全栈）：把科研流程切成 7 环主线「查论文 → 读文献 → 生 idea → 做验证 → 论文绘图 → 讲结果 → 可视化表达」，18 个工具挂在主线上，上游输出可一键流转为下游输入。**本地优先**（IndexedDB 单一真相源，零配置可用），云端（Supabase）与 LLM key 全部可选、缺失时优雅降级。
 
-它把研究生命周期切成 7 环主线：
+## 2. 常用命令
+
+```bash
+pnpm dev            # 开发服务器（Node >= 20，包管理器必须用 pnpm）
+pnpm lint           # ESLint，CI 硬门禁；vendored 可视化代码在 eslint.config.mjs ignores 内
+pnpm exec tsc --noEmit
+pnpm test           # Vitest：test/ 下 16 文件 140 用例，~0.6s 跑完
+pnpm test:e2e       # Playwright：e2e/happy-path.spec.ts，API 被 page.route 拦截、不触外网
+pnpm build          # next build --webpack；不配任何环境变量也必须能通过
+```
+
+## 3. 架构总览
+
+### 3.1 数据流（最重要的心智模型）
 
 ```
-查论文  →  读文献  →  生 idea  →  做验证  →  论文绘图  →  讲结果  →  可视化表达
+UI / hooks ──只调──> lib/db/repository.ts（仓储层）──读写──> Dexie/IndexedDB（唯一真相源）
+                              │                                ├─ papers / annotations / notes / progress / embeddings
+                              │                                └─ pdfBlobs（v3 起 PDF 二进制独立表，列表查询不触达）
+                              └─（仅登录且配置 Supabase 时）void cloudSync.push*() 不 await、
+                                 fire-and-forget 镜像到 Supabase Postgres（RLS 按 user_id 隔离）
 ```
 
-工具不是孤立的功能列表，而是一条**上游输出即下游输入**的链路。这是 PaperWeave 区别于"AI 工具箱"类产品的根本切入点——首页把 7 个阶段并排展开，点任意一环，下面的工具按阶段过滤。
+铁律：
+- **UI 永远不直接 fetch 论文数据接口**，一切论文/标注/笔记/进度读写经 `repository`。
+- 云同步失败不影响本地；门控是**登录态**（`setCloudSyncUser`），未登录/未配置时 cloudSync 全 no-op；`test/repository.test.ts` 用单测保证默认全程零网络请求。
+- PDF Blob 永不上云，且存在独立 `pdfBlobs` 表（v2→v3 迁移见 `test/local-db-migration.test.ts`）；`stripLocal` 在仓储层出口剥离本地元字段。
 
-> **架构基石 · 注册表驱动**：全站工具的单一事实源是 `lib/tools-registry.ts`。新增一个工具 = 加一条数据 + 写一个 `app/tools/<slug>/page.tsx`，过滤 / 搜索 / 排序 / 首页展示全部自动接管，边际成本极低。
+### 3.2 LLM 接入（两路 + BYOK）
 
----
-
-## 二、已交付能力盘点（真实状态）
-
-### 2.1 前端框架与设计系统
-- **Next.js 16 App Router** + React 19 + TypeScript 5 + Tailwind v4
-- 暖纸面底 + 5 团慢速漂移 radial blob + SVG `feTurbulence` 颗粒层的设计语言
-- 设计组件本身被产品化进 `tools/web-beautifier`，可即插即用
-- `pnpm build` ✅ 全部页面生成；`tsc --noEmit` ✅ 0 error；`pnpm lint` ✅ 0 error（硬门禁）；`pnpm test` ✅ 42 passed
-
-### 2.2 论文工作流核心（已落地）
-
-| 能力 | 路由 / 模块 | 核心技术 | 状态 |
-| --- | --- | --- | --- |
-| 多源论文检索 | `app/tools/paper-search` + `api/paper-search` | OpenAlex + arXiv 聚合，领域包 + 自定义关键词 | ✅ |
-| 论文库 | `app/library` + 可选 `api/papers` | 元数据 + 全文 + 总结 + 笔记 + 标签 | ✅ |
-| PDF 阅读器 + 批注 | `app/viewer/[id]` + `api/annotations` | react-pdf + 高亮/批注/笔记，四类标注 | ✅ |
-| AI 论文分析 | `api/analyze` / `api/analyze-paper` | 抽取研究问题 / 方法 / 创新点 / 应用方向 | ✅ |
-| arXiv / PDF 导入 | `api/papers/import/*` | 无状态助手：拉元数据 / 下 PDF / 解析，不持久化 | ✅ |
-
-### 2.3 读文献 / 生 idea / 做验证工具（已落地）
-
-| 阶段 | 工具 | 核心技术 |
+| 路 | 模块 | 说明 |
 | --- | --- | --- |
-| 读文献 | 文献网页速读器 `summarize` | DeepSeek 流式 + cheerio 正文抽取 |
-| 读文献 | 论文资料整理器 `markdown-convert` | turndown + mammoth + pdf2md + OMML→LaTeX |
-| 读文献 | 论文内容结构化总结 `markdown-summarize` | 流式结构化提取（**已接后端，不再占位**） |
-| 生 idea | Idea 生成器 `idea-generator` | 差异化假设 + 最小验证实验 + 风险清单（**已接后端，不再占位**） |
-| 做验证 | 研究任务规划器 `prompt-chunker` | 原子子问题 + 验收清单 + Runbook |
-| 做验证 / 论文绘图 | 研究自动化封装器 `skill-maker` | 输出可落地 `SKILL.md` |
+| 流式 | `lib/ai.ts` + `lib/ai/stream.ts` | Vercel AI SDK，仅 DeepSeek（`deepseek-chat`）；未配 key 时路由前置守卫返回可读 503（`aiNotConfiguredResponse`），不中途断流 |
+| 非流式 | `lib/ai/client.ts` | DeepSeek → OpenAI(`gpt-4o-mini`) → Gemini(`gemini-2.0-flash`) 顺序尝试，首个成功即返回；每家带 30s 超时 |
+| Embedding | `lib/ai/embeddings.ts` | OpenAI `text-embedding-3-small`(1536d) 主 → Gemini `text-embedding-004`(768d) 备；返回带 `model` 标识，**不同模型的向量禁止互比** |
 
-### 2.4 模型可视化 ·"讲结果"系列（已落地）
+**BYOK（访客自带 key）**：`lib/ai/keys.ts` 的 `resolveKeys(req)` 按「请求头 `x-deepseek-key`/`x-openai-key`/`x-gemini-key` 优先 → 环境变量兜底」解析；前端对应 `lib/ai/user-keys.ts` + `/settings` 页。占位 key（`ci-placeholder` 等，见各模块 `PLACEHOLDERS` 集合）视为未配置。
 
-| 工具 | 核心技术 |
-| --- | --- |
-| CNN 端到端讲解 | tiny-VGG + TF.js 浏览器内**真实推理**，逐层看 feature map |
-| 医学图像分割 | FWMamba-UNet 离线预计算激活回放 |
-| Transformer 可视化 | D3.js 注意力权重热图 + 多头注意力 |
-| GAN 生成对抗网络 | 潜向量交互 + 中间特征图演变 |
-| 扩散模型可视化 | Canvas 动态噪声 + U-Net 去噪过程逐步可视化 |
-| iGEM HPI Potsdam 2025 | three.js R3F 3D 星图 + 三段式滚动叙事 |
+### 3.3 注册表驱动
 
-### 2.5 资产 / 复刻类工具（已从主仓收敛移除）
-原先归在「资产」阶段的 9 个前端炫技 / 通用工具（`beautiful-aurora`、`web-beautifier`、`toolbox-background`、`fluid-sim`、`hamish-portfolio`、`bruno-folio`、`algorithm-visualizer`、`explain-code`、`optimize-prompt`）与科研主线定位有张力，**已整体移除**：删除注册表项、`app/tools/*` 页面、`components/*` 与 `lib/beautifier` 资产代码、`app/api/optimize` 路由，并清理 `app/layout.tsx` 里泄漏到全局的资产 CSS。`Phase` 类型与 `PHASES` 不再有「资产」枚举。主仓自此只剩 7 环科研主线。
+`lib/tools-registry.ts` 是全站工具的单一事实源（`TOOLS` 数组，18 项）。首页过滤/搜索、`app/sitemap.ts` 全部由它驱动。不变量由 `test/tools-registry.test.ts` 守护：slug 唯一、`app/tools/<slug>/page.tsx` 文件必须存在、phase 必须合法。**新增工具 = 注册表加一项 + 写一个页面**，别的不用动。
 
-> 注：`/api/explain` 路由予以保留——它同时被 PDF 批注层（`lib/annotation/hooks.ts`）作为「AI 解释选区」能力调用，并非资产专属。被删资产代码仍可从 git 历史（本次移除前的提交）取回，供未来独立 showcase 仓库使用。
+### 3.4 工具间流转（handoff）
 
-> 没有任何工具仍标 `comingSoon: true`——原先的两个占位（`idea-generator` / `markdown-summarize`）已在 P1 接通后端并并入主线链路。
+`lib/workflow/handoff.ts`：上游 `stageHandoff(targetSlug, payload)` 写 sessionStorage 后跳转，下游挂载时 `consumeHandoff(slug)` 一次性消费。payload 可携带 `sourcePaperId`，下游产出经 `SaveToLibrary` 组件回存到该论文条目（总结写 `summary`、idea 追加 `notes`），闭合「论文 → 生成 → 回存」回环。
 
----
+已连通的链路：`markdown-convert → markdown-summarize → idea-generator → { prompt-chunker（拆验证计划）, figure-generator（设计结果图） }`；论文库详情页可直发 summarize / idea-generator。链路也跨出浏览器：`skills/research-genealogy` 在终端产出 `lineage.json` → `/tools/research-genealogy` 页渲染成族谱树（粘贴导入，无后端参与）。
 
-## 三、技术栈与关键设计决策
+## 4. 目录与关键模块速查
 
-| 决策 | 替代方案 | 选择理由 |
+```
+app/
+├── page.tsx                     # 首页（7 环走廊 + 工具网格，注册表驱动）
+├── library/{page,| [id],stats}  # 论文库列表 / 详情（链路中枢）/ 统计看板
+├── viewer/[id]/                 # PDF 阅读器（react-pdf）+ 四类批注
+├── share/[token]/page.tsx       # 只读分享页
+├── settings/page.tsx            # 访客自带 key 设置
+├── opengraph-image.tsx, sitemap.ts, robots.ts
+├── tools/<slug>/page.tsx        # 18 个工具页
+└── api/                         # 23 个 route.ts，全部 runtime=nodejs、maxDuration≤60（Vercel Hobby 上限）
+    ├── paper-search{,/hot}      # 聚合检索 + 热门检索（需 service-role，否则空列表）
+    ├── citation-graph           # OpenAlex 引用网络
+    ├── analyze, analyze-paper   # AI 论文分析（共享 lib/ai/analyze.ts 的 prompt/解析）
+    ├── summarize, markdown-summarize, idea-generator, chunk-it-up, skill-maker, figure-generator  # 流式工具
+    ├── compare-papers           # 多篇对比（流式）
+    ├── library-qa/{embed,answer}# RAG：批量 embedding / 检索+流式作答
+    ├── markdown-convert         # docx/pdf/html → Markdown（mammoth/pdf2md/turndown + 自研 OMML→LaTeX）
+    ├── papers/import/{arxiv,pdf}# 无状态导入助手（拉元数据/解析，不持久化）
+    ├── pdf-proxy                # 同源 PDF 代理（SSRF 防护：域名白名单）
+    ├── share{,/[token],/status} # 快照分享（需 service-role）
+    ├── explain                  # 选区 AI 解释（被 lib/annotation/hooks.ts 调用）
+    └── metrics                  # 内存指标聚合（可选 METRICS_TOKEN 门禁）
+
+lib/
+├── tools-registry.ts            # ★ 工具单一事实源
+├── db/{local-db,repository,types}.ts   # ★ Dexie 表定义 / 仓储层 / 共享领域类型（Paper/Annotation/ResearchNote/Rect）
+├── ai/…                         # ★ 见 §3.2
+├── paper-search/
+│   ├── search-service.ts        # OpenAlex+arXiv 查询构造/过滤/摘要还原（纯函数可测）
+│   ├── cache.ts                 # Postgres 检索缓存：cacheKey 归一化（maxResults 不进 key）、14 天 TTL、best-effort
+│   └── citation-graph.ts        # OpenAlex works → {nodes,edges} 纯函数构图
+├── library-qa/retrieval.ts      # RAG 纯函数层：buildDoc / textHash(djb2) / cosineSim / topK；向量缓存在 Dexie
+│                                #   + keywordTopK：BM25 关键词降级（无 embedding key 时页面自动切换，零网络）
+├── genealogy/lineage.ts         # 研究方向族谱：lineage.json 解析 + DFS 树构建（纯函数）；数据由
+│                                #   skills/research-genealogy 在终端产出，/tools/research-genealogy 页渲染
+├── export/citations.ts          # BibTeX / APA / MLA / GB-T 7714，纯函数无网络
+├── share/snapshot.ts            # 分享快照构造（冻结副本，与本地编辑解耦），纯函数
+├── library-stats/stats.ts       # 统计看板聚合，纯本地
+├── api/{http,log}.ts            # 内存滑动窗口限流 / clientIp / 带超时 fetch；结构化 JSON 日志 + 内存指标
+├── sync/cloud-sync.ts           # Supabase 镜像（未配置/未登录时全 no-op）；登录瞬间 pushAllLocal + pullAll 合并
+├── supabase/{client,server}.ts  # 浏览器端 anon client / 服务端 service-role（均未配置安全降级为 null）
+├── auth/auth-context.tsx        # AuthProvider + useAuth（Google / 邮箱 / 手机 OTP）
+├── workflow/handoff.ts          # 见 §3.4
+├── convert-{docx,html,pdf}.ts, omml-to-latex.ts, extract.ts   # 文档转换链
+└── {cnn,gan,diffusion,transformer}-explainer/, med-seg/, ganlab…  # 可视化（部分 vendored，lint ignores 内）
+
+components/                      # 按工具域分目录；通用件：states.tsx（三态）、use-stream.ts（流式 hook，支持 stop()）、
+                                 # stream-output.tsx、tool-shell.tsx、workflow/handoff-controls.tsx
+skills/                          # 可安装的 Claude Code skills（paper-search / research-genealogy / cite-paper /
+                                 #   paper-figure），与 Web 端共享同一套领域规则（见 skills/README.md），两边互相同步；
+                                 #   research-genealogy 为内置拷贝（上游 unumbrela/research-genealogy，自带 Python 脚本）
+supabase/schema.sql              # 4 表（papers/annotations/research_notes/read_progress）+ RLS + 第 5、6 张：search_cache/shares
+test/  e2e/                      # Vitest 单测；Playwright 1 条 happy-path
+```
+
+## 5. 环境变量行为矩阵
+
+| 变量 | 配置后 | 缺失时（必须保持可用） |
 | --- | --- | --- |
-| Next.js 16 App Router | Vite SPA / Nuxt / Astro | 多工具路由 + 流式 API + 注册表驱动天然吻合 |
-| DeepSeek + Vercel AI SDK（流式） | OpenAI / Claude / Qwen | 价格最优，流式输出统一抽象 |
-| **本地 Dexie 单一真相源 + 可选云端 Prisma 同步** | 纯云端 / 纯本地 / 三套并存 | clone 即用、零配置门槛；需要同步再配数据库 |
-| 非流式多供应商 fallback（DeepSeek→OpenAI→Gemini） | 单一供应商 | 主供应商失败自动切换，单点故障不致全站 AI 瘫痪 |
-| OpenAlex + arXiv 检索 | 单一 arXiv | 覆盖更广，OpenAlex 含引用图谱 |
-| TF.js 浏览器内推理 | 后端推理服务 | "真实推理"是产品差异点，零运维 |
-| three.js + R3F | Babylon / 原生 WebGL | 生态最广，迁移成本最低 |
-| 注册表驱动 | 路由文件即清单 | 元数据集中、过滤 / 搜索 / 排序统一处理 |
+| `DEEPSEEK_API_KEY` | 流式 AI 默认可用 | 503 可读提示，引导访客自带 key |
+| `OPENAI_API_KEY` / `GOOGLE_API_KEY` | fallback + embedding | 同上 |
+| `NEXT_PUBLIC_SUPABASE_URL` + `_ANON_KEY` | 显示登录入口，登录即双向同步 | 登录入口隐藏，纯本地 |
+| `SUPABASE_SERVICE_ROLE_KEY`（+`SUPABASE_URL`） | 检索缓存、热门检索、只读分享 | 缓存透明降级直连；分享入口隐藏（前端经 `/api/share/status` 探测） |
+| `METRICS_TOKEN` | `/api/metrics?token=` 门禁 | 指标接口公开 |
 
-### 关键架构模块（P0–P3 沉淀）
-- **`lib/db/repository.ts`** —— 统一仓储层，论文工作流的「单一数据真相源」。本地 Dexie 优先 + best-effort 异步推云端，云同步由 `NEXT_PUBLIC_ENABLE_CLOUD_SYNC` 门控，默认关闭、未配数据库时完全不触达 Prisma。
-- **`lib/db/types.ts`** —— 共享领域类型（`Paper / Annotation / ResearchNote / Rect / AnnotationType`），全站 UI/hooks 从此取类型，解耦 `@prisma/client`（无 DB 也能编译）。
-- **`lib/workflow/handoff.ts`** —— 「上游输出一键发往下一环」，用 sessionStorage 一次性传递 payload，让 7 环链路在 UI 上真正连通。
-- **`lib/ai.ts`（流式）+ `lib/ai/client.ts`（非流式）** —— LLM 接入收敛为清晰两路；主力模型升级为 `deepseek-chat` / `gpt-4o-mini` / `gemini-2.0-flash`；占位 key 视为未配置。
+> 云同步的真实门控是**登录态**（`lib/sync/cloud-sync.ts` 的 `setCloudSyncUser`），没有独立的开关环境变量；未登录即零网络请求（有单测盖章）。
 
----
+## 6. 约定与不变量（改代码前必读）
 
-## 四、近期完成（2026-06-03 · P0–P4.2）
+1. **零配置构建**：`pnpm build` 在无任何 env 时必须通过——所有外部依赖初始化必须惰性 / 可空降级。
+2. **best-effort 外围**：检索缓存、云同步、日志指标，失败一律吞掉，绝不影响主功能返回。
+3. **纯函数优先**：可测逻辑（构图、引文、快照、RAG 检索、缓存键、限流）一律抽成无副作用纯函数放 `lib/`，路由只做编排——这是本仓百余条单测得以轻量的原因，新逻辑请沿用。
+4. **类型来源**：领域类型一律从 `lib/db/types.ts` 导入，不在页面里重复声明 `Paper`/`Author`。
+5. **公开免 key 路由必须限流**：用 `enforceRateLimit`（`lib/api/http.ts`），上游 fetch 必须带超时。
+6. **maxDuration ≤ 60**：Vercel Hobby 上限，新路由不要超。
+7. 中文注释 / 中文 UI 是既定风格；commit message 用 `type: 中文描述`。
 
-| 阶段 | 主题 | 成果 |
-| --- | --- | --- |
-| **P0** | 持久层统一 | 把「Dexie + Prisma + `data/papers/*.json`」三套并存，收敛为「Dexie 单一真相源 + 可选云同步」。新增 `repository.ts` / `types.ts`；删除 `cache-service.ts` / `save-paper.ts` 与全部 JSON 文件存储；统一标注四分类、`rects` 去 `any`。**零配置纯本地可用**。 |
-| **P1** | 主线链路打通 | 新增 `handoff.ts` + `handoff-controls.tsx`；`markdown-convert →（发往）→ markdown-summarize →（发往）→ idea-generator` 三步零复制粘贴贯通；论文库详情页变链路中枢，一键带论文上下文跳转下游。 |
-| **P2** | 体验流畅化 | 三态组件 `states.tsx`（骨架 / 空 / 错误重试），library 接入消除白屏；`useStream` 增 `stop()` 中断保留文本 + 「思考中」指示 + `friendlyError` 错误归类，7 个流式工具统一接入；PDF 阅读进度自动保存 / 恢复；检索 `AbortController` 取消 + `Promise.allSettled` 单源失败不拖垮整体。 |
-| **P3** | AI 接入层收敛 | 删死代码 `lib/services/ai.ts`（消除 `gpt-3.5-turbo` / `gemini-pro` 旧模型债务）；非流式 fallback 多供应商；6 个流式路由加「未配 key」前置守卫返回可读 503，不再中途断流。 |
-| **P4.2** | lint 清零（核心） | 核心路径（`lib/db`、`lib/ai`、`lib/workflow`、library、viewer、paper-search、papers/analyze API 等）现 **0 lint error**。 |
-| **P5** | 核心页打磨 + 去重 + 拆分 | (A) library / library[id] / viewer 及子组件（Sidebar / FloatingMenu / PDFViewerDynamic）从原生灰蓝/暗色全量换为暖纸面 token，消除画风割裂；(B) 去掉 library[id] 用随机数伪造的 PDF 下载进度条，改为诚实状态；(C) 三页 `Paper`/`Author` 改用 `lib/db/types` 单一类型源，抽 `lib/ai/analyze.ts` 收敛 `/api/analyze` 与 `/api/analyze-paper` 的重复 prompt/解析；(D) 拆分三个巨型组件（详见 §五·4）。 |
-| **P0.2（本轮）** | 零配置盖章 + 真离线 PDF | (1) 启用预留的 `pdfBlob`：viewer 优先读本地缓存 Blob，并在首次在线打开后**静默暖缓存**为 Dexie Blob，之后可断网阅读；`repository` 新增 `getPdfBlob` / `cachePdfBlob`。(2) 修正 `getPaper` / `listPapers` 泄漏 Blob 进 UI 状态的类型不诚实问题（统一 `stripBlob`）。(3) 修复潜伏 bug：`paperDB.getAll()` 用 `orderBy('cachedAt')` 但该键未建索引（真实 IndexedDB 也会抛 `SchemaError`），改内存排序。(4) 仓储层单测给「不开云同步时绝不发起任何网络请求」**盖章**——替代一次性手动跑。 |
-| **P7（本轮）** | 登录 + 跨设备云同步（Supabase Auth + RLS） | 实现「登录后论文库跨设备 / 换浏览器同步、清缓存不丢」。**Supabase Auth**：Google 一键 / 邮箱（密码 + 魔法链接）/ 手机号 OTP；`lib/supabase/client.ts`（未配置安全降级）、`lib/auth/auth-context.tsx`（AuthProvider + useAuth + 登录即双向同步）。**云同步**：`lib/sync/cloud-sync.ts` 把 Dexie 写操作镜像到 Supabase Postgres（带 `user_id`），登录瞬间 pushAllLocal + pullAll 合并；repository 的 8 处写入接入。**UI**：暖纸面风格 `AuthDialog`（Google 按钮 + 邮箱 / 手机 Tab）+ 导航 `AccountButton`（登录 ↔ 头像菜单）。**安全**：`supabase/schema.sql` 4 表 + 行级隔离 RLS（每人只读写自己的行）。文档 `AUTH-SETUP.md`。本地仍是即时真相源、PDF Blob 不入云（v1）。lint/tsc/test(42)/build（无任何 env 也能构建）全绿。 |
-| **P6** | 部署上线适配（Vercel + 访客自带 key） | 把项目改造成可公开部署：(1) **serverless 文件系统适配**——新增同源 PDF 代理 `app/api/pdf-proxy`（带 SSRF 防护），arXiv 入库 `pdfPath` 指向代理、本地上传 PDF 直接存 Dexie Blob，彻底去掉 `public/papers` 落盘（Vercel 只读 FS 会报错）；(2) **`maxDuration` 压到 ≤60s** 符合 Hobby 上限；(3) **访客自带 key**——`lib/ai/keys.ts`（请求头→env 解析）贯通流式 5 路由 + 非流式 `client`/`analyze`/`explanation` + analyze/analyze-paper/explain 路由；前端 `lib/ai/user-keys.ts` + `/settings` 页 + 右上角入口 + `useStream`/各 AI fetch 自动带 key 头。公开 demo 零成本、不会被刷爆。新增 `DEPLOY.md`（Vercel + Cloudflare 域名分步指南）。lint/tsc/test(42)/build（无 key 也能构建）全绿。 |
-| **P4.3** | 测试落地 + CI 硬门禁 | 引入 **Vitest**，新增 `test/` 5 个文件 **42 条**用例：arXiv 解析、检索过滤/去重/`allSettled` 容错、OMML→LaTeX、注册表不变量（slug 唯一 / 页面文件存在 / 阶段合法）、Dexie 仓储层。`eslint.config.mjs` 把 vendored 可视化（transformer/gan/diffusion explainer + ganlab）纳入 ignores，再清掉核心 ~20 处 `any` / `require()` 错误；CI 把 **lint 翻成硬门禁**并新增 `pnpm test` 步骤（lint / tsc / test / build 四道全绿）。顺手修正检索过滤不识别中文分号 `；` 的小 bug。 |
+## 7. 测试现状
 
----
+- **单测**（Vitest，140 条）：arXiv 解析、检索过滤/去重/容错、缓存键稳定性、引用图构图、引文格式、RAG 检索、分享快照、统计聚合、限流、指标、OMML→LaTeX、注册表不变量、仓储层（含「零配置零网络」盖章）、Dexie v2→v3 迁移。
+- **E2E**（Playwright，1 条）：首页 → 检索（fixture 注入）→ 入库 → 论文库断言，覆盖真实 Dexie 写读。
+- CI（`.github/workflows/ci.yml`）：build job 四道硬门禁（lint / tsc / test / build）+ 独立 e2e job。
 
-## 五、当前的局限与坑位（诚实清单）
+## 8. 已知问题 / 坑位（按优先级）
 
-1. ~~定位张力~~（**已解决**）：原「资产」阶段 9 个前端炫技 / 通用工具已整体从主仓移除（注册表项 + 页面 + `components` / `lib/beautifier` 资产代码 + `app/api/optimize` + 全局泄漏的资产 CSS），主仓收敛为纯 7 环科研主线。被删代码可从 git 历史取回供独立 showcase 仓库使用。
-2. ~~链路回存缺口~~（**已解决**）：下游产出可一键"回存"到对应论文条目——`handoff` 携带 `sourcePaperId`，新增 `SaveToLibrary` 组件，结构化总结回写 `summary`、idea 追加进 `notes`（详情页新增「研究笔记」区展示）。从一篇论文出发「生成 → 回存」的工作流闭环已打通。
-3. ~~纯本地端到端待实测（P0.2）~~（**已解决** · 本轮）：(a) 仓储层单测证明「未开 `NEXT_PUBLIC_ENABLE_CLOUD_SYNC` 时，save/update/标注/笔记/进度/删除全程不发起任何 `fetch`」——比一次性手动跑更耐久地给「不触达 Prisma」盖了章；UI 侧 library/viewer 只走 `repository`(Dexie)，云端 `/api/papers` 路由本就以 `DATABASE_URL` 门控并优雅降级。(b) 真离线 `pdfBlob` 已启用：viewer 优先读本地 Blob，在线打开后静默暖缓存，断网可读。
-4. ~~巨型组件未拆~~（**已解决** · P4.1）：`paper-search`（1109→431）、`library`（672→369）、`viewer/ViewerClient`（505→387）已拆出 7 个聚焦子组件（`paper-search/{ApiSettings,SearchForm,ResultCard}`、`library/{ImportModal,PaperCard}`、`viewer/{ViewerHeader,PdfToolbar}`，均 ≤286 行）；状态/处理器仍留页内，回归风险最小。
-5. ~~vendored 可视化代码 lint 未清 + CI 非硬门禁~~（**已解决** · 本轮）：vendored 可视化（transformer/gan/diffusion explainer + ganlab + `useGANTraining`）已进 `eslint.config.mjs` ignores（非本仓首发代码，债务留待独立 showcase 仓清偿）；核心 ~20 处 `any`/`require()` 已清零；**CI lint 已翻硬门禁**，`pnpm lint` 退出码为 0。
-6. **测试已起步，E2E 待补（P4.3 部分完成）**：已落地 **Vitest + 42 条单测**（arXiv 解析、检索过滤/去重/容错、OMML→LaTeX、注册表不变量、仓储层），并接入 CI 硬门禁。仍缺：Markdown 转换链（docx/pdf/html）端到端用例、1 条浏览器级 happy-path E2E（Playwright）。
-7. **全中文，无 i18n**：海外触达为零。
-8. **第三方版权**：`LICENSE`（MIT）已补；资产拆分后仅余 iGEM HPI Potsdam 主页（「可视化表达」环）仍内置第三方素材，公开发布前建议以"外链引用"替代"代码内置"规避授权风险。
-9. **统一错误 envelope 未全量**：非 AI 路由的 `{ success, error: { code, message } }` 统一响应格式留作后续。
-10. **无可观测性 / SEO**：错误率、token 消耗无埋点；无 OG 图 / sitemap。
-11. ~~文档引用悬空~~（**已解决**）：`README.md` 原链接已删除的 `OPTIMIZATION-ROADMAP.md` / `CORE-IMPROVEMENT-PLAN.md`、以及 CI 注释里的同名引用 —— 已分别修正为指向 `PROJECT-SUMMARY.md`，License 小节亦已对齐已补的 MIT `LICENSE`。
+1. **内存态的限流与指标**：滑动窗口限流和 `/api/metrics` 都是每实例一份，serverless 多实例下不汇总（设计上接受，README/代码注释已声明；要强一致需上 Upstash/Sentry）。
+2. **检索缓存 / 分享需要 service-role**：这两个功能在未配 `SUPABASE_SERVICE_ROLE_KEY` 的部署上不可见，演示前需确认环境。
+3. **全中文无 i18n**；vendored 可视化代码（transformer/gan/diffusion explainer、ganlab、`hooks/useGANTraining`）在 eslint ignores 内，历史 lint 债务未清。
+4. `hpi-potsdam` 工具内置第三方素材（iGEM），公开发布需注意授权；其余素材自有。
+5. PDF Blob 不入云（v1 设计）：换设备后需重新在线打开一次 PDF 才能离线读。
+6. 「可视化表达」环内容偏 showcase（仅 hpi-potsdam + citation-graph 挂靠），与其余 6 环的「工具」属性有张力，待充实或并环。
 
----
+## 9. 文档索引
 
-## 六、下一步行动建议
-
-按"对核心链路价值 / 可见度"排序（定位收敛、链路回存、零配置盖章、测试+CI 硬门禁均已完成，见 §五·1/2/3/5/6）：
-
-1. **门面与首因** —— 部署适配已就绪（见 `DEPLOY.md`：Vercel + 访客自带 key + Cloudflare 域名）；**剩待执行**的是需账号/付费的人工步骤（Vercel 登录部署、买域名接 DNS）+ 一张 README Demo GIF（检索→入库→批注→总结→生 idea→回存）。这是当前**最高优先级**。
-2. **补 E2E 与转换链测试** —— Playwright 跑 1 条 happy-path（检索→入库→阅读→批注→导出）；为 Markdown 转换链（docx/pdf/html→md）补端到端用例，进一步收紧门禁。
-3. **传播放大** —— i18n（至少 README 英文版）、iGEM 第三方素材改外链、技术故事 + 可玩 demo 投 HN / Reddit。
-4. **统一错误 envelope + 可观测性** —— 非 AI 路由统一 `{ success, error }`；接错误率 / token 消耗埋点；补 OG 图 / sitemap。
-
----
-
-## 一句话总结
-
-**7 环主线骨架已成型，论文检索 / 论文库 / PDF 批注 / AI 分析 / 6 个模型可视化均已跑通；P0–P5 把数据底座统一为 Dexie 单一真相源、把读文献三步串成零复制粘贴链路、把核心体验做出兜底、把 LLM 接入收敛成两路带 fallback、闭合「论文 → 总结/idea → 回存」回环、并收敛为纯 7 环科研主线；本轮再把「零配置可用」用仓储层单测盖章、启用真离线 PDF Blob，并落地 Vitest 42 条单测把 CI 升级为 lint/tsc/test/build 四道硬门禁。接下来的瓶颈不在再写工具，而在补门面（Demo GIF / Live Demo）、补 E2E、做传播，把"个人项目"打磨成可持续的开源爆款。**
+- `README.md` — 面向访客的功能/上手介绍
+- `DEPLOY.md` — Vercel + Cloudflare 部署步骤（代码侧适配已完成，剩人工账号操作）
+- `AUTH-SETUP.md` — Supabase 登录 + 云同步配置步骤
+- `supabase/schema.sql` — 云端建表 + RLS，控制台一次性运行

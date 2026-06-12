@@ -68,7 +68,6 @@ export async function searchOpenAlex(query: SearchQuery): Promise<PaperResult[]>
   const results: PaperResult[] = [];
   
   try {
-    console.log('[OpenAlex Search] Query:', query);
     let url = 'https://api.openalex.org/works?per-page=20';
     
     const filters: string[] = [];
@@ -96,7 +95,6 @@ export async function searchOpenAlex(query: SearchQuery): Promise<PaperResult[]>
       url += `&filter=${filters.join(',')}`;
     }
     
-    console.log('[OpenAlex Search] URL:', url);
     
     const response = await fetch(url);
     if (!response.ok) {
@@ -104,7 +102,6 @@ export async function searchOpenAlex(query: SearchQuery): Promise<PaperResult[]>
     }
     
     const data = await response.json();
-    console.log('[OpenAlex Search] Results count:', data.results?.length || 0);
     
     if (data.results) {
       for (const work of data.results.slice(0, query.maxResults || 20)) {
@@ -135,7 +132,6 @@ export async function searchArXiv(query: SearchQuery): Promise<PaperResult[]> {
   const results: PaperResult[] = [];
   
   try {
-    console.log('[arXiv Search] Query:', query);
     
     let searchQuery = '';
     
@@ -166,7 +162,6 @@ export async function searchArXiv(query: SearchQuery): Promise<PaperResult[]> {
     }
     
     if (!searchQuery) {
-      console.log('[arXiv Search] No search terms provided, skipping');
       return results;
     }
     
@@ -174,7 +169,6 @@ export async function searchArXiv(query: SearchQuery): Promise<PaperResult[]> {
     // sortOrder 只接受 ascending / descending（传 "desc" 会被 arXiv 直接 400）。
     const arxivSortBy = query.sortBy === 'year' ? 'submittedDate' : query.sortBy === 'relevance' ? 'relevance' : 'submittedDate';
     const url = `https://export.arxiv.org/api/query?search_query=${searchQuery}&max_results=${query.maxResults || 20}&sortBy=${arxivSortBy}&sortOrder=descending`;
-    console.log('[arXiv Search] URL:', url);
 
     const response = await fetch(url, {
       headers: {
@@ -187,7 +181,6 @@ export async function searchArXiv(query: SearchQuery): Promise<PaperResult[]> {
     }
     
     const text = await response.text();
-    console.log('[arXiv Search] Response received');
     
     const extractBetween = (str: string, start: string, end: string) => {
       const startIndex = str.indexOf(start);
@@ -213,7 +206,6 @@ export async function searchArXiv(query: SearchQuery): Promise<PaperResult[]> {
     };
     
     const entries = extractAllEntries(text);
-    console.log('[arXiv Search] Found entries:', entries.length);
     
     for (const entry of entries) {
       const id = extractBetween(entry, '<id>', '</id>')?.replace('http://arxiv.org/abs/', '') || '';
@@ -270,7 +262,6 @@ export async function searchSemanticScholar(query: SearchQuery, apiKey?: string)
   const results: PaperResult[] = [];
   
   try {
-    console.log('[Semantic Scholar Search] Query:', query);
     
     const headers: Record<string, string> = {};
     if (apiKey) {
@@ -286,7 +277,6 @@ export async function searchSemanticScholar(query: SearchQuery, apiKey?: string)
     }
     
     const url = `https://api.semanticscholar.org/graph/v1/paper/search?${params.toString()}`;
-    console.log('[Semantic Scholar Search] URL:', url);
     
     const response = await fetch(url, {
       method: 'GET',
@@ -298,7 +288,6 @@ export async function searchSemanticScholar(query: SearchQuery, apiKey?: string)
     }
     
     const data = await response.json();
-    console.log('[Semantic Scholar Search] Results count:', data.data?.length || 0);
     
     if (data.data) {
       for (const paper of data.data) {
@@ -341,7 +330,6 @@ export async function searchPapers(
   sources: string[],
   apiKeys?: Record<string, string>,
 ): Promise<SearchOutcome> {
-  console.log('[searchPapers] Starting search with sources:', sources);
 
   const allResults: PaperResult[] = [];
   const failedSources: string[] = [];
@@ -358,7 +346,6 @@ export async function searchPapers(
   }
 
   if (labeled.length === 0) {
-    console.log('[searchPapers] No sources selected');
     return { results: [], failedSources: [] };
   }
 
@@ -372,7 +359,6 @@ export async function searchPapers(
     }
   });
 
-  console.log('[searchPapers] Total results before dedupe:', allResults.length);
   
   const seen = new Set<string>();
   const uniqueResults = allResults.filter(paper => {
@@ -397,7 +383,6 @@ export async function searchPapers(
   });
   
   const finalResults = filteredResults.slice(0, query.maxResults || 50);
-  console.log('[searchPapers] Final results:', finalResults.length, 'failed sources:', failedSources);
 
   return { results: finalResults, failedSources };
 }

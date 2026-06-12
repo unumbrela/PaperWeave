@@ -210,7 +210,7 @@ export const cloudSync = {
 
   /**
    * 登录后拉全量并合并进本地 Dexie：
-   * - 论文：以 updated_at 较新者为准；保留本地已有的 pdfBlob。
+   * - 论文：以 updated_at 较新者为准（离线 PDF 在独立表，不受覆盖影响）。
    * - 标注 / 笔记 / 进度：直接 upsert。
    * 完成后派发 LIBRARY_CHANGED_EVENT，页面据此刷新。
    */
@@ -229,14 +229,13 @@ export const cloudSync = {
       for (const row of papers.data as PaperRow[]) {
         const remote = rowToPaper(row)
         const local = await db.papers.get(remote.id)
-        // 远端较新（或本地没有）才覆盖；始终保留本地 pdfBlob
+        // 远端较新（或本地没有）才覆盖；离线 PDF 在独立表，覆盖元数据不影响它
         const remoteNewer =
           !local ||
           (remote.updatedAt ?? '') >= (local.updatedAt ?? local.createdAt ?? '')
         if (remoteNewer) {
           await db.papers.put({
             ...remote,
-            pdfBlob: local?.pdfBlob,
             cachedAt: local?.cachedAt ?? new Date().toISOString(),
           })
         }
