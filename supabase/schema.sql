@@ -52,6 +52,19 @@ create table if not exists public.research_notes (
   updated_at text
 );
 
+-- ── 页面便签（📒 锚定在 PDF 页面坐标上的浮动笔记） ──────────
+create table if not exists public.sticky_notes (
+  id         text primary key,
+  user_id    uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  paper_id   text not null references public.papers(id) on delete cascade,
+  page       integer not null default 0,
+  x          double precision not null default 0,   -- scale=1 页面坐标系（与 annotations.rects 同约定）
+  y          double precision not null default 0,
+  content    text not null default '',
+  created_at text,
+  updated_at text
+);
+
 -- ── 阅读进度 ────────────────────────────────────────────
 create table if not exists public.read_progress (
   id           text primary key,
@@ -65,18 +78,20 @@ create table if not exists public.read_progress (
 create index if not exists idx_papers_user        on public.papers(user_id);
 create index if not exists idx_annotations_paper  on public.annotations(paper_id);
 create index if not exists idx_notes_paper        on public.research_notes(paper_id);
+create index if not exists idx_sticky_paper       on public.sticky_notes(paper_id);
 create index if not exists idx_progress_paper     on public.read_progress(paper_id);
 
 -- ── 行级安全：每人只能读写自己的行 ───────────────────────
 alter table public.papers         enable row level security;
 alter table public.annotations    enable row level security;
 alter table public.research_notes enable row level security;
+alter table public.sticky_notes   enable row level security;
 alter table public.read_progress  enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['papers','annotations','research_notes','read_progress']
+  foreach t in array array['papers','annotations','research_notes','sticky_notes','read_progress']
   loop
     execute format('drop policy if exists "own rows" on public.%I;', t);
     execute format(

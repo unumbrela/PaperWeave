@@ -1,4 +1,4 @@
-import type { Annotation, Author, Paper } from '@/lib/db/types';
+import type { Annotation, Author, Paper, StickyNote } from '@/lib/db/types';
 
 /** AI「解释选区」结构化结果（各字段可缺省） */
 export interface AISummary {
@@ -14,10 +14,12 @@ export interface ExportData {
   // 上游（useAIExplanation）以 unknown 传入，函数内窄化为 AISummary
   aiSummary: unknown;
   researchNotes: string;
+  /** 页面便签（📒），可选——按页码排序导出 */
+  stickyNotes?: StickyNote[];
 }
 
 export function generateMarkdown(data: ExportData): string {
-  const { paper, annotations, researchNotes } = data;
+  const { paper, annotations, researchNotes, stickyNotes = [] } = data;
   const aiSummary = data.aiSummary as AISummary | null | undefined;
   const authors = Array.isArray(paper.authors)
     ? paper.authors
@@ -116,8 +118,20 @@ export function generateMarkdown(data: ExportData): string {
     markdown += `\n---\n\n`;
   }
   
+  const notedStickies = stickyNotes.filter((note) => note.content.trim());
+  if (notedStickies.length > 0) {
+    markdown += `## 7. 页面便签 📒\n\n`;
+    [...notedStickies]
+      .sort((a, b) => a.page - b.page || a.y - b.y)
+      .forEach((note) => {
+        markdown += `- ${note.content.trim().replace(/\n/g, '\n  ')}\n`;
+        markdown += `  *Page ${note.page + 1}*\n\n`;
+      });
+    markdown += `---\n\n`;
+  }
+
   if (researchNotes && researchNotes.trim()) {
-    markdown += `## 7. 我的研究笔记\n\n${researchNotes}\n\n`;
+    markdown += `## 8. 我的研究笔记\n\n${researchNotes}\n\n`;
     markdown += `---\n\n`;
   }
   

@@ -2,12 +2,13 @@
 
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Maximize2 } from 'lucide-react';
 
-/** PDF 阅读器的翻页 + 缩放工具条。 */
+/** PDF 阅读器的翻页 + 缩放 + 贴便签工具条。 */
 export function PdfToolbar({
   currentPage,
   numPages,
   scale,
   fitMode,
+  noteMode,
   onPrev,
   onNext,
   onFitWidth,
@@ -15,11 +16,13 @@ export function PdfToolbar({
   onZoomOut,
   onZoomIn,
   onResetZoom,
+  onToggleNoteMode,
 }: {
   currentPage: number;
   numPages: number;
   scale: number;
   fitMode: 'page' | 'width';
+  noteMode: boolean;
   onPrev: () => void;
   onNext: () => void;
   onFitWidth: () => void;
@@ -27,6 +30,7 @@ export function PdfToolbar({
   onZoomOut: () => void;
   onZoomIn: () => void;
   onResetZoom: () => void;
+  onToggleNoteMode: () => void;
 }) {
   return (
     <div className="bg-paper-2/60 border-b border-line px-4 py-2 flex items-center justify-between">
@@ -51,6 +55,17 @@ export function PdfToolbar({
       </div>
 
       <div className="flex items-center gap-2">
+        <button
+          onClick={onToggleNoteMode}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+            noteMode ? 'bg-sun/30 text-ink ring-1 ring-sun' : 'hover:bg-paper-3 text-ink-2'
+          }`}
+          title={noteMode ? '退出贴便签模式' : '贴便签：点击页面任意位置新建一个笔记'}
+        >
+          <span className="leading-none">📒</span>
+          {noteMode ? '点击页面放置…' : '贴便签'}
+        </button>
+        <div className="w-px h-6 bg-line-strong mx-2" />
         <button
           onClick={onFitWidth}
           className={`p-2 rounded-lg transition-colors ${fitMode === 'width' ? 'bg-ink text-paper-2' : 'hover:bg-paper-3 text-ink-2'}`}

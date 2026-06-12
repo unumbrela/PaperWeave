@@ -256,11 +256,12 @@ export default function PaperDetailPage({ params }: { params: Promise<{ id: stri
             <div className="flex items-center gap-2">
               <ShareButton
                 build={async () => {
-                  const [annotations, note] = await Promise.all([
+                  const [annotations, note, stickyNotes] = await Promise.all([
                     repository.listAnnotations(paper!.id),
                     repository.getNote(paper!.id),
+                    repository.listStickyNotes(paper!.id),
                   ]);
-                  return buildPaperSnapshot(paper!, annotations, note);
+                  return buildPaperSnapshot(paper!, annotations, note, stickyNotes);
                 }}
                 label="分享"
               />

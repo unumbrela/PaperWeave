@@ -10,7 +10,7 @@ import PDFViewerDynamic from '@/components/pdf/PDFViewerDynamic';
 import { ViewerHeader } from '@/components/viewer/ViewerHeader';
 import { PdfToolbar } from '@/components/viewer/PdfToolbar';
 import { generateMarkdown, downloadMarkdown } from '@/lib/export/markdown';
-import { useAnnotations, useResearchNotes, useAIExplanation } from '@/lib/annotation/hooks';
+import { useAnnotations, useResearchNotes, useStickyNotes, useAIExplanation } from '@/lib/annotation/hooks';
 
 export default function ViewerClient() {
   const params = useParams();
@@ -27,8 +27,10 @@ export default function ViewerClient() {
   const [selectionRects, setSelectionRects] = useState<Array<{ x: number; y: number; width: number; height: number }>>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [copiedState, setCopiedState] = useState<{ [key: string]: boolean }>({});
+  const [noteMode, setNoteMode] = useState(false);
 
   const { annotations, fetchAnnotations, createAnnotation, updateAnnotation, deleteAnnotation } = useAnnotations(params.id as string);
+  const { stickyNotes, fetchStickyNotes, createStickyNote, updateStickyNote, deleteStickyNote } = useStickyNotes(params.id as string);
   const { notes: researchNotes, setNotes: setResearchNotes, fetchNotes, saveNotes } = useResearchNotes(params.id as string);
   const { explanation: aiSummary, explain: requestAIExplanation } = useAIExplanation();
 
@@ -64,6 +66,10 @@ export default function ViewerClient() {
   useEffect(() => {
     fetchNotes();
   }, [fetchNotes]);
+
+  useEffect(() => {
+    fetchStickyNotes();
+  }, [fetchStickyNotes]);
 
   useEffect(() => {
     const debounce = setTimeout(() => saveNotes(researchNotes), 800);
@@ -165,6 +171,7 @@ export default function ViewerClient() {
   };
 
   const handleTextSelection = useCallback(() => {
+    if (noteMode) return; // 贴便签模式下点击用于放置 📒，不弹选区菜单
     const selection = window.getSelection();
     if (!selection) return;
 
@@ -200,12 +207,19 @@ export default function ViewerClient() {
         text: selectedText,
       });
     }
-  }, [scale]);
+  }, [scale, noteMode]);
 
   useEffect(() => {
     document.addEventListener('mouseup', handleTextSelection);
     return () => document.removeEventListener('mouseup', handleTextSelection);
   }, [handleTextSelection]);
+
+  // 放置一个便签后自动退出贴便签模式，恢复正常的选字批注交互
+  const handleCreateStickyNote = useCallback(async (x: number, y: number) => {
+    const created = await createStickyNote({ page: currentPage - 1, x, y });
+    setNoteMode(false);
+    return created;
+  }, [createStickyNote, currentPage]);
 
   const handleCreateAnnotation = async (type: AnnotationType, text: string, comment?: string) => {
     if (!params.id || !paper) return;
@@ -247,6 +261,7 @@ export default function ViewerClient() {
       annotations,
       aiSummary,
       researchNotes,
+      stickyNotes,
     });
 
     downloadMarkdown(markdown, `${paper.title.replace(/[^a-z0-9]/gi, '_')}_research_brief.md`);
@@ -375,6 +390,7 @@ export default function ViewerClient() {
             numPages={numPages}
             scale={scale}
             fitMode={fitMode}
+            noteMode={noteMode}
             onPrev={() => setCurrentPage(Math.max(1, currentPage - 1))}
             onNext={() => setCurrentPage(Math.min(numPages, currentPage + 1))}
             onFitWidth={handleFitWidth}
@@ -382,6 +398,7 @@ export default function ViewerClient() {
             onZoomOut={() => setScale(Math.max(0.3, scale - 0.1))}
             onZoomIn={() => setScale(Math.min(3, scale + 0.1))}
             onResetZoom={() => setScale(1.0)}
+            onToggleNoteMode={() => setNoteMode((v) => !v)}
           />
 
           <div ref={pdfContainerRef} className="flex-1 overflow-auto bg-paper-3">
@@ -391,6 +408,11 @@ export default function ViewerClient() {
                 currentPage={currentPage}
                 scale={scale}
                 annotations={annotations}
+                stickyNotes={stickyNotes}
+                noteMode={noteMode}
+                onCreateStickyNote={handleCreateStickyNote}
+                onUpdateStickyNote={updateStickyNote}
+                onDeleteStickyNote={deleteStickyNote}
                 onLoadSuccess={handleDocumentLoadSuccess}
                 onLoadError={handleDocumentLoadError}
               />
@@ -408,12 +430,15 @@ export default function ViewerClient() {
         {isSidebarOpen && (
           <Sidebar
             annotations={annotations}
+            stickyNotes={stickyNotes}
             aiSummary={aiSummary}
             researchNotes={researchNotes}
             onDeleteAnnotation={deleteAnnotation}
             onEditAnnotation={handleEditAnnotation}
             onAIExplain={handleAIExplain}
             onResearchNotesChange={setResearchNotes}
+            onDeleteStickyNote={deleteStickyNote}
+            onJumpToPage={(page) => setCurrentPage(page + 1)}
           />
         )}
       </div>

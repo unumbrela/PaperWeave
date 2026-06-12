@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
-import type { Annotation } from '@/lib/db/types';
+import type { Annotation, StickyNote } from '@/lib/db/types';
 import AnnotationLayer from '@/components/annotation/AnnotationLayer';
+import StickyNoteLayer from '@/components/annotation/StickyNoteLayer';
 
 const Document = dynamic(() => import('react-pdf').then(mod => mod.Document), { ssr: false });
 const Page = dynamic(() => import('react-pdf').then(mod => mod.Page), { ssr: false });
@@ -15,6 +16,12 @@ interface PDFViewerDynamicProps {
   currentPage: number;
   scale: number;
   annotations: Annotation[];
+  stickyNotes?: StickyNote[];
+  /** 贴便签模式：开启后点击页面任意位置新建一个 📒 */
+  noteMode?: boolean;
+  onCreateStickyNote?: (x: number, y: number) => Promise<StickyNote | null>;
+  onUpdateStickyNote?: (id: string, patch: Partial<Pick<StickyNote, 'x' | 'y' | 'content'>>) => void;
+  onDeleteStickyNote?: (id: string) => void;
   onLoadSuccess: (numPages: number) => void;
   onLoadError?: (error: Error) => void;
   containerRef?: React.RefObject<HTMLDivElement | null>;
@@ -25,6 +32,11 @@ export default function PDFViewerDynamic({
   currentPage,
   scale,
   annotations,
+  stickyNotes,
+  noteMode = false,
+  onCreateStickyNote,
+  onUpdateStickyNote,
+  onDeleteStickyNote,
   onLoadSuccess,
   onLoadError,
 }: PDFViewerDynamicProps) {
@@ -195,6 +207,17 @@ export default function PDFViewerDynamic({
           currentPage={currentPage - 1}
           scale={scale}
         />
+        {onCreateStickyNote && onUpdateStickyNote && onDeleteStickyNote && (
+          <StickyNoteLayer
+            notes={stickyNotes ?? []}
+            currentPage={currentPage - 1}
+            scale={scale}
+            noteMode={noteMode}
+            onCreate={onCreateStickyNote}
+            onUpdate={onUpdateStickyNote}
+            onDelete={onDeleteStickyNote}
+          />
+        )}
         <style jsx global>{`
           .pdf-reading-page {
             display: flex;
