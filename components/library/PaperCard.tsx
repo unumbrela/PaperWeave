@@ -52,12 +52,18 @@ export function PaperCard({
   onToggleExpand,
   onDelete,
   onAnalyze,
+  analyzing = false,
+  analyzeError,
 }: {
   paper: Paper;
   expanded: boolean;
   onToggleExpand: () => void;
   onDelete: () => void;
   onAnalyze: () => void;
+  /** 本卡片正在 AI 分析中（按钮置灰防重复点击） */
+  analyzing?: boolean;
+  /** 上次分析失败的原因（展示在按钮下方，给用户出路） */
+  analyzeError?: string | null;
 }) {
   return (
     <div className="surface rounded-2xl overflow-hidden relative transition-shadow hover:shadow-md">
@@ -189,10 +195,14 @@ export function PaperCard({
                     e.stopPropagation();
                     onAnalyze();
                   }}
-                  className="cta-gradient rounded-full px-4 py-2 text-sm font-medium focus-ring"
+                  disabled={analyzing}
+                  className="cta-gradient rounded-full px-4 py-2 text-sm font-medium focus-ring disabled:opacity-60 disabled:cursor-wait"
                 >
-                  🔮 开始分析
+                  {analyzing ? "✨ 正在分析…" : "🔮 开始分析"}
                 </button>
+                {analyzeError && (
+                  <p className="mt-3 text-xs text-coral">{analyzeError}</p>
+                )}
               </div>
             )}
           </div>

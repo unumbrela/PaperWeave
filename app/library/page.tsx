@@ -37,6 +37,9 @@ export default function LibraryPage() {
     paper: null,
   });
   const [isDeleting, setIsDeleting] = useState(false);
+  // AI 分析进行中的论文 id（同一时间只允许一篇）与各论文的上次分析失败原因
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  const [analyzeErrors, setAnalyzeErrors] = useState<Record<string, string | null>>({});
 
   const allTags = [...new Set(papers.flatMap((p) => p.tags))];
   const allDirections = [...new Set(papers.map((p) => p.direction).filter(Boolean))];
@@ -167,7 +170,9 @@ export default function LibraryPage() {
 
   async function handleAnalyze(paperId: string) {
     const target = papers.find((p) => p.id === paperId);
-    if (!target) return;
+    if (!target || analyzingId) return;
+    setAnalyzingId(paperId);
+    setAnalyzeErrors((prev) => ({ ...prev, [paperId]: null }));
     try {
       // 服务端无状态 AI 助手：传入摘要文本，返回结构化分析（不持久化）
       const res = await fetch("/api/analyze", {
@@ -185,14 +190,25 @@ export default function LibraryPage() {
           contribution?: string;
           notes?: string;
         };
-        // 分析结果回写本地仓储
+        // 分析结果回写本地仓储（仅成功路径——失败时绝不持久化占位垃圾）
         const updated = await repository.updatePaper(paperId, { summary, methodology, contribution, notes });
         if (updated) {
           setPapers((prev) => prev.map((p) => (p.id === paperId ? { ...p, ...updated } : p)));
         }
+      } else {
+        setAnalyzeErrors((prev) => ({
+          ...prev,
+          [paperId]: `分析失败：${data.message || "未知错误"}`,
+        }));
       }
     } catch (error) {
       console.error("Failed to analyze paper:", error);
+      setAnalyzeErrors((prev) => ({
+        ...prev,
+        [paperId]: "分析失败：网络异常或服务不可用，请稍后重试",
+      }));
+    } finally {
+      setAnalyzingId(null);
     }
   }
 
@@ -397,6 +413,8 @@ export default function LibraryPage() {
                 onToggleExpand={() => setOpenAccordion(openAccordion === paper.id ? null : paper.id)}
                 onDelete={() => setDeleteConfirm({ show: true, paper })}
                 onAnalyze={() => handleAnalyze(paper.id)}
+                analyzing={analyzingId === paper.id}
+                analyzeError={analyzeErrors[paper.id]}
               />
             ))}
           </div>

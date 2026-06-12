@@ -26,9 +26,27 @@ const PLACEHOLDERS = new Set([
 ]);
 const isReal = (k?: string): k is string => !!k && !PLACEHOLDERS.has(k);
 
+/**
+ * 未配置任何 LLM key 时给前端的清晰错误。
+ * 消费方是 useStream 的 `res.text()`（裸文本），文案含「未配置」可被
+ * StreamOutput 的 friendlyError 归类为「key 未配置」并给出处置建议。
+ */
+export function aiNotConfiguredResponse(): Response {
+  return new Response(
+    "AI 服务未配置：请在右上角「API Key」填入你自己的 key（DeepSeek / OpenAI / Gemini 任一）；本地开发也可在 .env.local 配置后重试。",
+    { status: 503 },
+  );
+}
+
 export interface StreamOpts {
   temperature?: number;
   max_tokens?: number;
+  /**
+   * DeepSeek 档位覆盖（如 idea-generator 用 "deepseek-reasoner"）。
+   * 仅影响 DeepSeek attempt；fallback 到 OpenAI/Gemini 时仍用各家默认 chat 模型
+   * ——流式场景下「有产出 > 死路」，接受推理深度降级。
+   */
+  deepseekModel?: string;
 }
 
 /** OpenAI 兼容端点（OpenAI 本体或 DeepSeek，靠 baseURL 区分）的文本增量流。 */
@@ -94,7 +112,7 @@ export async function streamChat(
   const eff = effectiveKeys(keys);
   const attempts: Array<{ provider: string; gen: () => AsyncGenerator<string> }> = [];
   if (isReal(eff.deepseek))
-    attempts.push({ provider: "deepseek", gen: () => openaiCompatStream(messages, eff.deepseek!, "deepseek-chat", DEEPSEEK_URL, opts) });
+    attempts.push({ provider: "deepseek", gen: () => openaiCompatStream(messages, eff.deepseek!, opts.deepseekModel ?? "deepseek-chat", DEEPSEEK_URL, opts) });
   if (isReal(eff.openai))
     attempts.push({ provider: "openai", gen: () => openaiCompatStream(messages, eff.openai!, "gpt-4o-mini", undefined, opts) });
   if (isReal(eff.gemini))

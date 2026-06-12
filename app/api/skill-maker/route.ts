@@ -1,6 +1,5 @@
-import { streamText } from "ai";
-import { getDeepSeek, MODELS, aiNotConfiguredResponse } from "@/lib/ai";
-import { resolveKeys } from "@/lib/ai/keys";
+import { streamChat, aiNotConfiguredResponse } from "@/lib/ai/stream";
+import { resolveKeys, hasAnyKey } from "@/lib/ai/keys";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -18,8 +17,8 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
-  const { deepseek: dsKey } = resolveKeys(req);
-  if (!dsKey) return aiNotConfiguredResponse();
+  const keys = resolveKeys(req);
+  if (!hasAnyKey(keys)) return aiNotConfiguredResponse();
   let parsed;
   try {
     parsed = Body.parse(await req.json());
@@ -63,12 +62,16 @@ ${parsed.capability}
 
 严格按系统提示中的章节结构输出，不要多加别的段落，不要加 "这是你的 SKILL.md" 之类的前言。`;
 
-  const result = streamText({
-    model: getDeepSeek(dsKey)(MODELS.chat),
-    system,
-    prompt,
-    temperature: 0.3,
-  });
+  const stream = await streamChat(
+    [
+      { role: "system", content: system },
+      { role: "user", content: prompt },
+    ],
+    { temperature: 0.3, max_tokens: 4000 },
+    keys,
+  );
 
-  return result.toTextStreamResponse();
+  return new Response(stream, {
+    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+  });
 }

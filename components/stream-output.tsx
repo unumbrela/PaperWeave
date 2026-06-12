@@ -9,7 +9,7 @@ import { Markdown } from "@/components/markdown";
 function friendlyError(raw: string): { title: string; hint?: string } {
   const m = raw.toLowerCase();
   if (/api[_ ]?key|未配置|unauthorized|401|no.*key|缺少密钥/.test(m)) {
-    return { title: "AI 服务未配置或密钥无效", hint: "请在 .env.local 配置 DEEPSEEK_API_KEY 后重试。" };
+    return { title: "AI 服务未配置或密钥无效", hint: "请在右上角「API Key」填入 DeepSeek / OpenAI / Gemini 任一家的 key（本地开发也可配 .env.local）后重试。" };
   }
   if (/429|rate|限流|too many/.test(m)) {
     return { title: "请求过于频繁（限流）", hint: "稍候片刻再重试。" };

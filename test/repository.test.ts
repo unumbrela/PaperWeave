@@ -31,6 +31,14 @@ describe('论文 CRUD（本地）', () => {
     expect(got?.title).toBe('测试论文');
   });
 
+  it('findPaperByTitle 忽略大小写与首尾空白命中（非 arXiv 来源入库去重）', async () => {
+    await repository.savePaper({ title: 'Attention Is All You Need' });
+
+    expect(await repository.findPaperByTitle('attention is all you need')).toBeTruthy();
+    expect(await repository.findPaperByTitle('  Attention Is All You Need  ')).toBeTruthy();
+    expect(await repository.findPaperByTitle('Some Other Paper')).toBeUndefined();
+  });
+
   it('updatePaper 局部更新并刷新 updatedAt', async () => {
     const saved = await repository.savePaper({ title: 'orig' });
     const updated = await repository.updatePaper(saved.id, { summary: 'AI 总结' });

@@ -105,6 +105,12 @@ export const repository = {
     return !!(await paperDB.getByArxivId(arxivId))
   },
 
+  /** 按标题精确查重（忽略大小写）——非 arXiv 来源（如 OpenAlex）入库前防重复 */
+  async findPaperByTitle(title: string): Promise<Paper | undefined> {
+    const hit = await paperDB.getByTitle(title)
+    return hit ? stripLocal(hit) : undefined
+  },
+
   /**
    * 入库 / 更新论文。缺省字段会补齐合理默认值；返回落库后的完整 Paper。
    */

@@ -1,6 +1,5 @@
-import { streamText } from "ai";
-import { getDeepSeek, MODELS, aiNotConfiguredResponse } from "@/lib/ai";
-import { resolveKeys } from "@/lib/ai/keys";
+import { streamChat, aiNotConfiguredResponse } from "@/lib/ai/stream";
+import { resolveKeys, hasAnyKey } from "@/lib/ai/keys";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -16,8 +15,8 @@ const Body = z.object({
 const MAX_REF_CHARS = 12000;
 
 export async function POST(req: Request) {
-  const { deepseek: dsKey } = resolveKeys(req);
-  if (!dsKey) return aiNotConfiguredResponse();
+  const keys = resolveKeys(req);
+  if (!hasAnyKey(keys)) return aiNotConfiguredResponse();
   let parsed;
   try {
     parsed = Body.parse(await req.json());
@@ -57,12 +56,17 @@ export async function POST(req: Request) {
 ## 推荐优先级
 按"可行性 × 创新性"给出建议先做哪一条，一句话说明理由。`;
 
-  const result = streamText({
-    model: getDeepSeek(dsKey)(MODELS.reasoner),
-    system,
-    prompt,
-    temperature: 0.5,
-  });
+  // DeepSeek 走 reasoner 深度推理；fallback 到 OpenAI/Gemini 时降级为各家 chat 模型
+  const stream = await streamChat(
+    [
+      { role: "system", content: system },
+      { role: "user", content: prompt },
+    ],
+    { temperature: 0.5, max_tokens: 4000, deepseekModel: "deepseek-reasoner" },
+    keys,
+  );
 
-  return result.toTextStreamResponse();
+  return new Response(stream, {
+    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+  });
 }

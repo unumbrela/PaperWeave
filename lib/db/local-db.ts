@@ -148,6 +148,14 @@ export const paperDB = {
   },
 
   /**
+   * 按标题精确查找（忽略大小写与首尾空白）——非 arXiv 来源的入库去重用。
+   * title 在 schema 里有索引，equalsIgnoreCase 走索引不全表扫。
+   */
+  async getByTitle(title: string): Promise<CachedPaper | undefined> {
+    return await db.papers.where('title').equalsIgnoreCase(title.trim()).first()
+  },
+
+  /**
    * 添加或更新论文
    */
   async upsert(paper: CachedPaper): Promise<void> {

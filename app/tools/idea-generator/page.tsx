@@ -100,7 +100,7 @@ export default function Page() {
           </button>
 
           <p className="mt-3 text-[11px] text-ink-3 text-center serif-italic">
-            用 deepseek-reasoner 深度推理，可能稍慢
+            配 DeepSeek key 时用 deepseek-reasoner 深度推理（可能稍慢）；只配 OpenAI / Gemini 也能生成
           </p>
         </div>
 

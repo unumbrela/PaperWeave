@@ -1,6 +1,5 @@
-import { streamText } from "ai";
-import { getDeepSeek, MODELS, aiNotConfiguredResponse } from "@/lib/ai";
-import { resolveKeys } from "@/lib/ai/keys";
+import { streamChat, aiNotConfiguredResponse } from "@/lib/ai/stream";
+import { resolveKeys, hasAnyKey } from "@/lib/ai/keys";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -36,8 +35,8 @@ const EXECUTOR_LABEL = {
 } as const;
 
 export async function POST(req: Request) {
-  const { deepseek: dsKey } = resolveKeys(req);
-  if (!dsKey) return aiNotConfiguredResponse();
+  const keys = resolveKeys(req);
+  if (!hasAnyKey(keys)) return aiNotConfiguredResponse();
   let parsed;
   try {
     parsed = Body.parse(await req.json());
@@ -115,12 +114,16 @@ ${parsed.task}
 
 现在开始输出五阶段 Markdown。`;
 
-  const result = streamText({
-    model: getDeepSeek(dsKey)(MODELS.chat),
-    system,
-    prompt,
-    temperature: 0.3,
-  });
+  const stream = await streamChat(
+    [
+      { role: "system", content: system },
+      { role: "user", content: prompt },
+    ],
+    { temperature: 0.3, max_tokens: 4000 },
+    keys,
+  );
 
-  return result.toTextStreamResponse();
+  return new Response(stream, {
+    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+  });
 }
