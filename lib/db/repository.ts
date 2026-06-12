@@ -18,9 +18,10 @@ import {
   noteDB,
   progressDB,
   pdfBlobDB,
+  stickyNoteDB,
   type CachedPaper,
 } from './local-db'
-import type { Paper, Annotation, AnnotationType, ResearchNote, Rect } from './types'
+import type { Paper, Annotation, AnnotationType, ResearchNote, Rect, StickyNote } from './types'
 import { ANNOTATION_COLORS } from './types'
 import { cloudSync } from '@/lib/sync/cloud-sync'
 
@@ -237,6 +238,50 @@ export const repository = {
   async deleteAnnotation(id: string): Promise<void> {
     await annotationDB.delete(id)
     void cloudSync.deleteAnnotation(id)
+  },
+
+  // ────────────────────────────────────────────────────────
+  // 页面便签（📒 锚定在 PDF 页面坐标上的浮动笔记）
+  // ────────────────────────────────────────────────────────
+
+  async listStickyNotes(paperId: string): Promise<StickyNote[]> {
+    const list = await stickyNoteDB.getByPaperId(paperId)
+    return list.sort((a, b) => a.page - b.page || a.y - b.y)
+  },
+
+  async createStickyNote(data: {
+    paperId: string
+    page: number
+    x: number
+    y: number
+    content?: string
+  }): Promise<StickyNote> {
+    const note: StickyNote = {
+      id: genId('sticky'),
+      paperId: data.paperId,
+      page: data.page,
+      x: data.x,
+      y: data.y,
+      content: data.content ?? '',
+      createdAt: new Date().toISOString(),
+    }
+    await stickyNoteDB.add(note)
+    void cloudSync.pushStickyNote(note)
+    return note
+  },
+
+  async updateStickyNote(
+    id: string,
+    patch: Partial<Pick<StickyNote, 'x' | 'y' | 'content'>>,
+  ): Promise<void> {
+    await stickyNoteDB.update(id, { ...patch, updatedAt: new Date().toISOString() })
+    const updated = await stickyNoteDB.getById(id)
+    if (updated) void cloudSync.pushStickyNote(updated)
+  },
+
+  async deleteStickyNote(id: string): Promise<void> {
+    await stickyNoteDB.delete(id)
+    void cloudSync.deleteStickyNote(id)
   },
 
   // ────────────────────────────────────────────────────────

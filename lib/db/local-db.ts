@@ -9,9 +9,9 @@
  */
 
 import Dexie, { Table } from 'dexie'
-import type { Paper, Annotation, ResearchNote } from './types'
+import type { Paper, Annotation, ResearchNote, StickyNote } from './types'
 
-export type { Paper, Annotation, ResearchNote, Author, Rect, AnnotationType, SourceType } from './types'
+export type { Paper, Annotation, ResearchNote, StickyNote, Author, Rect, AnnotationType, SourceType } from './types'
 
 /**
  * 缓存论文接口 —— 在共享 `Paper` 上叠加本地特有字段（缓存时间）
@@ -70,6 +70,7 @@ class PaperDB extends Dexie {
   readProgress!: Table<ReadProgress>
   embeddings!: Table<PaperEmbedding>
   pdfBlobs!: Table<PdfBlobEntry>
+  stickyNotes!: Table<StickyNote>
 
   constructor() {
     super('paper_workspace')
@@ -111,6 +112,11 @@ class PaperDB extends Dexie {
             delete p.pdfBlob
           })
       })
+
+    // v4：新增页面便签表（📒 锚定在 PDF 页面坐标上的浮动笔记）。
+    this.version(4).stores({
+      stickyNotes: 'id, paperId, page'
+    })
   }
 }
 
@@ -168,7 +174,7 @@ export const paperDB = {
   async delete(id: string): Promise<void> {
     await db.transaction(
       'rw',
-      [db.papers, db.annotations, db.notes, db.readProgress, db.embeddings, db.pdfBlobs],
+      [db.papers, db.annotations, db.notes, db.readProgress, db.embeddings, db.pdfBlobs, db.stickyNotes],
       async () => {
         await db.papers.delete(id)
         await db.annotations.where('paperId').equals(id).delete()
@@ -176,6 +182,7 @@ export const paperDB = {
         await db.readProgress.where('paperId').equals(id).delete()
         await db.embeddings.where('paperId').equals(id).delete()
         await db.pdfBlobs.delete(id)
+        await db.stickyNotes.where('paperId').equals(id).delete()
       },
     )
   },
@@ -276,6 +283,53 @@ export const noteDB = {
    */
   async delete(id: string): Promise<void> {
     await db.notes.delete(id)
+  }
+}
+
+/**
+ * 页面便签操作函数
+ */
+export const stickyNoteDB = {
+  /**
+   * 获取论文的所有便签
+   */
+  async getByPaperId(paperId: string): Promise<StickyNote[]> {
+    return await db.stickyNotes.where('paperId').equals(paperId).toArray()
+  },
+
+  /**
+   * 获取全部便签（统计/分享用）
+   */
+  async getAll(): Promise<StickyNote[]> {
+    return await db.stickyNotes.toArray()
+  },
+
+  /**
+   * 按 id 获取单条便签
+   */
+  async getById(id: string): Promise<StickyNote | undefined> {
+    return await db.stickyNotes.get(id)
+  },
+
+  /**
+   * 添加便签
+   */
+  async add(note: StickyNote): Promise<void> {
+    await db.stickyNotes.add(note)
+  },
+
+  /**
+   * 更新便签
+   */
+  async update(id: string, updates: Partial<StickyNote>): Promise<void> {
+    await db.stickyNotes.update(id, updates)
+  },
+
+  /**
+   * 删除便签
+   */
+  async delete(id: string): Promise<void> {
+    await db.stickyNotes.delete(id)
   }
 }
 

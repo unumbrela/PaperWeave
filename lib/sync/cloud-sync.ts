@@ -12,7 +12,7 @@
 
 import { getSupabase } from '@/lib/supabase/client'
 import { db } from '@/lib/db/local-db'
-import type { Paper, Annotation, ResearchNote } from '@/lib/db/types'
+import type { Paper, Annotation, ResearchNote, StickyNote } from '@/lib/db/types'
 
 /** 本地库发生变化（拉取合并后）时派发，页面据此刷新 */
 export const LIBRARY_CHANGED_EVENT = 'paperweave:library-changed'
@@ -144,6 +144,35 @@ function rowToNote(r: NoteRow): ResearchNote {
   }
 }
 
+function stickyNoteToRow(n: StickyNote, userId: string) {
+  return {
+    id: n.id,
+    user_id: userId,
+    paper_id: n.paperId,
+    page: n.page,
+    x: n.x,
+    y: n.y,
+    content: n.content,
+    created_at: n.createdAt,
+    updated_at: n.updatedAt ?? new Date().toISOString(),
+  }
+}
+
+type StickyNoteRow = ReturnType<typeof stickyNoteToRow>
+
+function rowToStickyNote(r: StickyNoteRow): StickyNote {
+  return {
+    id: r.id,
+    paperId: r.paper_id,
+    page: r.page,
+    x: r.x,
+    y: r.y,
+    content: r.content ?? '',
+    createdAt: r.created_at,
+    updatedAt: r.updated_at ?? undefined,
+  }
+}
+
 // ── 推送（写操作后 best-effort，失败只告警不影响本地） ────────────────
 
 // Supabase 查询构造器是 thenable（PromiseLike），await 后得到 { error }
@@ -184,6 +213,18 @@ export const cloudSync = {
     await safe('deleteAnnotation', () => sb.from('annotations').delete().eq('id', id))
   },
 
+  async pushStickyNote(n: StickyNote) {
+    const sb = client()
+    if (!sb) return
+    await safe('pushStickyNote', () => sb.from('sticky_notes').upsert(stickyNoteToRow(n, currentUserId!)))
+  },
+
+  async deleteStickyNote(id: string) {
+    const sb = client()
+    if (!sb) return
+    await safe('deleteStickyNote', () => sb.from('sticky_notes').delete().eq('id', id))
+  },
+
   async pushNote(n: ResearchNote) {
     const sb = client()
     if (!sb) return
@@ -218,11 +259,12 @@ export const cloudSync = {
     const sb = client()
     if (!sb) return
 
-    const [papers, annotations, notes, progress] = await Promise.all([
+    const [papers, annotations, notes, progress, stickyNotes] = await Promise.all([
       sb.from('papers').select('*'),
       sb.from('annotations').select('*'),
       sb.from('research_notes').select('*'),
       sb.from('read_progress').select('*'),
+      sb.from('sticky_notes').select('*'),
     ])
 
     if (!papers.error && papers.data) {
@@ -254,6 +296,12 @@ export const cloudSync = {
       }
     }
 
+    if (!stickyNotes.error && stickyNotes.data) {
+      for (const row of stickyNotes.data as StickyNoteRow[]) {
+        await db.stickyNotes.put(rowToStickyNote(row))
+      }
+    }
+
     if (!progress.error && progress.data) {
       for (const row of progress.data as Array<Record<string, unknown>>) {
         await db.readProgress.put({
@@ -280,11 +328,12 @@ export const cloudSync = {
     if (!sb) return
     const uid = currentUserId!
 
-    const [papers, annotations, notes, progress] = await Promise.all([
+    const [papers, annotations, notes, progress, stickyNotes] = await Promise.all([
       db.papers.toArray(),
       db.annotations.toArray(),
       db.notes.toArray(),
       db.readProgress.toArray(),
+      db.stickyNotes.toArray(),
     ])
 
     if (papers.length) {
@@ -300,6 +349,11 @@ export const cloudSync = {
     if (notes.length) {
       await safe('pushAllLocal/notes', () =>
         sb.from('research_notes').upsert(notes.map((n) => noteToRow(n, uid))),
+      )
+    }
+    if (stickyNotes.length) {
+      await safe('pushAllLocal/stickyNotes', () =>
+        sb.from('sticky_notes').upsert(stickyNotes.map((n) => stickyNoteToRow(n, uid))),
       )
     }
     if (progress.length) {

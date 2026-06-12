@@ -14,7 +14,7 @@ import {
   Check,
   X
 } from 'lucide-react';
-import type { Annotation, AnnotationType } from '@/lib/db/types';
+import type { Annotation, AnnotationType, StickyNote } from '@/lib/db/types';
 import { ANNOTATION_COLORS } from '@/lib/annotation/hooks';
 
 const ANNOTATION_TYPE_LABELS: Record<AnnotationType, string> = {
@@ -37,6 +37,8 @@ interface AISummaryShape {
 
 interface SidebarProps {
   annotations: Annotation[];
+  /** 页面便签（📒，锚定在 PDF 页面坐标上） */
+  stickyNotes?: StickyNote[];
   /** AI 解释结果（来自 useAIExplanation，运行时为 unknown，渲染前在内部收窄） */
   aiSummary: unknown;
   researchNotes: string;
@@ -44,6 +46,9 @@ interface SidebarProps {
   onEditAnnotation: (id: string, comment: string) => Promise<void>;
   onAIExplain: (text: string) => void;
   onResearchNotesChange: (content: string) => void;
+  onDeleteStickyNote?: (id: string) => void;
+  /** 跳转到便签所在页（0-based 页码） */
+  onJumpToPage?: (page: number) => void;
 }
 
 type TabType = 'all' | 'highlight' | 'insight' | 'todo' | 'transferable' | 'ai' | 'notes';
@@ -60,11 +65,14 @@ const tabs: { id: TabType; label: string; icon: typeof LayoutGrid }[] = [
 
 export default function Sidebar({
   annotations,
+  stickyNotes = [],
   aiSummary,
   researchNotes,
   onDeleteAnnotation,
   onEditAnnotation,
   onResearchNotesChange,
+  onDeleteStickyNote,
+  onJumpToPage,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -299,13 +307,52 @@ export default function Sidebar({
 
   const renderResearchNotes = () => {
     return (
-      <div className="rounded-xl p-4 bg-paper-2/60 border border-line">
-        <textarea
-          className="w-full h-64 bg-transparent text-ink text-sm resize-none focus:outline-none placeholder:text-ink-4"
-          placeholder="在此添加研究笔记..."
-          value={researchNotes}
-          onChange={(event) => onResearchNotesChange(event.target.value)}
-        />
+      <div className="space-y-3">
+        <div className="rounded-xl p-4 bg-paper-2/60 border border-line">
+          <textarea
+            className="w-full h-64 bg-transparent text-ink text-sm resize-none focus:outline-none placeholder:text-ink-4"
+            placeholder="在此添加研究笔记..."
+            value={researchNotes}
+            onChange={(event) => onResearchNotesChange(event.target.value)}
+          />
+        </div>
+
+        {stickyNotes.length > 0 && (
+          <div>
+            <h4 className="overline mb-2 text-ink-3">📒 页面便签（{stickyNotes.length}）</h4>
+            <div className="space-y-2">
+              {stickyNotes.map((note) => (
+                <div
+                  key={note.id}
+                  className="group rounded-xl p-3 bg-paper-2/60 border border-line hover:border-line-strong transition-all"
+                >
+                  <div className="flex items-start gap-2">
+                    <button
+                      onClick={() => onJumpToPage?.(note.page)}
+                      className="text-xs px-2 py-0.5 rounded-full bg-sun/20 text-ink-2 hover:bg-sun/40 transition-colors flex-shrink-0"
+                      title="跳转到该页"
+                    >
+                      第 {note.page + 1} 页
+                    </button>
+                    <p className="flex-1 min-w-0 text-xs text-ink-2 whitespace-pre-wrap break-words">
+                      {note.content || <span className="text-ink-4">(空便签 — 在页面上点击 📒 编辑)</span>}
+                    </p>
+                    {onDeleteStickyNote && (
+                      <button
+                        onClick={() => onDeleteStickyNote(note.id)}
+                        className="p-1 rounded-lg hover:bg-coral/12 text-ink-4 hover:text-coral transition-colors flex-shrink-0"
+                        title="删除便签"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <p className="mt-1.5 text-[10px] text-ink-4">{formatDate(note.createdAt)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   };

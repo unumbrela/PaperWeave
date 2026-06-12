@@ -8,7 +8,7 @@ import {
   type PaperShareData,
   type LibraryShareData,
 } from "@/lib/share/snapshot";
-import type { Paper, Annotation, ResearchNote } from "@/lib/db/types";
+import type { Paper, Annotation, ResearchNote, StickyNote } from "@/lib/db/types";
 
 const paper = (over: Partial<Paper> = {}): Paper => ({
   id: "p1",
@@ -92,6 +92,27 @@ describe("buildPaperSnapshot", () => {
   it("无笔记时回退到 paper.notes", () => {
     const snap = buildPaperSnapshot(paper({ notes: "回退笔记" }), [], undefined);
     expect((snap.data as PaperShareData).researchNote).toBe("回退笔记");
+  });
+
+  it("页面便签：过滤空内容、按 页码→纵坐标 排序、只保留页码与内容", () => {
+    const stickies: StickyNote[] = [
+      { id: "s1", paperId: "p1", page: 3, x: 1, y: 9, content: "后页", createdAt: "2024-01-02" },
+      { id: "s2", paperId: "p1", page: 0, x: 1, y: 200, content: "首页下", createdAt: "2024-01-02" },
+      { id: "s3", paperId: "p1", page: 0, x: 1, y: 10, content: "首页上", createdAt: "2024-01-02" },
+      { id: "s4", paperId: "p1", page: 1, x: 1, y: 1, content: "   ", createdAt: "2024-01-02" },
+    ];
+    const snap = buildPaperSnapshot(paper(), [], undefined, stickies);
+    const data = snap.data as PaperShareData;
+    expect(data.stickyNotes).toEqual([
+      { page: 0, content: "首页上" },
+      { page: 0, content: "首页下" },
+      { page: 3, content: "后页" },
+    ]);
+  });
+
+  it("无便签（或全空）时不带 stickyNotes 字段", () => {
+    const snap = buildPaperSnapshot(paper(), [], undefined, []);
+    expect((snap.data as PaperShareData).stickyNotes).toBeUndefined();
   });
 });
 

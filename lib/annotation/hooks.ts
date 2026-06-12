@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import type { Annotation, AnnotationType, Rect } from '@/lib/db/types';
+import type { Annotation, AnnotationType, Rect, StickyNote } from '@/lib/db/types';
 import { ANNOTATION_COLORS } from '@/lib/db/types';
 import { repository } from '@/lib/db/repository';
 import { userKeyHeaders } from '@/lib/ai/user-keys';
@@ -89,6 +89,70 @@ export function useAnnotations(paperId: string) {
     createAnnotation,
     updateAnnotation,
     deleteAnnotation,
+  };
+}
+
+/**
+ * 页面便签 hook（📒）—— 内部走本地 Dexie 仓储（单一真相源）。
+ */
+export function useStickyNotes(paperId: string) {
+  const [stickyNotes, setStickyNotes] = useState<StickyNote[]>([]);
+
+  const fetchStickyNotes = useCallback(async () => {
+    if (!paperId) return;
+    try {
+      const data = await repository.listStickyNotes(paperId);
+      setStickyNotes(data);
+    } catch (error) {
+      console.error('获取页面便签失败:', error);
+    }
+  }, [paperId]);
+
+  const createStickyNote = useCallback(async (data: {
+    page: number;
+    x: number;
+    y: number;
+    content?: string;
+  }) => {
+    if (!paperId) return null;
+    try {
+      const created = await repository.createStickyNote({ paperId, ...data });
+      setStickyNotes((prev) => [...prev, created]);
+      return created;
+    } catch (error) {
+      console.error('[StickyNotes Hook] 创建便签失败:', error);
+      return null;
+    }
+  }, [paperId]);
+
+  const updateStickyNote = useCallback(async (id: string, patch: Partial<Pick<StickyNote, 'x' | 'y' | 'content'>>) => {
+    try {
+      await repository.updateStickyNote(id, patch);
+      setStickyNotes((prev) => prev.map((n) => (n.id === id ? { ...n, ...patch } : n)));
+      return true;
+    } catch (error) {
+      console.error('[StickyNotes Hook] 更新便签失败:', error);
+      return false;
+    }
+  }, []);
+
+  const deleteStickyNote = useCallback(async (id: string) => {
+    try {
+      await repository.deleteStickyNote(id);
+      setStickyNotes((prev) => prev.filter((n) => n.id !== id));
+      return true;
+    } catch (error) {
+      console.error('[StickyNotes Hook] 删除便签失败:', error);
+      return false;
+    }
+  }, []);
+
+  return {
+    stickyNotes,
+    fetchStickyNotes,
+    createStickyNote,
+    updateStickyNote,
+    deleteStickyNote,
   };
 }
 

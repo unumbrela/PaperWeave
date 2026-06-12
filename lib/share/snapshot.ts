@@ -6,7 +6,7 @@
  * 链接内容是点击那一刻的副本，不随本地后续编辑变化。纯函数，可单测。
  */
 
-import type { Paper, Annotation, ResearchNote, AnnotationType } from "@/lib/db/types";
+import type { Paper, Annotation, ResearchNote, StickyNote, AnnotationType } from "@/lib/db/types";
 
 export type ShareKind = "paper" | "library";
 
@@ -33,9 +33,16 @@ export interface AnnotationSnapshot {
   comment?: string;
 }
 
+export interface StickyNoteSnapshot {
+  page: number;
+  content: string;
+}
+
 export interface PaperShareData extends PaperSnapshot {
   annotations: AnnotationSnapshot[];
   researchNote?: string;
+  /** 页面便签（📒，仅保留页码与内容，坐标对只读分享无意义） */
+  stickyNotes?: StickyNoteSnapshot[];
 }
 
 export interface LibraryShareData {
@@ -92,12 +99,17 @@ export function toPaperSnapshot(paper: Paper): PaperSnapshot {
   };
 }
 
-/** 构造单篇分享快照（含批注分类与研究笔记）。 */
+/** 构造单篇分享快照（含批注分类、研究笔记与页面便签）。 */
 export function buildPaperSnapshot(
   paper: Paper,
   annotations: Annotation[],
   note?: ResearchNote,
+  stickyNotes?: StickyNote[],
 ): ShareSnapshot {
+  const stickies = (stickyNotes || [])
+    .filter((n) => n.content.trim())
+    .sort((a, b) => a.page - b.page || a.y - b.y)
+    .map((n) => ({ page: n.page, content: n.content }));
   const data: PaperShareData = {
     ...toPaperSnapshot(paper),
     annotations: (annotations || []).map((a) => ({
@@ -107,6 +119,7 @@ export function buildPaperSnapshot(
       comment: a.comment,
     })),
     researchNote: note?.content || paper.notes,
+    ...(stickies.length > 0 ? { stickyNotes: stickies } : {}),
   };
   return {
     kind: "paper",

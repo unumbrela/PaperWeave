@@ -177,6 +177,20 @@ function PaperView({ data }: { data: PaperShareData }) {
         </div>
       )}
 
+      {!!data.stickyNotes?.length && (
+        <div className="mt-6">
+          <h3 className="serif mb-3 text-lg text-ink">页面便签 📒（{data.stickyNotes.length}）</h3>
+          <div className="space-y-2">
+            {data.stickyNotes.map((n, i) => (
+              <div key={i} className="rounded-xl border border-line bg-paper-2/40 p-3">
+                <span className="overline text-[10px] text-ink-3">第 {n.page + 1} 页</span>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-ink-2">{n.content}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {data.researchNote?.trim() && (
         <div className="mt-6">
           <h3 className="serif mb-2 text-lg text-ink">研究笔记</h3>

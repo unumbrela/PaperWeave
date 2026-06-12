@@ -18,14 +18,14 @@
 ## ✨ 功能总览
 
 ### 🔎 查论文
-- **多源聚合检索**（[`/tools/paper-search`](app/tools/paper-search/page.tsx)）：OpenAlex + arXiv 双源并发检索，`Promise.allSettled` 保证单源故障不拖垮整体；支持领域包（CV / NLP / Mamba / 扩散模型…）、必含/排除关键词、年份与会议过滤、检索中途取消。
+- **多源聚合检索**（[`/tools/paper-search`](app/tools/paper-search/page.tsx)）：OpenAlex + arXiv 双源并发检索，`Promise.allSettled` 保证单源故障不拖垮整体；支持领域包（CV / NLP / Mamba / 扩散模型…）、必含/排除关键词、年份与会议过滤、检索中途取消。**一键速览**：LLM 把当前结果打包成一次批量调用，逐篇生成一句话中文总结（入库时随 `summary` 落库供下游复用）；每条结果可**一键阅读**——自动入库去重后直达 PDF 阅读器。
 - **服务端检索缓存**（可选）：配置 Supabase 后热门查询直接命中 Postgres 缓存（14 天 TTL），检索页展示「🔥 热门检索」；不配置则透明降级为直连上游。
 - **引用网络图谱**（[`/tools/citation-graph`](app/tools/citation-graph/page.tsx)）：任选一篇 OpenAlex 论文，参考文献 + 被引文献汇成一张 **D3 力导向图**，圆越大被引越多，支持缩放/拖拽/点击直达。
 - **研究方向发展族谱**（[`/tools/research-genealogy`](app/tools/research-genealogy/page.tsx)）：图谱看单篇，**族谱看整个方向**——配套的 [`research-genealogy`](skills/research-genealogy/SKILL.md) skill 在终端做多轮检索 + 引文滚雪球，产出「奠基 → 路线分叉 → 并行竞争 → 前沿」的发展族谱（每条 builds-on 边经真实引文核验，绝不凭记忆报论文）；产物 `lineage.json` 粘贴回站内即渲染成可点击的族谱树。
 
 ### 📚 论文库（本地优先）
 - **入库即拥有**（[`/library`](app/library/page.tsx)）：元数据、摘要、AI 结构化总结、研究笔记、标签，全部存在浏览器 IndexedDB（Dexie），**无需注册、断网可用**。
-- **PDF 阅读器 + 四类批注**（[`/viewer/[id]`](app/viewer/[id]/page.tsx)）：高亮 / 洞见 / 待办 / 可迁移四种标注，选区 AI 解释，阅读进度自动保存；PDF 首次在线打开后静默缓存为本地 Blob，之后**断网也能读**。
+- **PDF 阅读器 + 四类批注 + 页面便签**（[`/viewer/[id]`](app/viewer/[id]/page.tsx)）：高亮 / 洞见 / 待办 / 可迁移四种标注，选区 AI 解释，阅读进度自动保存；**📒 页面便签**——点击页面任意位置贴一个便签，点开即写（段落大意 / 名词解释），可拖动移位，侧边栏汇总可跳页，随精读导出与只读分享；PDF 首次在线打开后静默缓存为本地 Blob，之后**断网也能读**。
 - **引文导出**：每篇一键导出 BibTeX + APA / MLA / GB/T 7714，整库一键导出 `.bib`——纯本地纯函数，无需任何 API key。
 - **统计看板**（[`/library/stats`](app/library/stats/page.tsx)）：来源 / 年份 / 月度入库 / 批注分类分布、标签云、被引 Top 5，零配置即用。
 

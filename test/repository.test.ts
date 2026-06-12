@@ -11,6 +11,7 @@ beforeEach(async () => {
   await db.annotations.clear();
   await db.notes.clear();
   await db.readProgress.clear();
+  await db.stickyNotes.clear();
 });
 
 afterEach(() => {
@@ -59,10 +60,11 @@ describe('论文 CRUD（本地）', () => {
     expect(await repository.listPapers({ direction: 'cv' })).toHaveLength(2);
   });
 
-  it('deletePaper 级联删除标注/笔记/进度', async () => {
+  it('deletePaper 级联删除标注/笔记/便签/进度', async () => {
     const p = await repository.savePaper({ title: 'cascade' });
     await repository.createAnnotation({ paperId: p.id, page: 0, rects: [], type: 'highlight' });
     await repository.saveNote(p.id, '一些笔记');
+    await repository.createStickyNote({ paperId: p.id, page: 0, x: 10, y: 20, content: '便签' });
     await repository.saveProgress(p.id, 3, 10);
 
     await repository.deletePaper(p.id);
@@ -70,6 +72,7 @@ describe('论文 CRUD（本地）', () => {
     expect(await repository.getPaper(p.id)).toBeUndefined();
     expect(await repository.listAnnotations(p.id)).toHaveLength(0);
     expect(await repository.getNote(p.id)).toBeUndefined();
+    expect(await repository.listStickyNotes(p.id)).toHaveLength(0);
     expect(await repository.getProgress(p.id)).toBeUndefined();
   });
 });
@@ -90,6 +93,25 @@ describe('标注 / 笔记 / 进度', () => {
     const n2 = await repository.saveNote(p.id, 'v2');
     expect(n2.id).toBe(n1.id);
     expect((await repository.getNote(p.id))?.content).toBe('v2');
+  });
+
+  it('页面便签 CRUD 并按 页码→纵坐标 排序', async () => {
+    const p = await repository.savePaper({ title: 'sticky' });
+    const n2 = await repository.createStickyNote({ paperId: p.id, page: 2, x: 5, y: 100, content: '第三页' });
+    const n1 = await repository.createStickyNote({ paperId: p.id, page: 0, x: 5, y: 300, content: '第一页下方' });
+    const n0 = await repository.createStickyNote({ paperId: p.id, page: 0, x: 5, y: 50, content: '第一页上方' });
+
+    const list = await repository.listStickyNotes(p.id);
+    expect(list.map((n) => n.id)).toEqual([n0.id, n1.id, n2.id]);
+
+    await repository.updateStickyNote(n0.id, { content: '改过', x: 99 });
+    const updated = (await repository.listStickyNotes(p.id)).find((n) => n.id === n0.id);
+    expect(updated?.content).toBe('改过');
+    expect(updated?.x).toBe(99);
+    expect(updated?.updatedAt).toBeTruthy();
+
+    await repository.deleteStickyNote(n1.id);
+    expect(await repository.listStickyNotes(p.id)).toHaveLength(2);
   });
 
   it('saveProgress upsert 阅读进度', async () => {
@@ -132,6 +154,9 @@ describe('零配置盖章：默认不触达网络/云端', () => {
     await repository.updatePaper(p.id, { summary: 's' });
     await repository.createAnnotation({ paperId: p.id, page: 0, rects: [], type: 'todo' });
     await repository.saveNote(p.id, 'n');
+    const sticky = await repository.createStickyNote({ paperId: p.id, page: 0, x: 1, y: 2 });
+    await repository.updateStickyNote(sticky.id, { content: 'c' });
+    await repository.deleteStickyNote(sticky.id);
     await repository.saveProgress(p.id, 1, 1);
     await repository.deletePaper(p.id);
 

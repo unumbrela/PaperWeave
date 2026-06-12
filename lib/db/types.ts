@@ -64,6 +64,25 @@ export interface Annotation {
   updatedAt?: string;
 }
 
+/**
+ * 页面便签（📒）—— 锚定在 PDF 页面任意位置的浮动笔记。
+ * 与 ResearchNote（每篇一条的整篇笔记）互补：便签贴在具体段落旁，
+ * 用于段落大意、名词解释等就地记录。
+ * 坐标 (x, y) 为 scale = 1 时的页面坐标系（与 Annotation.rects 同一约定），
+ * 渲染时乘以当前缩放比例，缩放/换设备不漂移。
+ */
+export interface StickyNote {
+  id: string;
+  paperId: string;
+  /** 0-based 页码（与 Annotation.page 一致） */
+  page: number;
+  x: number;
+  y: number;
+  content: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 /** 研究笔记（每篇论文一条，富文本/Markdown 内容） */
 export interface ResearchNote {
   id: string;
