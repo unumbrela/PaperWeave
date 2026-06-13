@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { cacheKey, queryLabel } from '@/lib/paper-search/cache';
-import type { SearchQuery } from '@/lib/paper-search/types';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  cacheKey, queryLabel, putCached, CACHE_TTL_MS, DEGRADED_TTL_MS,
+} from '@/lib/paper-search/cache';
+import { getServiceSupabase } from '@/lib/supabase/server';
+import type { SearchQuery, PaperResult } from '@/lib/paper-search/types';
+
+vi.mock('@/lib/supabase/server', () => ({ getServiceSupabase: vi.fn(() => null) }));
 
 describe('cacheKey', () => {
   const base: SearchQuery = {
@@ -61,6 +66,44 @@ describe('cacheKey', () => {
 
   it('输出为 64 位十六进制（sha256）', () => {
     expect(cacheKey(base, ['openalex'])).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('putCached（TTL 分级）', () => {
+  let upserted: Record<string, unknown> | null;
+
+  beforeEach(() => {
+    upserted = null;
+    vi.mocked(getServiceSupabase).mockReturnValue({
+      from: () => ({
+        upsert: async (row: Record<string, unknown>) => {
+          upserted = row;
+          return { error: null };
+        },
+      }),
+    } as unknown as ReturnType<typeof getServiceSupabase>);
+  });
+
+  const somePaper: PaperResult = {
+    id: 'p', title: 'T', authors: [], url: 'https://x', source: 'arxiv',
+  };
+
+  it('全源成功：缓存 14 天', async () => {
+    await putCached('k', 'label', [somePaper], []);
+    const expires = new Date(upserted!.expires_at as string).getTime();
+    expect(expires - Date.now()).toBeGreaterThan(CACHE_TTL_MS - 60_000);
+  });
+
+  it('部分源失败：只缓存 10 分钟（残缺结果不钉死 14 天）', async () => {
+    await putCached('k', 'label', [somePaper], ['arXiv']);
+    const expires = new Date(upserted!.expires_at as string).getTime();
+    expect(expires - Date.now()).toBeLessThanOrEqual(DEGRADED_TTL_MS + 60_000);
+    expect(expires - Date.now()).toBeGreaterThan(0);
+  });
+
+  it('全源失败且 0 结果：不缓存', async () => {
+    await putCached('k', 'label', [], ['OpenAlex', 'arXiv']);
+    expect(upserted).toBeNull();
   });
 });
 

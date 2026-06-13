@@ -66,24 +66,28 @@ export function restoreOpenAlexAbstract(index?: Record<string, number[]>) {
 
 export async function searchOpenAlex(query: SearchQuery): Promise<PaperResult[]> {
   const results: PaperResult[] = [];
-  
+
   try {
-    let url = 'https://api.openalex.org/works?per-page=20';
-    
+    // 每源请求量对齐 maxResults（跨源去重后还要截断，多要一点不亏）
+    const perPage = Math.min(Math.max(query.maxResults || 30, 20), 100);
+    let url = `https://api.openalex.org/works?per-page=${perPage}`;
+
     const filters: string[] = [];
-    
+
     const keywordQuery = buildKeywordQuery(query);
 
     if (keywordQuery) {
       url += `&search=${encodeURIComponent(keywordQuery)}`;
     }
-    
+
+    // OpenAlex 的 > / < 是严格不等：要包含边界年必须 ±1
+    //（此前 >2024 + <2026 把 2024 和 2026 都排掉了，只剩 2025）
     if (query.startYear) {
-      filters.push(`publication_year:>${query.startYear}`);
+      filters.push(`publication_year:>${query.startYear - 1}`);
     }
-    
+
     if (query.endYear) {
-      filters.push(`publication_year:<${query.endYear}`);
+      filters.push(`publication_year:<${query.endYear + 1}`);
     }
     
     if (query.venues && query.venues.length > 0) {
@@ -164,7 +168,15 @@ export async function searchArXiv(query: SearchQuery): Promise<PaperResult[]> {
     if (!searchQuery) {
       return results;
     }
-    
+
+    // 年份过滤：arXiv 用 submittedDate 范围子句（此前完全没实现，
+    // 导致 arXiv 结果无视年份筛选）。方括号需 URL 编码，空格用 +。
+    if (query.startYear || query.endYear) {
+      const start = query.startYear || 1991; // arXiv 创立年
+      const end = query.endYear || new Date().getFullYear();
+      searchQuery += `+AND+submittedDate:%5B${start}01010000+TO+${end}12312359%5D`;
+    }
+
     // arXiv 的 sortBy 仅支持 relevance / lastUpdatedDate / submittedDate；
     // sortOrder 只接受 ascending / descending（传 "desc" 会被 arXiv 直接 400）。
     const arxivSortBy = query.sortBy === 'year' ? 'submittedDate' : query.sortBy === 'relevance' ? 'relevance' : 'submittedDate';
@@ -271,11 +283,17 @@ export async function searchSemanticScholar(query: SearchQuery, apiKey?: string)
     const params = new URLSearchParams();
     params.set('query', buildKeywordQuery(query));
     params.set('limit', String(query.maxResults || 20));
-    
-    if (query.startYear) {
-      params.set('year', `>${query.startYear}`);
+    // 不带 fields 时 S2 只返回 paperId + title（摘要/引用数/年份全为空），必须显式声明
+    params.set(
+      'fields',
+      'title,abstract,year,venue,citationCount,openAccessPdf,authors',
+    );
+
+    // S2 原生支持闭区间范围语法："2024-2026" / "2024-" / "-2026"
+    if (query.startYear || query.endYear) {
+      params.set('year', `${query.startYear || ''}-${query.endYear || ''}`);
     }
-    
+
     const url = `https://api.semanticscholar.org/graph/v1/paper/search?${params.toString()}`;
     
     const response = await fetch(url, {
@@ -319,6 +337,64 @@ export interface SearchOutcome {
   failedSources: string[];
 }
 
+/** 跨源去重键：归一化标题（小写、去非字母数字）。作者名各源格式不一，不进键。 */
+export function normalizeTitleKey(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/**
+ * 跨源合并：同一篇论文在多个源出现时合并为一条（而非丢弃后到的），
+ * 保留先到源的身份字段，缺失字段从重复条目补齐——
+ * 典型收益：OpenAlex 提供引用数，arXiv 提供稳定 PDF 链接。
+ */
+export function mergeDuplicates(results: PaperResult[]): PaperResult[] {
+  const byKey = new Map<string, PaperResult>();
+  for (const paper of results) {
+    const key = normalizeTitleKey(paper.title);
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, { ...paper });
+      continue;
+    }
+    if (existing.citations == null && paper.citations != null) existing.citations = paper.citations;
+    if (!existing.pdfUrl && paper.pdfUrl) existing.pdfUrl = paper.pdfUrl;
+    if (!existing.venue && paper.venue) existing.venue = paper.venue;
+    if (!existing.abstract && paper.abstract) existing.abstract = paper.abstract;
+    if (!existing.year && paper.year) existing.year = paper.year;
+    if (existing.authors.length === 0 && paper.authors.length > 0) existing.authors = paper.authors;
+  }
+  return [...byKey.values()];
+}
+
+/**
+ * 综合排序 = 按源交错（round-robin）：各源内部保持上游自己的相关性顺序，
+ * 跨源轮流取，避免「有引用数的源整体压过没有引用数的源」。
+ */
+export function interleaveBySource(results: PaperResult[]): PaperResult[] {
+  const groups = new Map<string, PaperResult[]>();
+  for (const p of results) {
+    const g = groups.get(p.source);
+    if (g) g.push(p);
+    else groups.set(p.source, [p]);
+  }
+  const queues = [...groups.values()];
+  const out: PaperResult[] = [];
+  for (let i = 0; out.length < results.length; i++) {
+    for (const q of queues) {
+      if (i < q.length) out.push(q[i]);
+    }
+  }
+  return out;
+}
+
+/** 年份后置过滤：兜住上游忽略年份参数的情况；无年份字段的不误杀。 */
+export function withinYearRange(paper: PaperResult, query: SearchQuery): boolean {
+  if (!paper.year) return true;
+  if (query.startYear && paper.year < query.startYear) return false;
+  if (query.endYear && paper.year > query.endYear) return false;
+  return true;
+}
+
 const SOURCE_LABELS: Record<string, string> = {
   openalex: 'OpenAlex',
   arxiv: 'arXiv',
@@ -360,29 +436,29 @@ export async function searchPapers(
   });
 
   
-  const seen = new Set<string>();
-  const uniqueResults = allResults.filter(paper => {
-    const key = `${paper.title}-${paper.authors.join(',')}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  
-  const filteredResults = uniqueResults.filter((paper) => shouldKeepPaper(paper, query));
+  // 跨源合并（同篇互补字段）→ 必含/排除词 + 年份后置过滤 → 按模式排序
+  const merged = mergeDuplicates(allResults);
+  const filteredResults = merged.filter(
+    (paper) => shouldKeepPaper(paper, query) && withinYearRange(paper, query),
+  );
 
-  filteredResults.sort((a, b) => {
-    if (query.sortBy === 'year') {
-      return (b.year || 0) - (a.year || 0);
-    }
-    if (query.sortBy === 'citations' && b.citations && a.citations) {
-      return b.citations - a.citations;
-    }
-    if (b.citations && a.citations) return b.citations - a.citations;
-    if (b.year || a.year) return (b.year || 0) - (a.year || 0);
-    return 0;
-  });
-  
-  const finalResults = filteredResults.slice(0, query.maxResults || 50);
+  let sorted: PaperResult[];
+  if (query.sortBy === 'citations') {
+    // 被引降序；无引用数的排最后（而非被当作 0 混进去）
+    sorted = [...filteredResults].sort(
+      (a, b) => (b.citations ?? -1) - (a.citations ?? -1) || (b.year ?? 0) - (a.year ?? 0),
+    );
+  } else if (query.sortBy === 'year') {
+    sorted = [...filteredResults].sort(
+      (a, b) => (b.year ?? 0) - (a.year ?? 0) || (b.citations ?? -1) - (a.citations ?? -1),
+    );
+  } else {
+    // 综合：尊重各源自己的相关性排序，跨源交错（此前这里会按引用数
+    // 重排，导致没有引用数的 arXiv 整体沉底、相关性顺序被丢弃）
+    sorted = interleaveBySource(filteredResults);
+  }
+
+  const finalResults = sorted.slice(0, query.maxResults || 50);
 
   return { results: finalResults, failedSources };
 }

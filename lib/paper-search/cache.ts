@@ -17,6 +17,13 @@ import type { SearchQuery, PaperResult } from './types';
 export const CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
+ * 「部分源失败」的降级有效期：10 分钟。
+ * 残缺结果只短暂缓存，上游恢复后很快能拿到完整结果，
+ * 避免一次 arXiv 抽风把"只有 OpenAlex"的快照钉死 14 天。
+ */
+export const DEGRADED_TTL_MS = 10 * 60 * 1000;
+
+/**
  * 由「查询 + 检索源」算出稳定的缓存键。
  * 归一化要点：去掉随次数变化的字段（maxResults 不进 key，键稳定才能跨不同条数命中）、
  * 字符串去首尾空白并小写、source 排序，保证「同义查询同键」。
@@ -97,13 +104,15 @@ export async function putCached(
   if (!db) return;
   // 上游整体失败（0 结果且有失败源）不缓存，避免把"空"钉死 14 天
   if (results.length === 0 && failedSources.length > 0) return;
+  // 部分源失败：结果残缺，只缓存 10 分钟；全源成功才缓存 14 天
+  const ttl = failedSources.length > 0 ? DEGRADED_TTL_MS : CACHE_TTL_MS;
   try {
     const row: Partial<CacheRow> = {
       query_hash: key,
       label,
       results,
       failed_sources: failedSources,
-      expires_at: new Date(Date.now() + CACHE_TTL_MS).toISOString(),
+      expires_at: new Date(Date.now() + ttl).toISOString(),
     };
     await db.from('search_cache').upsert(row, { onConflict: 'query_hash' });
   } catch {
