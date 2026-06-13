@@ -148,11 +148,11 @@ export default function PDFViewerDynamic({
   }
 
   return (
-    <div 
+    <div
       ref={pdfContainerRef}
-      className="w-full h-full flex items-start justify-center overflow-auto"
+      className="w-full h-full flex items-start justify-center overflow-auto p-6"
     >
-      <div className="relative pdf-reading-page max-w-full">
+      <div className="relative pdf-reading-page">
         <Document
           file={file}
           onLoadSuccess={handleLoadSuccess}
@@ -184,7 +184,7 @@ export default function PDFViewerDynamic({
           <Page
             pageNumber={currentPage}
             scale={scale}
-            className="shadow-xl rounded-lg"
+            className="rounded-lg overflow-hidden"
             loading={
               <div className="min-h-[600px] bg-paper-2/60 rounded-lg flex items-center justify-center w-full">
                 <div className="w-8 h-8 border-2 border-coral border-t-transparent rounded-full animate-spin" />
@@ -226,29 +226,26 @@ export default function PDFViewerDynamic({
           }
 
           .pdf-reading-page .react-pdf__Page {
-            display: flex;
-            justify-content: center;
+            /* 关键：让画布与文字层保持同一坐标系。
+               不要用 max-width/height:auto 去 CSS 缩放 canvas——
+               文字层是按 --scale-factor 绝对定位的，CSS 单独缩放 canvas
+               会让两者错位，选中时高亮与字形分离，看上去就是“重影”。
+               缩放统一交给 react-pdf 的 scale 参数完成。 */
+            position: relative;
           }
 
-          .pdf-reading-page .react-pdf__Page canvas {
-            max-width: 100%;
-            height: auto;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+          .pdf-reading-page .react-pdf__Page__canvas {
+            box-shadow: 0 8px 30px -8px rgba(26, 23, 19, 0.28);
             border-radius: 0.5rem;
           }
 
-          .pdf-reading-page .react-pdf__Page__textContent {
-            mix-blend-mode: normal;
-            text-shadow: none !important;
-          }
-
+          /* 文字层只用于选区，保持透明并与字形 1:1 对齐 */
           .pdf-reading-page .react-pdf__Page__textContent span {
-            color: transparent !important;
             text-shadow: none !important;
           }
 
           .pdf-reading-page .react-pdf__Page__textContent ::selection {
-            background: rgba(246, 194, 90, 0.32);
+            background: rgba(246, 194, 90, 0.4);
           }
 
           .pdf-reading-page .react-pdf__Page__annotationLayer {

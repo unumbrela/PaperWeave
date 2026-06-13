@@ -357,24 +357,53 @@ export default function Sidebar({
     );
   };
 
+  const activeTabMeta = tabs.find((t) => t.id === activeTab);
+  const tabCount = (id: TabType): number | null => {
+    if (id === 'all') return annotations.length;
+    if (id === 'ai' || id === 'notes') return null;
+    return annotations.filter((a) => a.type === id).length;
+  };
+
   return (
     <div className="w-80 h-full flex flex-col bg-paper/80 backdrop-blur-sm border-l border-line">
-      <div className="flex border-b border-line">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 flex flex-col items-center gap-1.5 py-3 px-2 transition-all duration-200 ${
-              activeTab === tab.id
-                ? 'text-ink border-b-2 border-coral bg-paper-2/60'
-                : 'text-ink-3 hover:text-ink hover:bg-paper-2/50'
-            }`}
-          >
-            <tab.icon className="w-5 h-5" />
-            <span className="text-xs">{tab.label}</span>
-          </button>
-        ))}
+      {/* 紧凑图标 Tab 行：7 个全部铺满一行，不再挤压换行 */}
+      <div className="flex items-stretch border-b border-line px-1.5 pt-1.5">
+        {tabs.map((tab) => {
+          const count = tabCount(tab.id);
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              title={tab.label}
+              aria-label={tab.label}
+              className={`relative flex-1 flex items-center justify-center py-2.5 rounded-t-lg transition-all duration-200 ${
+                isActive
+                  ? 'text-ink bg-paper-2/70'
+                  : 'text-ink-3 hover:text-ink hover:bg-paper-2/40'
+              }`}
+            >
+              <tab.icon className="w-[18px] h-[18px]" />
+              {count ? (
+                <span className="ml-1 text-[10px] font-medium tabular-nums text-ink-3">
+                  {count}
+                </span>
+              ) : null}
+              {isActive && (
+                <span className="absolute bottom-0 left-1.5 right-1.5 h-0.5 rounded-full bg-coral" />
+              )}
+            </button>
+          );
+        })}
       </div>
+
+      {/* 当前 Tab 名称条：图标已足够紧凑，这里补回完整标签，保证功能可读 */}
+      {activeTabMeta && (
+        <div className="px-4 py-2 border-b border-line/60 flex items-center gap-2">
+          <activeTabMeta.icon className="w-4 h-4 text-coral" />
+          <span className="text-sm font-medium text-ink">{activeTabMeta.label}</span>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {activeTab === 'ai' ? (

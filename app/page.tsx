@@ -1,10 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState, type CSSProperties } from "react";
 import { Search } from "lucide-react";
 import { ToolCard } from "@/components/tool-card";
+import { Reveal } from "@/components/reveal";
 import { PHASES, TOOLS, WORKFLOW_PHASES, type Phase } from "@/lib/tools-registry";
 import { cn } from "@/lib/utils";
+
+/** Hero 大标题逐词上浮（reveal-word 遮罩 + word-rise），重点词用流动渐变。 */
+const HEADLINE: Array<{ word: string; flow?: boolean; lineBreak?: boolean }> = [
+  { word: "From" },
+  { word: "papers,", flow: true },
+  { word: "to", lineBreak: true },
+  { word: "polished" },
+  { word: "stories.", flow: true },
+];
 
 function formatDisplayDate(date: Date) {
   const parts = new Intl.DateTimeFormat("zh-CN", {
@@ -49,34 +59,35 @@ export default function Home() {
       <section className="relative">
         <div className="mx-auto max-w-6xl px-6 pt-20 sm:pt-28 pb-16">
           {/* Top meta row */}
-          <div
-            className="rise-d flex items-center justify-between"
-            style={{ animationDelay: "40ms" }}
-          >
+          <Reveal className="flex items-center justify-between">
             <div className="overline flex items-center gap-2">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-coral" />
               Research Workflow · Vol. 01
             </div>
             <div className="hidden sm:block overline">{currentDate}</div>
-          </div>
+          </Reveal>
 
           <div className="mt-10 grid grid-cols-12 gap-6 items-end">
             {/* Headline — one language, one face (Fraunces italic with its
-                SOFT axis at 100). No mixed English/Chinese typography. */}
-            <h1
-              className="rise display-italic col-span-12 lg:col-span-9 leading-[0.88] text-[64px] sm:text-[100px] lg:text-[132px] text-ink font-normal"
-              style={{ animationDelay: "120ms" }}
-            >
-              From <span>papers</span>,
-              <br />
-              to polished <span>stories</span>.
+                SOFT axis at 100). Words rise out of a mask, accent words flow. */}
+            <h1 className="display-italic col-span-12 lg:col-span-9 leading-[0.88] text-[64px] sm:text-[100px] lg:text-[132px] text-ink font-normal">
+              {HEADLINE.map((w, i) => (
+                <Fragment key={w.word + i}>
+                  {w.lineBreak && <br />}
+                  <span className="reveal-word">
+                    <span
+                      className={w.flow ? "text-flow" : undefined}
+                      style={{ "--wd": `${140 + i * 95}ms` } as CSSProperties}
+                    >
+                      {w.word}
+                    </span>
+                  </span>{" "}
+                </Fragment>
+              ))}
             </h1>
 
             {/* Right pull */}
-            <div
-              className="rise col-span-12 lg:col-span-3 lg:pb-4"
-              style={{ animationDelay: "260ms" }}
-            >
+            <Reveal delay={260} className="col-span-12 lg:col-span-3 lg:pb-4">
               <div className="hairline mb-4" />
               <p className="text-[13px] leading-relaxed text-ink-2 max-w-xs">
                 这里是 <span className="serif-italic text-ink">PaperWeave</span>
@@ -84,7 +95,7 @@ export default function Home() {
                 <span className="serif-italic text-ink">idea</span>
                 、做验证、讲结果——每一步都有工具，串成一条完整的研究工作流。不替你写论文，只让每一步都顺起来。
               </p>
-            </div>
+            </Reveal>
           </div>
         </div>
 
@@ -95,21 +106,18 @@ export default function Home() {
 
       {/* WORKFLOW STRIP */}
       <section className="mx-auto w-full max-w-6xl px-6 pt-12">
-        <div
-          className="rise-d flex items-baseline justify-between mb-6"
-          style={{ animationDelay: "380ms" }}
-        >
+        <Reveal className="flex items-baseline justify-between mb-6">
           <h2 className="serif text-[22px] sm:text-[26px] tracking-tight text-ink">
             <span className="serif-italic text-ink-2">The</span> Workflow
           </h2>
           <span className="overline text-ink-3">
             7 phases · woven end to end
           </span>
-        </div>
+        </Reveal>
 
-        <div
-          className="rise-d grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2"
-          style={{ animationDelay: "480ms" }}
+        <Reveal
+          delay={80}
+          className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2"
         >
           {WORKFLOW_PHASES.map((phase, i) => {
             const active = selected === phase;
@@ -141,15 +149,12 @@ export default function Home() {
               </button>
             );
           })}
-        </div>
+        </Reveal>
       </section>
 
       {/* SEARCH + FILTER */}
       <section className="mx-auto w-full max-w-6xl px-6 pt-12">
-        <div
-          className="rise-d grid grid-cols-12 gap-6 items-center"
-          style={{ animationDelay: "560ms" }}
-        >
+        <Reveal className="grid grid-cols-12 gap-6 items-center">
           <div className="col-span-12 lg:col-span-7">
             <label className="relative block">
               <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-3" />
@@ -189,12 +194,12 @@ export default function Home() {
               ))}
             </div>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       {/* TOOLS */}
       <section className="mx-auto w-full max-w-6xl px-6 pt-12 pb-24">
-        <div className="flex items-baseline justify-between mb-8">
+        <Reveal className="flex items-baseline justify-between mb-8">
           <h2 className="serif text-[28px] sm:text-[34px] tracking-tight text-ink">
             <span className="serif-italic text-ink-2">The</span> Collection
           </h2>
@@ -202,7 +207,7 @@ export default function Home() {
             {String(filtered.length).padStart(2, "0")} /{" "}
             {String(TOOLS.length).padStart(2, "0")}
           </span>
-        </div>
+        </Reveal>
 
         {filtered.length === 0 ? (
           <div className="surface rounded-2xl p-12 text-center">
