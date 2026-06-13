@@ -69,94 +69,154 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* ================= MESH BACKGROUND ================= */
-.mesh-bg {
+/* ================= LOOM BACKGROUND ================= */
+/* PaperWeave's namesake made literal: a fixed vertical "warp" crossed by
+   drifting, undulating horizontal "weft" threads, over a muted warm dye-wash.
+   All motion is transform-only (compositor-friendly); the cursor shifts the
+   field (parallax) and trails a warm bloom. */
+.loom {
   position: fixed;
   inset: 0;
   z-index: 0;
   overflow: hidden;
-  background: var(--paper);
   pointer-events: none;
+  /* pointer position, normalized 0–1 (written by MeshBackground via rAF) */
+  --mx: 0.5;
+  --my: 0.5;
+  background:
+    /* the warp: fixed, faint vertical threads of the loom */
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 43px,
+      rgba(26, 23, 19, 0.035) 43px 44px
+    ),
+    /* warm paper grounding wash */
+    radial-gradient(
+      140% 120% at 50% -10%,
+      #fbf7ee 0%,
+      var(--paper) 55%,
+      #efe7d8 100%
+    );
 }
 
-.mesh-blob {
+/* Soft edge vignette for depth. */
+.loom::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 100% at 50% 42%,
+    transparent 56%,
+    rgba(26, 23, 19, 0.07) 100%
+  );
+}
+
+/* Dye-wash: muted color clouds drifting behind the weave, plus cursor
+   parallax so the color shifts gently with the pointer. */
+.loom-dye {
+  position: absolute;
+  inset: 0;
+  transform: translate3d(
+    calc((var(--mx) - 0.5) * -40px),
+    calc((var(--my) - 0.5) * -40px),
+    0
+  );
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+.loom-blob {
   position: absolute;
   border-radius: 9999px;
-  filter: blur(110px);
-  will-change: transform, opacity;
+  filter: blur(120px);
   mix-blend-mode: multiply;
+  will-change: transform;
+}
+.loom-blob.d1 {
+  width: 66vw;
+  height: 66vw;
+  top: -20vw;
+  left: -14vw;
+  background: radial-gradient(closest-side, #ffc4ab 0%, transparent 72%);
+  opacity: 0.6;
+  animation: drift-a 26s ease-in-out infinite alternate;
+}
+.loom-blob.d2 {
+  width: 58vw;
+  height: 58vw;
+  top: -10vw;
+  right: -16vw;
+  background: radial-gradient(closest-side, #ffe1a6 0%, transparent 72%);
+  opacity: 0.5;
+  animation: drift-b 32s ease-in-out infinite alternate;
+}
+.loom-blob.d3 {
+  width: 72vw;
+  height: 72vw;
+  bottom: -28vw;
+  left: 8vw;
+  background: radial-gradient(closest-side, #bfe0c4 0%, transparent 74%);
+  opacity: 0.42;
+  animation: drift-c 38s ease-in-out infinite alternate;
+}
+.loom-blob.d4 {
+  width: 46vw;
+  height: 46vw;
+  bottom: -12vw;
+  right: -10vw;
+  background: radial-gradient(closest-side, #c7b4ff 0%, transparent 72%);
+  opacity: 0.32;
+  animation: drift-b 30s ease-in-out infinite alternate-reverse;
 }
 
-.mesh-blob.b1 {
-  width: 62vw;
-  height: 62vw;
-  top: -18vw;
-  left: -12vw;
-  background: radial-gradient(closest-side, #ffb4a2 0%, transparent 72%);
-  animation: drift-a 6s ease-in-out infinite alternate;
-  opacity: 0.85;
+/* Weft: a canvas flow-field of luminous threads streaming along a slowly
+   morphing vector field, swirling where the cursor passes. Drawn additively
+   over the warp + dye so crossings bloom. (See components/mesh-background.tsx) */
+.loom-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
 }
-.mesh-blob.b2 {
-  width: 55vw;
-  height: 55vw;
-  top: -14vw;
-  right: -10vw;
-  background: radial-gradient(closest-side, #c7b4ff 0%, transparent 70%);
-  animation: drift-b 7s ease-in-out infinite alternate;
-  opacity: 0.8;
-}
-.mesh-blob.b3 {
-  width: 70vw;
-  height: 70vw;
-  bottom: -24vw;
-  left: 6vw;
-  background: radial-gradient(closest-side, #ffe0a3 0%, transparent 72%);
-  animation: drift-c 8s ease-in-out infinite alternate;
-  opacity: 0.7;
-}
-.mesh-blob.b4 {
-  width: 48vw;
-  height: 48vw;
-  bottom: -10vw;
-  right: -8vw;
-  background: radial-gradient(closest-side, #a9d6ff 0%, transparent 70%);
-  animation: drift-d 6.5s ease-in-out infinite alternate;
-  opacity: 0.7;
-}
-.mesh-blob.b5 {
-  width: 38vw;
-  height: 38vw;
-  top: 34vh;
-  left: 28vw;
-  background: radial-gradient(closest-side, #ffc8d6 0%, transparent 70%);
-  animation: drift-e 5s ease-in-out infinite alternate;
-  opacity: 0.55;
+
+/* Warm bloom that tracks the cursor exactly (transform-only follow). */
+.loom-spot {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  --mx: 0.5;
+  --my: 0.5;
+  background: radial-gradient(
+    circle at center,
+    rgba(255, 138, 120, 0.18) 0%,
+    rgba(255, 198, 120, 0.08) 28%,
+    transparent 48%
+  );
+  mix-blend-mode: multiply;
+  transform: translate3d(
+    calc((var(--mx) - 0.5) * 100vw),
+    calc((var(--my) - 0.5) * 100vh),
+    0
+  );
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
 }
 
 @keyframes drift-a {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
-  50%  { transform: translate3d(16vw, 22vh, 0) scale(1.22); }
-  100% { transform: translate3d(-12vw, 13vh, 0) scale(0.86); }
+  50%  { transform: translate3d(10vw, 12vh, 0) scale(1.14); }
+  100% { transform: translate3d(-8vw, 7vh, 0) scale(0.9); }
 }
 @keyframes drift-b {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
-  50%  { transform: translate3d(-18vw, 15vh, 0) scale(1.18); }
-  100% { transform: translate3d(11vw, -13vh, 0) scale(0.84); }
+  50%  { transform: translate3d(-12vw, 9vh, 0) scale(1.12); }
+  100% { transform: translate3d(8vw, -8vh, 0) scale(0.9); }
 }
 @keyframes drift-c {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
-  50%  { transform: translate3d(15vw, -19vh, 0) scale(1.2); }
-  100% { transform: translate3d(-16vw, -12vh, 0) scale(0.86); }
-}
-@keyframes drift-d {
-  0%   { transform: translate3d(0, 0, 0) scale(1); }
-  50%  { transform: translate3d(-14vw, -16vh, 0) scale(1.24); }
-  100% { transform: translate3d(10vw, 13vh, 0) scale(0.82); }
-}
-@keyframes drift-e {
-  0%   { transform: translate3d(0, 0, 0) scale(1); }
-  50%  { transform: translate3d(14vw, -15vh, 0) scale(1.32); }
-  100% { transform: translate3d(-11vw, 12vh, 0) scale(0.74); }
+  50%  { transform: translate3d(11vw, -11vh, 0) scale(1.15); }
+  100% { transform: translate3d(-10vw, -7vh, 0) scale(0.88); }
 }
 
 /* Grain overlay (sits above mesh, below content) */
@@ -522,4 +582,165 @@ kbd {
   box-shadow:
     0 0 0 3px rgba(59, 110, 246, 0.25),
     0 0 0 1px rgba(59, 110, 246, 0.5);
+}
+
+/* ================= SCROLL REVEAL ================= */
+/* Paired with <Reveal>: hidden until `.is-revealed` is added on viewport entry. */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Revealed end-state is transform:none (not translateY(0)) so it leaves no
+   lingering containing block for position:fixed descendants (e.g. tool modals).
+   We deliberately omit will-change here for the same reason. */
+.reveal.is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+/* ================= FLOWING GRADIENT TEXT ================= */
+/* Warm→cool sweep that drifts across the glyphs. Colors are overridable via
+   --flow-a/-b/-c so tool headers can flow in their own accent. */
+.text-flow {
+  --flow-a: var(--coral);
+  --flow-b: var(--plum);
+  --flow-c: var(--ocean);
+  background-image: linear-gradient(
+    100deg,
+    var(--flow-a),
+    var(--flow-b),
+    var(--flow-c),
+    var(--flow-a)
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-flow 7s ease-in-out infinite;
+}
+@keyframes gradient-flow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* ================= WORD-BY-WORD HEADLINE REVEAL ================= */
+/* Each word sits in an overflow-hidden mask; the inner span rises into view.
+   The padding/margin pair keeps descenders (p, g, y) from being clipped. */
+.reveal-word {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  padding-bottom: 0.14em;
+  margin-bottom: -0.14em;
+}
+.reveal-word > span {
+  display: inline-block;
+  transform: translateY(115%);
+  animation: word-rise 0.95s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--wd, 0ms);
+}
+@keyframes word-rise {
+  to { transform: translateY(0); }
+}
+
+/* ================= POINTER-TILT CARD ================= */
+/* JS writes --tilt-x/-y/-lift and --glow-x/-y/-o on pointermove; the entrance
+   animation lives on the OUTER element so it never fights this transform. */
+.tilt {
+  --tilt-x: 0deg;
+  --tilt-y: 0deg;
+  --tilt-lift: 0px;
+  --glow-x: 50%;
+  --glow-y: 0%;
+  --glow-o: 0;
+  transform: perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y))
+    translate3d(0, var(--tilt-lift), 0);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Override the plain card-glass hover lift so tilt stays in control. */
+.tilt.card-glass:hover {
+  transform: perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y))
+    translate3d(0, var(--tilt-lift), 0);
+}
+.tilt::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at var(--glow-x) var(--glow-y),
+    rgba(255, 255, 255, 0.55) 0%,
+    transparent 42%
+  );
+  opacity: var(--glow-o);
+  transition: opacity 0.3s ease;
+  mix-blend-mode: screen;
+  z-index: 2;
+}
+
+/* ================= NAV LINK UNDERLINE ================= */
+.nav-link {
+  position: relative;
+}
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -5px;
+  height: 1.5px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--coral), var(--plum), var(--ocean));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nav-link:hover::after,
+.nav-link[data-active="true"]::after {
+  transform: scaleX(1);
+}
+
+/* ================= MISC MOTION ================= */
+@keyframes logo-spin {
+  to { transform: rotate(360deg); }
+}
+.logo-dot-spin {
+  animation: logo-spin 16s linear infinite;
+}
+
+/* Shimmering hairline (footer top edge). */
+.shimmer-line {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--line) 20%,
+    rgba(136, 84, 208, 0.35) 50%,
+    var(--line) 80%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 8s linear infinite;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The loom keeps a gentle ambient drift (dye clouds + a calm thread field
+     driven from JS); we only disable the cursor-driven parallax/bloom here. */
+  .loom-dye,
+  .loom-spot { transform: none; transition: none; }
+  .text-flow { animation: none; }
+  .reveal-word > span { animation: none; transform: none; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .logo-dot-spin,
+  .shimmer-line { animation: none; }
+  .tilt { transform: none !important; }
+  .tilt::after { display: none; }
 }

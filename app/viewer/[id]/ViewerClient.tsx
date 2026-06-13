@@ -344,7 +344,7 @@ export default function ViewerClient() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-paper">
+      <div className="h-dvh flex items-center justify-center bg-paper">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-coral border-t-transparent rounded-full animate-spin mx-auto mb-3" />
           <p className="text-ink-3">正在加载论文…</p>
@@ -355,7 +355,7 @@ export default function ViewerClient() {
 
   if (!paper) {
     return (
-      <div className="h-screen flex items-center justify-center bg-paper">
+      <div className="h-dvh flex items-center justify-center bg-paper">
         <div className="text-center">
           <p className="text-ink-3 mb-4">{error || '论文不存在'}</p>
           <button
@@ -370,7 +370,7 @@ export default function ViewerClient() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-paper">
+    <div className="h-dvh flex flex-col bg-paper">
       <ViewerHeader
         title={paper.title}
         sourceUrl={paper.sourceUrl}
