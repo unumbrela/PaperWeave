@@ -38,10 +38,16 @@ Supabase 控制台 → **Authentication → Providers / Sign In**：
 - Supabase → **Authentication → Providers → Phone** 开启，并接一个 SMS 服务商（Twilio / MessageBird / Vonage 等，**需要它们的账号和费用**）。
 - 没接 SMS 时，登录框里的「手机号」方式会报错——这是正常的，邮箱 / Google 不受影响。
 
-### 回跳地址白名单（重要）
+### 回跳地址白名单（**最重要——邮件确认打不开多半是这里**）
 Supabase → **Authentication → URL Configuration**：
 - **Site URL** 填 `https://www.z1ha0.com`
+  > ⚠️ 若这里仍是默认的 `http://localhost:3000`，则**所有**注册确认 / 魔法链接邮件都会回跳到
+  > localhost——线上点开就是「无法访问 / 连接被拒」。务必改成生产域名。
 - **Redirect URLs** 加上 `https://www.z1ha0.com/**`（以及本地开发 `http://localhost:3000/**`，和 Vercel 预览域名 `https://*.vercel.app/**`）
+  > Supabase 只有当代码传的 `emailRedirectTo` 命中此白名单时才采用它，否则回退到 Site URL。
+
+> 回跳现统一落到 `/auth/callback`（代码里 `emailRedirectTo` / OAuth `redirectTo` 已指向它），
+> 该页负责解析会话、给出「确认成功 / 失败」反馈后跳首页；白名单按 `/**` 通配即可覆盖。
 
 ## 4. 在 Vercel 配环境变量（1 分钟）
 
