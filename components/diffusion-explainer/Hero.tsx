@@ -4,7 +4,7 @@ export function Hero() {
   return (
     <div className="text-center mb-8">
       <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-sm mb-4">
-        <span className="serif-italic">讲结果</span>
+        <span className="serif-italic">可视化展厅</span>
         <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
       </div>
       <h1 className="serif text-3xl md:text-4xl font-medium text-ink tracking-tight">

@@ -48,12 +48,12 @@ test("首页 → 检索 → 入库 → 论文库", async ({ page }) => {
 
   // 2) 进入论文检索工具
   await page.goto("/tools/paper-search");
-  const keyword = page.getByPlaceholder("输入关键词或短语（支持中英文混合）");
+  const keyword = page.getByPlaceholder("关键词、方法名或数据集 — 例如 mamba medical segmentation");
   await expect(keyword).toBeVisible();
   await keyword.fill("diffusion segmentation");
 
   // 3) 触发检索，结果卡片出现（来自 fixture）
-  await page.getByRole("button", { name: "开始搜索" }).click();
+  await page.getByRole("button", { name: "检索", exact: true }).click();
   await expect(page.getByText(FIXTURE_TITLE)).toBeVisible({ timeout: 15_000 });
 
   // 4) 入库（写入 Dexie）—— 单条结果，直接点页面上唯一的「导入库」

@@ -4,7 +4,13 @@ import { Fragment, useMemo, useState, type CSSProperties } from "react";
 import { Search } from "lucide-react";
 import { ToolCard } from "@/components/tool-card";
 import { Reveal } from "@/components/reveal";
-import { PHASES, TOOLS, WORKFLOW_PHASES, type Phase } from "@/lib/tools-registry";
+import {
+  PHASES,
+  WORKFLOW_PHASES,
+  getWorkflowTools,
+  getGalleryTools,
+  type Phase,
+} from "@/lib/tools-registry";
 import { cn } from "@/lib/utils";
 
 /** Hero 大标题逐词上浮（reveal-word 遮罩 + word-rise），重点词用流动渐变。 */
@@ -40,18 +46,32 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const currentDate = formatDisplayDate(new Date());
 
+  const workflowTools = useMemo(() => getWorkflowTools(), []);
+  const galleryTools = useMemo(() => getGalleryTools(), []);
+
+  const matchesQuery = (
+    t: { name: string; description: string; phases: Phase[] },
+    q: string,
+  ) =>
+    !q ||
+    t.name.toLowerCase().includes(q) ||
+    t.description.toLowerCase().includes(q) ||
+    t.phases.some((p) => p.toLowerCase().includes(q));
+
+  // 工作流网格：按 5 环阶段 + 关键词过滤。
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return TOOLS.filter((t) => {
+    return workflowTools.filter((t) => {
       if (selected !== "全部" && !t.phases.includes(selected)) return false;
-      if (!q) return true;
-      return (
-        t.name.toLowerCase().includes(q) ||
-        t.description.toLowerCase().includes(q) ||
-        t.phases.some((p) => p.toLowerCase().includes(q))
-      );
+      return matchesQuery(t, q);
     });
-  }, [selected, query]);
+  }, [selected, query, workflowTools]);
+
+  // 展厅：独立于工作流阶段，仅按关键词过滤。
+  const filteredGallery = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return galleryTools.filter((t) => matchesQuery(t, q));
+  }, [query, galleryTools]);
 
   return (
     <>
@@ -91,9 +111,9 @@ export default function Home() {
               <div className="hairline mb-4" />
               <p className="text-[13px] leading-relaxed text-ink-2 max-w-xs">
                 这里是 <span className="serif-italic text-ink">PaperWeave</span>
-                ，一个研究型论文助手。查文献、生{" "}
+                ，一个本地优先的论文工作台。查文献、生{" "}
                 <span className="serif-italic text-ink">idea</span>
-                、做验证、讲结果——每一步都有工具，串成一条完整的研究工作流。不替你写论文，只让每一步都顺起来。
+                、做验证、出图——5 环串成一条打通的工作流，上游产出即下游输入。不替你写论文，只让每一步都顺起来；另设可视化展厅放交互式教学演示。
               </p>
             </Reveal>
           </div>
@@ -111,13 +131,13 @@ export default function Home() {
             <span className="serif-italic text-ink-2">The</span> Workflow
           </h2>
           <span className="overline text-ink-3">
-            7 phases · woven end to end
+            5 phases · woven end to end
           </span>
         </Reveal>
 
         <Reveal
           delay={80}
-          className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2"
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2"
         >
           {WORKFLOW_PHASES.map((phase, i) => {
             const active = selected === phase;
@@ -205,7 +225,7 @@ export default function Home() {
           </h2>
           <span className="overline">
             {String(filtered.length).padStart(2, "0")} /{" "}
-            {String(TOOLS.length).padStart(2, "0")}
+            {String(workflowTools.length).padStart(2, "0")}
           </span>
         </Reveal>
 
@@ -224,6 +244,30 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {/* GALLERY — 交互式教学演示，独立于工作流 */}
+      {filteredGallery.length > 0 && (
+        <section className="mx-auto w-full max-w-6xl px-6 pb-24">
+          <div className="hairline mb-12" />
+          <Reveal className="flex items-baseline justify-between mb-3">
+            <h2 className="serif text-[28px] sm:text-[34px] tracking-tight text-ink">
+              <span className="serif-italic text-ink-2">The</span> Gallery
+            </h2>
+            <span className="overline">可视化展厅</span>
+          </Reveal>
+          <Reveal delay={60}>
+            <p className="text-[13px] leading-relaxed text-ink-2 max-w-xl mb-8">
+              交互式教学演示——经典模型在浏览器里真实推理 /
+              回放，以及科研项目叙事页。它们独立于上面的工作流，不入论文库、不参与一键流转，纯粹用来「看懂」与「讲清」。
+            </p>
+          </Reveal>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filteredGallery.map((tool, i) => (
+              <ToolCard key={tool.slug} tool={tool} index={i + 1} />
+            ))}
+          </div>
+        </section>
+      )}
     </>
   );
 }

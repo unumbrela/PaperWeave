@@ -28,8 +28,8 @@ export default function OpengraphImage() {
           研究型论文助手
         </div>
         <div style={{ fontSize: 32, marginTop: 28, color: "#5c554c", maxWidth: 900, lineHeight: 1.4 }}>
-          把查文献 · 读文献 · 生 idea · 做验证 · 论文绘图 · 讲结果 · 可视化表达
-          串成一条研究工作流
+          把查文献 · 读文献 · 生 idea · 做验证 · 论文绘图
+          串成一条打通的研究工作流
         </div>
         <div style={{ display: "flex", marginTop: 40, gap: 16 }}>
           {["检索", "PDF 批注", "引用网络", "语义检索", "统计看板"].map((t) => (

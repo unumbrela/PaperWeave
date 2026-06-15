@@ -32,7 +32,9 @@ const MAX_TILT = 7; // degrees
 
 export function ToolCard({ tool, index }: { tool: Tool; index: number }) {
   const accent = ACCENTS[tool.slug] ?? "#8854d0";
-  const primaryPhase = tool.phases[0];
+  // 展厅工具不属于任何工作流阶段，眉标用统一的「展厅」标签。
+  const primaryPhase =
+    tool.phases[0] ?? (tool.track === "gallery" ? "展厅" : "");
   // Stagger: cards emerge in reading order (left→right, then top→bottom).
   // A longer 160ms step lets each card fully take its place before the next
   // starts growing in, so the "small → large" scale reads clearly.

@@ -1,17 +1,22 @@
+// 工作流主线 5 环。讲结果 / 可视化表达 已从工作流剥离，迁入「可视化展厅」（track: "gallery"）。
 export type Phase =
   | "查论文"
   | "读文献"
   | "生 idea"
   | "做验证"
-  | "论文绘图"
-  | "讲结果"
-  | "可视化表达";
+  | "论文绘图";
+
+// workflow：挂在 5 环主线、参与一键流转闭环的工具。
+// gallery：交互式教学演示（模型可视化 / 科研叙事），独立于工作流，不参与阶段过滤与 handoff。
+export type Track = "workflow" | "gallery";
 
 export type Tool = {
   slug: string;
   name: string;
   description: string;
+  /** workflow 工具挂在 5 环主线；gallery 工具不属于任何工作流阶段（phases 为空）。 */
   phases: Phase[];
+  track: Track;
   icon: string;
   gradient: string;
   href: string;
@@ -26,6 +31,7 @@ export const TOOLS: Tool[] = [
     description:
       "从关键词或领域出发，调 arXiv 拉候选论文，整理成可继续处理的论文库。预设关键词包 + 自定义领域。",
     phases: ["查论文"],
+    track: "workflow",
     icon: "🔎",
     gradient: "from-[#ff4f8b] to-[#b14bff]",
     href: "/tools/paper-search",
@@ -35,7 +41,8 @@ export const TOOLS: Tool[] = [
     name: "引用网络图谱",
     description:
       "输入一篇论文（OpenAlex），用 D3 力导向图展开它的引用网络：参考文献 + 被引文献一张图，圆越大被引越多。从检索结果一键直达。",
-    phases: ["查论文", "可视化表达"],
+    phases: ["查论文"],
+    track: "workflow",
     icon: "🕸️",
     gradient: "from-[#b14bff] to-[#4bb3ff]",
     href: "/tools/citation-graph",
@@ -45,7 +52,8 @@ export const TOOLS: Tool[] = [
     name: "研究方向发展族谱",
     description:
       "图谱看单篇，族谱看方向：配套 Claude Code skill 深度调研一个方向的发展脉络（奠基 → 路线分叉 → 前沿，引文边均经核验），产出的 lineage.json 在本页渲染成可点击的族谱树。",
-    phases: ["查论文", "可视化表达"],
+    phases: ["查论文"],
+    track: "workflow",
     icon: "🌳",
     gradient: "from-[#2e9e6b] to-[#b14bff]",
     href: "/tools/research-genealogy",
@@ -57,6 +65,7 @@ export const TOOLS: Tool[] = [
     name: "文献网页速读器",
     description: "粘贴 URL，拿到 30 秒能读完的结构化要点与关键引述。",
     phases: ["读文献"],
+    track: "workflow",
     icon: "📰",
     gradient: "from-[#ff4f8b] to-[#b14bff]",
     href: "/tools/summarize",
@@ -67,6 +76,7 @@ export const TOOLS: Tool[] = [
     description:
       "拖拽批量上传 Word/PDF/HTML/TXT，本地解析输出带 LaTeX 公式与表格的干净 Markdown。",
     phases: ["读文献"],
+    track: "workflow",
     icon: "📄",
     gradient: "from-[#4bb3ff] to-[#b14bff]",
     href: "/tools/markdown-convert",
@@ -77,6 +87,7 @@ export const TOOLS: Tool[] = [
     description:
       "输入一篇论文的 Markdown，结构化提取关键点、方法、实验设置、引文，便于后续串联与对比。",
     phases: ["读文献"],
+    track: "workflow",
     icon: "📚",
     gradient: "from-[#6b8ed6] to-[#4bb3ff]",
     href: "/tools/markdown-summarize",
@@ -87,6 +98,7 @@ export const TOOLS: Tool[] = [
     description:
       "从论文库勾选 2-6 篇，AI 生成「研究问题/方法/数据集/指标/创新点/局限」横向对比矩阵，一键导出 Markdown，综述写作刚需。",
     phases: ["读文献"],
+    track: "workflow",
     icon: "📊",
     gradient: "from-[#4bb3ff] to-[#6b8ed6]",
     href: "/tools/paper-compare",
@@ -97,6 +109,7 @@ export const TOOLS: Tool[] = [
     description:
       "对入库论文建语义索引，用自然语言提问（embedding 检索 + LLM 归纳），返回带引用、可溯源到具体论文的答案。无 embedding key 时自动降级本地关键词检索。",
     phases: ["读文献"],
+    track: "workflow",
     icon: "💬",
     gradient: "from-[#b14bff] to-[#6b8ed6]",
     href: "/tools/library-qa",
@@ -109,6 +122,7 @@ export const TOOLS: Tool[] = [
     description:
       "基于参考论文与可用资源，输出有差异化假设、最小验证实验、风险清单的研究 idea。",
     phases: ["生 idea"],
+    track: "workflow",
     icon: "💡",
     gradient: "from-[#f59e0b] to-[#ec4899]",
     href: "/tools/idea-generator",
@@ -121,6 +135,7 @@ export const TOOLS: Tool[] = [
     description:
       "把一个模糊的研究想法拆成原子子问题 + 验收清单 + 可直接执行的 Runbook。小模型也能稳跑。",
     phases: ["做验证"],
+    track: "workflow",
     icon: "🧩",
     gradient: "from-[#f59e0b] to-[#ec4899]",
     href: "/tools/prompt-chunker",
@@ -131,6 +146,7 @@ export const TOOLS: Tool[] = [
     description:
       "描述需求，产出可直接落地到 ~/.claude/skills 的 SKILL.md。也可用来封装论文绘图流程。",
     phases: ["做验证", "论文绘图"],
+    track: "workflow",
     icon: "🧰",
     gradient: "from-[#ff4f8b] to-[#4b8bff]",
     href: "/tools/skill-maker",
@@ -143,18 +159,20 @@ export const TOOLS: Tool[] = [
     description:
       "描述想画的图（可附数据），生成可直接运行的出版级绘图代码：matplotlib / seaborn / plotly / TikZ，内置色盲友好配色、期刊单双栏尺寸与投稿自查清单。",
     phases: ["论文绘图"],
+    track: "workflow",
     icon: "📈",
     gradient: "from-[#10b981] to-[#4bb3ff]",
     href: "/tools/figure-generator",
   },
 
-  // ── 讲结果 ──────────────────────────────────────────────
+  // ── 可视化展厅（gallery）：交互式教学演示，独立于工作流 ──────
   {
     slug: "cnn-explainer",
     name: "经典模型 · CNN 端到端讲解",
     description:
       "交互式理解卷积神经网络：真实的 tiny-VGG 在浏览器里跑推理，一层层看 feature map 如何流动。",
-    phases: ["讲结果"],
+    phases: [],
+    track: "gallery",
     icon: "🧠",
     gradient: "from-[#f4c25a] to-[#3b6ef6]",
     href: "/tools/cnn-explainer",
@@ -164,7 +182,8 @@ export const TOOLS: Tool[] = [
     name: "经典模型 · 医学图像分割",
     description:
       "端到端剖析 FWMamba-UNet：从输入到 DWT 小波分解、编码器、EAFF-Skip、最终掩膜，真实中间层激活一次看清。",
-    phases: ["讲结果"],
+    phases: [],
+    track: "gallery",
     icon: "🩻",
     gradient: "from-[#6b8ed6] to-[#f4c25a]",
     href: "/tools/med-seg-explainer",
@@ -174,7 +193,8 @@ export const TOOLS: Tool[] = [
     name: "经典模型 · Transformer 可视化",
     description:
       "交互式理解 Transformer 架构：从输入嵌入、多头注意力机制、残差连接到输出，逐层解析注意力权重的变化。",
-    phases: ["讲结果"],
+    phases: [],
+    track: "gallery",
     icon: "🔗",
     gradient: "from-[#f4c25a] to-[#ec4899]",
     href: "/tools/transformer-explainer",
@@ -184,7 +204,8 @@ export const TOOLS: Tool[] = [
     name: "经典模型 · GAN 生成对抗网络",
     description:
       "端到端探索生成对抗网络：观察 Generator 与 Discriminator 的博弈过程，可视化中间特征图的演变。",
-    phases: ["讲结果"],
+    phases: [],
+    track: "gallery",
     icon: "⚔️",
     gradient: "from-[#10b981] to-[#f4c25a]",
     href: "/tools/gan-explainer",
@@ -194,19 +215,20 @@ export const TOOLS: Tool[] = [
     name: "经典模型 · 扩散模型",
     description:
       "直观理解扩散模型的去噪过程：从随机噪声开始，逐步观察每一步去噪后图像的变化，理解时间步的作用。",
-    phases: ["讲结果"],
+    phases: [],
+    track: "gallery",
     icon: "🌀",
     gradient: "from-[#8b5cf6] to-[#f4c25a]",
     href: "/tools/diffusion-explainer",
   },
 
-  // ── 可视化表达 ───────────────────────────────────────────
   {
     slug: "hpi-potsdam",
     name: "科研项目交互叙事 · iGEM",
     description:
       "HPI Potsdam 2025 iGEM BioComplete 主页：Three.js 3D 星图 + 三段式滚动叙事。附中文解读与迁移思路（物理位场 / 单细胞 embedding 等）。",
-    phases: ["可视化表达"],
+    phases: [],
+    track: "gallery",
     icon: "🧬",
     gradient: "from-[#4cc9f0] to-[#7c3aed]",
     href: "/tools/hpi-potsdam",
@@ -220,19 +242,15 @@ export const PHASES: ("全部" | Phase)[] = [
   "生 idea",
   "做验证",
   "论文绘图",
-  "讲结果",
-  "可视化表达",
 ];
 
-// 仅主线 7 环（不含「全部」）用于首页 Workflow 走廊
+// 仅主线 5 环（不含「全部」）用于首页 Workflow 走廊
 export const WORKFLOW_PHASES: Phase[] = [
   "查论文",
   "读文献",
   "生 idea",
   "做验证",
   "论文绘图",
-  "讲结果",
-  "可视化表达",
 ];
 
 export function getTool(slug: string): Tool | undefined {
@@ -241,4 +259,14 @@ export function getTool(slug: string): Tool | undefined {
 
 export function getToolsInPhase(phase: Phase): Tool[] {
   return TOOLS.filter((t) => t.phases.includes(phase));
+}
+
+// 工作流工具：挂在 5 环主线、参与一键流转闭环。
+export function getWorkflowTools(): Tool[] {
+  return TOOLS.filter((t) => t.track === "workflow");
+}
+
+// 展厅工具：交互式教学演示，独立于工作流。
+export function getGalleryTools(): Tool[] {
+  return TOOLS.filter((t) => t.track === "gallery");
 }
