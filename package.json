@@ -15,7 +15,6 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@ai-sdk/deepseek": "^2.0.29",
     "@google/generative-ai": "^0.24.1",
     "@opendocsg/pdf2md": "^0.2.6",
     "@react-three/drei": "^10.7.7",
@@ -23,7 +22,6 @@
     "@react-three/postprocessing": "^3.0.4",
     "@supabase/supabase-js": "^2.106.1",
     "@tensorflow/tfjs": "^4.22.0",
-    "ai": "^6.0.168",
     "cheerio": "^1.2.0",
     "clsx": "^2.1.1",
     "d3": "^7",

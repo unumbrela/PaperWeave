@@ -24,7 +24,7 @@ export function ToolShell({
   children: React.ReactNode;
 }) {
   const accent = ACCENTS[tool.slug] ?? "#8854d0";
-  const primaryPhase = tool.phases[0];
+  const primaryPhase = tool.phases[0] ?? "展厅";
   // Title flows in the tool's own accent → plum → back to accent.
   const flowStyle = {
     "--flow-a": accent,

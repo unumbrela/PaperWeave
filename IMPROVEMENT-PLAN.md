@@ -90,3 +90,28 @@
 | E2E 只有 happy-path | 工程 | ✅ 新增 `e2e/ai-tools.spec.ts`（流式渲染 / 零 key 提示 / 全源失败文案）+ `test/stream-chat.test.ts`（fallback 矩阵）+ 标题去重单测；单测 140→145 |
 
 备注：`ai` / `@ai-sdk/deepseek` 依赖在源码中已零引用，留待下次依赖清理时移除。
+
+---
+
+## 5. 第三轮（2026-06）：定位收口 —— 7 环 → 5 环 + 可视化展厅
+
+**问题**：对外叙事是「覆盖科研全流程的 7 环工作台」，但真正集成（接论文库 + 参与 handoff 闭环）的只有前 5 环
+`查论文 → 读文献 → 生 idea → 做验证 → 论文绘图`；后 2 环（`讲结果` 的 5 个模型 explainer + `可视化表达` 的 iGEM）
+是松散挂靠的教学演示，不入论文库、不参与一键流转。由此：(1)`讲结果` 语义错配（承诺「讲你的结果」却交付「讲经典模型」)；
+(2) 定位被稀释，淡化了真正卖点（论文库精读闭环）；(3) demo 被算进「核心工作流」抬高了「全流程」兑现门槛。
+
+**决策**：收紧到集成核心，把 explainer + iGEM 降级为独立「可视化展厅」，不再当工作流环节。
+
+| 项 | 动作 |
+| --- | --- |
+| 工作流环数 | ✅ 7 → 5：`Phase` 联合类型删除 `讲结果`/`可视化表达`；`PHASES`/`WORKFLOW_PHASES` 同步收为 5 环 |
+| 注册表区分 | ✅ `Tool` 新增 `track: "workflow" \| "gallery"`；新增 `getWorkflowTools()`/`getGalleryTools()` |
+| 5 个 explainer + iGEM | ✅ 标 `track: "gallery"`、`phases: []`，从工作流剥离为独立展厅（不删实现，保留 showcase 价值） |
+| citation-graph / research-genealogy | ✅ phases 去掉 `可视化表达`，收回为纯 `查论文` |
+| 首页 | ✅ 5 环走廊 + 工作流网格按 5 环过滤 + 新增「可视化展厅」分区（诚实标注教学演示）；hero 文案重写 |
+| 不变量单测 | ✅ workflow 工具 phases ⊆ 5 环；gallery 工具 phases 为空；两者完整划分 TOOLS |
+| 文案/SEO | ✅ `layout.tsx` 描述、`opengraph-image.tsx`、explainer Hero 眉标（`讲结果` → `可视化展厅`）同步 |
+| 依赖清理 | ✅ 移除零引用的 `ai` / `@ai-sdk/deepseek` |
+
+排期（本轮不做）：让 handoff 闭环在 UI 上显性化（5 环走廊连线 / 工具页「上游←本步→下游」位置条）；
+若要补回真正的「讲结果」语义环，应做「把**你的**实验产出整理成可讲的故事」而非经典模型 demo。

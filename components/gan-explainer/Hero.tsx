@@ -3,7 +3,7 @@ export function Hero() {
     <div className="text-center">
       <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 mb-6 bg-green-100 text-green-700 text-sm">
         <span className="w-2 h-2 rounded-full bg-green-500" />
-        讲结果
+        可视化展厅
       </div>
       <h1 className="serif text-3xl sm:text-4xl lg:text-5xl leading-tight tracking-tight text-ink">
         生成对抗网络 · GAN

@@ -7,6 +7,8 @@ import {
   WORKFLOW_PHASES,
   getTool,
   getToolsInPhase,
+  getWorkflowTools,
+  getGalleryTools,
 } from '@/lib/tools-registry';
 
 // 注册表是全站工具的「单一事实源」（README/PROJECT-SUMMARY），
@@ -29,17 +31,33 @@ describe('tools-registry 不变量', () => {
       expect(t.icon, `icon of ${t.slug}`).toBeTruthy();
       expect(t.gradient, `gradient of ${t.slug}`).toBeTruthy();
       expect(t.href, `href of ${t.slug}`).toBeTruthy();
-      expect(t.phases.length, `phases of ${t.slug}`).toBeGreaterThan(0);
+      expect(['workflow', 'gallery'], `track of ${t.slug}`).toContain(t.track);
     }
   });
 
-  it('每个工具的 phases 都是合法阶段', () => {
+  it('workflow 工具挂在 5 环主线；gallery 工具不属于任何工作流阶段', () => {
     const valid = new Set(WORKFLOW_PHASES);
     for (const t of TOOLS) {
-      for (const p of t.phases) {
-        expect(valid.has(p), `${t.slug} 含非法阶段 ${p}`).toBe(true);
+      if (t.track === 'workflow') {
+        // 工作流工具必须挂至少一个阶段，且全部合法
+        expect(t.phases.length, `workflow 工具 ${t.slug} 无阶段`).toBeGreaterThan(0);
+        for (const p of t.phases) {
+          expect(valid.has(p), `${t.slug} 含非法阶段 ${p}`).toBe(true);
+        }
+      } else {
+        // 展厅工具不参与阶段过滤，phases 必须为空
+        expect(t.phases.length, `gallery 工具 ${t.slug} 不应挂阶段`).toBe(0);
       }
     }
+  });
+
+  it('getWorkflowTools / getGalleryTools 完整划分 TOOLS', () => {
+    const wf = getWorkflowTools();
+    const gal = getGalleryTools();
+    expect(wf.length + gal.length).toBe(TOOLS.length);
+    expect(wf.every((t) => t.track === 'workflow')).toBe(true);
+    expect(gal.every((t) => t.track === 'gallery')).toBe(true);
+    expect(gal.length, '应保留至少一个展厅工具').toBeGreaterThan(0);
   });
 
   it('指向 /tools/<slug> 的工具确有对应页面文件', () => {
@@ -52,9 +70,13 @@ describe('tools-registry 不变量', () => {
     }
   });
 
-  it('PHASES = 「全部」+ 7 环主线', () => {
+  it('PHASES = 「全部」+ 5 环主线', () => {
     expect(PHASES[0]).toBe('全部');
     expect(PHASES.slice(1)).toEqual(WORKFLOW_PHASES);
+    expect(WORKFLOW_PHASES).toHaveLength(5);
+    // 讲结果 / 可视化表达 已从工作流剥离
+    expect(WORKFLOW_PHASES).not.toContain('讲结果' as never);
+    expect(WORKFLOW_PHASES).not.toContain('可视化表达' as never);
   });
 
   it('每个主线阶段至少挂着一个工具', () => {

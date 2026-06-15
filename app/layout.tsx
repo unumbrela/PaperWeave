@@ -39,7 +39,7 @@ const fraunces = Fraunces({
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.z1ha0.com";
 const SITE_DESC =
-  "把查文献、读文献、生 idea、做验证、论文绘图、讲结果、可视化表达串成一条研究工作流。PaperWeave 不替你写论文，但让其他每一步都顺起来。";
+  "本地优先的论文工作台：把查文献、读文献、生 idea、做验证、论文绘图串成一条打通的研究工作流，上游产出即下游输入。PaperWeave 不替你写论文，但让其他每一步都顺起来。";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

@@ -56,8 +56,8 @@ test("论文检索：全源失败时明示上游问题并给出路", async ({ pa
   );
 
   await page.goto("/tools/paper-search");
-  await page.getByPlaceholder("输入关键词或短语（支持中英文混合）").fill("diffusion segmentation");
-  await page.getByRole("button", { name: "开始搜索" }).click();
+  await page.getByPlaceholder("关键词、方法名或数据集 — 例如 mamba medical segmentation").fill("diffusion segmentation");
+  await page.getByRole("button", { name: "检索", exact: true }).click();
 
   await expect(page.getByText(/所有检索源（openalex、arxiv）均未返回结果/)).toBeVisible({ timeout: 15_000 });
 });
