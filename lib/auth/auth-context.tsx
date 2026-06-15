@@ -17,6 +17,7 @@ import {
   type ReactNode,
 } from 'react'
 import { getSupabase, isSupabaseConfigured, type User } from '@/lib/supabase/client'
+import { authRedirectURL } from '@/lib/auth/redirect'
 import { cloudSync, setSyncUser } from '@/lib/sync/cloud-sync'
 
 interface AuthResult {
@@ -95,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!sb) return NOT_CONFIGURED
     const { error } = await sb.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: authRedirectURL('/auth/callback') },
     })
     return error ? { error: msg(error) } : {}
   }, [])
@@ -117,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await sb.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: window.location.origin },
+        options: { emailRedirectTo: authRedirectURL('/auth/callback') },
       })
       if (error) return { error: msg(error) }
       // 需要邮件确认时 session 为空
@@ -131,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!sb) return NOT_CONFIGURED
     const { error } = await sb.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: authRedirectURL('/auth/callback') },
     })
     return error ? { error: msg(error) } : {}
   }, [])
