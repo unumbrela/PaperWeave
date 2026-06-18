@@ -13,6 +13,8 @@ import { OpenAI } from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { ResolvedKeys } from "./keys";
 import type { Message } from "./client";
+import { OPENROUTER_URL, OPENROUTER_HEADERS } from "./openrouter";
+import { DEFAULT_OPENROUTER_MODEL } from "./models";
 
 const DEEPSEEK_URL = process.env.DEEPSEEK_API_URL || "https://api.deepseek.com/v1";
 
@@ -22,6 +24,7 @@ const PLACEHOLDERS = new Set([
   "your-deepseek-key",
   "your_deepseek_key",
   "your-gemini-key",
+  "your-openrouter-key",
   "ci-placeholder",
 ]);
 const isReal = (k?: string): k is string => !!k && !PLACEHOLDERS.has(k);
@@ -33,7 +36,7 @@ const isReal = (k?: string): k is string => !!k && !PLACEHOLDERS.has(k);
  */
 export function aiNotConfiguredResponse(): Response {
   return new Response(
-    "AI 服务未配置：请在右上角「API Key」填入你自己的 key（DeepSeek / OpenAI / Gemini 任一）；本地开发也可在 .env.local 配置后重试。",
+    "AI 服务未配置：请在右上角「API Key」填入你自己的 key（DeepSeek / OpenAI / Gemini / OpenRouter 任一）；本地开发也可在 .env.local 配置后重试。",
     { status: 503 },
   );
 }
@@ -49,15 +52,16 @@ export interface StreamOpts {
   deepseekModel?: string;
 }
 
-/** OpenAI 兼容端点（OpenAI 本体或 DeepSeek，靠 baseURL 区分）的文本增量流。 */
+/** OpenAI 兼容端点（OpenAI 本体 / DeepSeek / OpenRouter，靠 baseURL 区分）的文本增量流。 */
 async function* openaiCompatStream(
   messages: Message[],
   key: string,
   model: string,
   baseURL: string | undefined,
   opts: StreamOpts,
+  headers?: Record<string, string>,
 ): AsyncGenerator<string> {
-  const client = new OpenAI({ apiKey: key, ...(baseURL ? { baseURL } : {}) });
+  const client = new OpenAI({ apiKey: key, ...(baseURL ? { baseURL } : {}), ...(headers ? { defaultHeaders: headers } : {}) });
   const stream = await client.chat.completions.create({
     model,
     messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
@@ -96,12 +100,13 @@ function effectiveKeys(override?: ResolvedKeys) {
     deepseek: override?.deepseek ?? process.env.DEEPSEEK_API_KEY,
     openai: override?.openai ?? process.env.OPENAI_API_KEY,
     gemini: override?.gemini ?? process.env.GOOGLE_API_KEY,
+    openrouter: override?.openrouter ?? process.env.OPENROUTER_API_KEY,
   };
 }
 
 /**
- * 按 DeepSeek→OpenAI→Gemini 顺序，返回首个能产出内容的文本流。
- * `onComplete` 在流正常结束时回调（用于埋点），出错不调用。
+ * 访客若选定 OpenRouter 模型则优先用它，否则按 DeepSeek→OpenAI→Gemini 顺序，
+ * 返回首个能产出内容的文本流。`onComplete` 在流正常结束时回调（用于埋点），出错不调用。
  */
 export async function streamChat(
   messages: Message[],
@@ -111,16 +116,22 @@ export async function streamChat(
 ): Promise<ReadableStream<Uint8Array>> {
   const eff = effectiveKeys(keys);
   const attempts: Array<{ provider: string; gen: () => AsyncGenerator<string> }> = [];
+  // 访客显式选定的 OpenRouter 模型 → 主供应商
+  if (keys?.openrouterModel && isReal(eff.openrouter))
+    attempts.push({ provider: `openrouter:${keys.openrouterModel}`, gen: () => openaiCompatStream(messages, eff.openrouter!, keys.openrouterModel!, OPENROUTER_URL, opts, OPENROUTER_HEADERS) });
   if (isReal(eff.deepseek))
     attempts.push({ provider: "deepseek", gen: () => openaiCompatStream(messages, eff.deepseek!, opts.deepseekModel ?? "deepseek-chat", DEEPSEEK_URL, opts) });
   if (isReal(eff.openai))
     attempts.push({ provider: "openai", gen: () => openaiCompatStream(messages, eff.openai!, "gpt-4o-mini", undefined, opts) });
   if (isReal(eff.gemini))
     attempts.push({ provider: "gemini", gen: () => geminiStream(messages, eff.gemini!, opts) });
+  // 仅配 OpenRouter key 又没选型时的兜底
+  if (isReal(eff.openrouter) && !keys?.openrouterModel)
+    attempts.push({ provider: `openrouter:${DEFAULT_OPENROUTER_MODEL}`, gen: () => openaiCompatStream(messages, eff.openrouter!, DEFAULT_OPENROUTER_MODEL, OPENROUTER_URL, opts, OPENROUTER_HEADERS) });
 
   if (attempts.length === 0) {
     throw new Error(
-      "AI 服务未配置：请在右上角「API Key」填入你自己的 key（DeepSeek / OpenAI / Gemini 任一）。",
+      "AI 服务未配置：请在右上角「API Key」填入你自己的 key（DeepSeek / OpenAI / Gemini / OpenRouter 任一）。",
     );
   }
 

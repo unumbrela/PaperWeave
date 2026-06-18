@@ -11,6 +11,8 @@
 import { OpenAI } from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { ResolvedKeys } from './keys';
+import { OPENROUTER_URL, OPENROUTER_HEADERS } from './openrouter';
+import { DEFAULT_OPENROUTER_MODEL } from './models';
 
 const DEEPSEEK_URL = process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1';
 
@@ -23,7 +25,7 @@ export const NON_STREAM_MODELS = {
 
 type Message = { role: 'system' | 'user' | 'assistant'; content: string };
 
-const PLACEHOLDERS = new Set(['', 'your-openai-key', 'your-deepseek-key', 'your_deepseek_key', 'your-gemini-key', 'ci-placeholder']);
+const PLACEHOLDERS = new Set(['', 'your-openai-key', 'your-deepseek-key', 'your_deepseek_key', 'your-gemini-key', 'your-openrouter-key', 'ci-placeholder']);
 const isReal = (k?: string): k is string => !!k && !PLACEHOLDERS.has(k);
 
 /** 把「访客自带 key」覆盖到环境变量之上，得到本次调用实际可用的 key */
@@ -32,6 +34,7 @@ function effectiveKeys(override?: ResolvedKeys) {
     deepseek: override?.deepseek ?? process.env.DEEPSEEK_API_KEY,
     openai: override?.openai ?? process.env.OPENAI_API_KEY,
     gemini: override?.gemini ?? process.env.GOOGLE_API_KEY,
+    openrouter: override?.openrouter ?? process.env.OPENROUTER_API_KEY,
   };
 }
 
@@ -71,6 +74,18 @@ async function callOpenAI(messages: Message[], key: string, model?: string, temp
   return res.choices?.[0]?.message?.content ?? '';
 }
 
+/** OpenRouter（OpenAI 兼容网关）：用访客选中的模型一次性补全。 */
+async function callOpenRouter(messages: Message[], key: string, model: string, temperature = 0.3, max_tokens = 1000) {
+  const client = new OpenAI({ apiKey: key, baseURL: OPENROUTER_URL, defaultHeaders: OPENROUTER_HEADERS });
+  const res = await client.chat.completions.create({
+    model,
+    messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+    temperature,
+    max_tokens,
+  });
+  return res.choices?.[0]?.message?.content ?? '';
+}
+
 async function callGemini(messages: Message[], key: string, _model?: string, temperature = 0.3, max_tokens = 1000) {
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
@@ -85,7 +100,8 @@ async function callGemini(messages: Message[], key: string, _model?: string, tem
 }
 
 /**
- * 统一非流式补全：按 DeepSeek → OpenAI → Gemini 顺序尝试，首个成功即返回。
+ * 统一非流式补全：访客若选定 OpenRouter 模型则优先用它，
+ * 之后按 DeepSeek → OpenAI → Gemini 顺序兜底，首个成功即返回。
  */
 export async function chatCompletion(
   messages: Message[],
@@ -96,12 +112,18 @@ export async function chatCompletion(
   const eff = effectiveKeys(keys);
 
   const attempts: Array<{ name: string; fn: () => Promise<string> }> = [];
+  // 访客显式选定的 OpenRouter 模型 → 作为主供应商（DeepSeek 等仍作兜底）
+  if (keys?.openrouterModel && isReal(eff.openrouter))
+    attempts.push({ name: `OpenRouter(${keys.openrouterModel})`, fn: () => callOpenRouter(messages, eff.openrouter!, keys.openrouterModel!, temperature, max_tokens) });
   if (isReal(eff.deepseek)) attempts.push({ name: 'DeepSeek', fn: () => callDeepSeek(messages, eff.deepseek!, model, temperature, max_tokens) });
   if (isReal(eff.openai)) attempts.push({ name: 'OpenAI', fn: () => callOpenAI(messages, eff.openai!, model, temperature, max_tokens) });
   if (isReal(eff.gemini)) attempts.push({ name: 'Gemini', fn: () => callGemini(messages, eff.gemini!, model, temperature, max_tokens) });
+  // 仅配了 OpenRouter key 又没选型时，用兜底模型保证可用（不抢内置供应商的默认位）
+  if (isReal(eff.openrouter) && !keys?.openrouterModel)
+    attempts.push({ name: `OpenRouter(${DEFAULT_OPENROUTER_MODEL})`, fn: () => callOpenRouter(messages, eff.openrouter!, DEFAULT_OPENROUTER_MODEL, temperature, max_tokens) });
 
   if (attempts.length === 0) {
-    throw new Error('AI 服务未配置：请在右上角「API Key」填入你自己的 key（本地开发可在 .env.local 设 DEEPSEEK_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY）。');
+    throw new Error('AI 服务未配置：请在右上角「API Key」填入你自己的 key（本地开发可在 .env.local 设 DEEPSEEK_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY / OPENROUTER_API_KEY）。');
   }
 
   let lastErr: unknown = null;
