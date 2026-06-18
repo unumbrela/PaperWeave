@@ -5,6 +5,7 @@ import { Loader2, AlertCircle, CheckSquare, Square, Table2, Copy, Check, Downloa
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
 import { Markdown } from "@/components/markdown";
+import { SendToTool } from "@/components/workflow/handoff-controls";
 import { repository } from "@/lib/db/repository";
 import { userKeyHeaders } from "@/lib/ai/user-keys";
 import type { Paper } from "@/lib/db/types";
@@ -187,7 +188,7 @@ export default function Page() {
 
           {result && (
             <div>
-              <div className="mb-3 flex items-center justify-end gap-2">
+              <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
                 <button
                   onClick={copyResult}
                   disabled={isGenerating}
@@ -203,8 +204,23 @@ export default function Page() {
                   <Download className="h-3.5 w-3.5" />
                   下载 .md
                 </button>
+                {!isGenerating && (
+                  <SendToTool
+                    targetSlug="idea-generator"
+                    label="发往 Idea 生成器"
+                    payload={{
+                      from: TOOL.name,
+                      fields: {
+                        references: `下面是几篇相关工作的横向对比，作为已知工作背景：\n\n${result}`,
+                      },
+                    }}
+                  />
+                )}
               </div>
-              <Markdown>{result}</Markdown>
+              {/* 宽对比矩阵横向滚动，避免多列被挤压 */}
+              <div className="-mx-1 overflow-x-auto px-1">
+                <Markdown>{result}</Markdown>
+              </div>
             </div>
           )}
         </div>

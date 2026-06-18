@@ -11,8 +11,6 @@ export interface AISummary {
 export interface ExportData {
   paper: Paper;
   annotations: Annotation[];
-  // 上游（useAIExplanation）以 unknown 传入，函数内窄化为 AISummary
-  aiSummary: unknown;
   researchNotes: string;
   /** 页面便签（📒），可选——按页码排序导出 */
   stickyNotes?: StickyNote[];
@@ -20,7 +18,8 @@ export interface ExportData {
 
 export function generateMarkdown(data: ExportData): string {
   const { paper, annotations, researchNotes, stickyNotes = [] } = data;
-  const aiSummary = data.aiSummary as AISummary | null | undefined;
+  // AI 解释现逐条挂在标注上（aiSummary 字段），导出时从标注汇总。
+  const aiAnnotations = annotations.filter((a) => a.aiSummary);
   const authors = Array.isArray(paper.authors)
     ? paper.authors
     : typeof paper.authors === 'string'
@@ -48,20 +47,20 @@ export function generateMarkdown(data: ExportData): string {
   
   markdown += `---\n\n`;
   
-  if (aiSummary) {
+  if (aiAnnotations.length > 0) {
     markdown += `## 2. AI 解释\n\n`;
-    if (aiSummary.coreIdea) {
-      markdown += `### Core Idea\n\n${aiSummary.coreIdea}\n\n`;
-    }
-    if (aiSummary.relatedConcepts) {
-      markdown += `### Related Concepts\n\n${aiSummary.relatedConcepts}\n\n`;
-    }
-    if (aiSummary.whyItMatters) {
-      markdown += `### Why It Matters\n\n${aiSummary.whyItMatters}\n\n`;
-    }
-    if (aiSummary.applications) {
-      markdown += `### Potential Applications\n\n${aiSummary.applications}\n\n`;
-    }
+    aiAnnotations.forEach((annotation, index) => {
+      const summary = annotation.aiSummary as AISummary;
+      markdown += `### 解释 ${index + 1} · Page ${annotation.page + 1}\n\n`;
+      if (annotation.selectedText) {
+        markdown += `> ${annotation.selectedText}\n\n`;
+      }
+      if (summary.coreIdea) markdown += `- **核心概念：** ${summary.coreIdea}\n`;
+      if (summary.relatedConcepts) markdown += `- **相关概念：** ${summary.relatedConcepts}\n`;
+      if (summary.whyItMatters) markdown += `- **为什么重要：** ${summary.whyItMatters}\n`;
+      if (summary.applications) markdown += `- **潜在应用：** ${summary.applications}\n`;
+      markdown += `\n`;
+    });
     markdown += `---\n\n`;
   }
   

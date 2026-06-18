@@ -9,6 +9,9 @@ import {
   getToolsInPhase,
   getWorkflowTools,
   getGalleryTools,
+  getUpstreamTool,
+  getDownstreamTool,
+  getPhaseLeadTool,
 } from '@/lib/tools-registry';
 
 // 注册表是全站工具的「单一事实源」（README/PROJECT-SUMMARY），
@@ -88,5 +91,43 @@ describe('tools-registry 不变量', () => {
   it('getTool 命中 / 未命中行为正确', () => {
     expect(getTool(TOOLS[0].slug)).toEqual(TOOLS[0]);
     expect(getTool('definitely-not-a-tool')).toBeUndefined();
+  });
+
+  describe('链路位置推导（5 环闭环可视化）', () => {
+    it('每环都有代表工具', () => {
+      for (const phase of WORKFLOW_PHASES) {
+        expect(getPhaseLeadTool(phase), `${phase} 无代表工具`).toBeDefined();
+      }
+    });
+
+    it('首环无上游、末环无下游；中间环上下游自洽', () => {
+      const first = getPhaseLeadTool(WORKFLOW_PHASES[0])!;
+      const last = getPhaseLeadTool(WORKFLOW_PHASES[WORKFLOW_PHASES.length - 1])!;
+      expect(getUpstreamTool(first.slug)).toBeUndefined();
+      expect(getDownstreamTool(last.slug)).toBeUndefined();
+
+      // 每个 workflow 工具的上/下游（若存在）都应是合法 workflow 工具，
+      // 且其主环序号严格在本工具主环之前/之后。
+      for (const t of getWorkflowTools()) {
+        const idx = WORKFLOW_PHASES.indexOf(t.phases[0]);
+        const up = getUpstreamTool(t.slug);
+        const down = getDownstreamTool(t.slug);
+        if (up) {
+          expect(up.track).toBe('workflow');
+          expect(WORKFLOW_PHASES.indexOf(up.phases[0])).toBeLessThan(idx);
+        }
+        if (down) {
+          expect(down.track).toBe('workflow');
+          expect(WORKFLOW_PHASES.indexOf(down.phases[0])).toBeGreaterThan(idx);
+        }
+      }
+    });
+
+    it('gallery 工具不参与链路', () => {
+      for (const t of getGalleryTools()) {
+        expect(getUpstreamTool(t.slug)).toBeUndefined();
+        expect(getDownstreamTool(t.slug)).toBeUndefined();
+      }
+    });
   });
 });

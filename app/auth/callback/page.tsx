@@ -37,7 +37,9 @@ export default function AuthCallbackPage() {
   const [state, setState] = useState<State>({ phase: 'pending' })
 
   useEffect(() => {
-    // 必须在调用 getSupabase()（会触发 detectSessionInUrl 清掉 hash）之前抢先读 error。
+    // 落地即同步判定错误/未配置态是本页的职责（必须在 getSupabase() 触发
+    // detectSessionInUrl 清掉 hash 之前抢先读 error），故此处同步 setState 是有意为之。
+    /* eslint-disable react-hooks/set-state-in-effect */
     const authError = readAuthError()
     if (authError) {
       setState({ phase: 'error', message: authError })
@@ -52,6 +54,7 @@ export default function AuthCallbackPage() {
       })
       return
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     let done = false
     const finish = (next: State) => {

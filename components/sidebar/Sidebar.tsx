@@ -28,23 +28,15 @@ function getAnnotationTypeLabel(type: AnnotationType): string {
   return ANNOTATION_TYPE_LABELS[type] || type;
 }
 
-interface AISummaryShape {
-  coreIdea?: string;
-  relatedConcepts?: string;
-  whyItMatters?: string;
-  applications?: string;
-}
-
 interface SidebarProps {
   annotations: Annotation[];
   /** 页面便签（📒，锚定在 PDF 页面坐标上） */
   stickyNotes?: StickyNote[];
-  /** AI 解释结果（来自 useAIExplanation，运行时为 unknown，渲染前在内部收窄） */
-  aiSummary: unknown;
+  /** 正在生成 AI 解释的标注 id（该卡显示 loading） */
+  explainingId?: string | null;
   researchNotes: string;
   onDeleteAnnotation: (id: string) => void;
   onEditAnnotation: (id: string, comment: string) => Promise<void>;
-  onAIExplain: (text: string) => void;
   onResearchNotesChange: (content: string) => void;
   onDeleteStickyNote?: (id: string) => void;
   /** 跳转到便签所在页（0-based 页码） */
@@ -66,7 +58,7 @@ const tabs: { id: TabType; label: string; icon: typeof LayoutGrid }[] = [
 export default function Sidebar({
   annotations,
   stickyNotes = [],
-  aiSummary,
+  explainingId,
   researchNotes,
   onDeleteAnnotation,
   onEditAnnotation,
@@ -117,9 +109,11 @@ export default function Sidebar({
     });
   };
 
-  const renderAnnotationCard = (annotation: Annotation) => {
-    const isExpanded = expandedId === annotation.id;
+  const renderAnnotationCard = (annotation: Annotation, forceExpand = false) => {
+    const isExpanded = forceExpand || expandedId === annotation.id;
     const isEditing = editingId === annotation.id;
+    const isExplaining = explainingId === annotation.id;
+    const hasAI = !!annotation.aiSummary;
 
     return (
       <div
@@ -139,11 +133,23 @@ export default function Sidebar({
               <span className="text-xs text-ink-3">
                 第 {annotation.page + 1} 页
               </span>
+              {hasAI && (
+                <span className="ml-auto inline-flex items-center gap-0.5 text-[10px] text-plum">
+                  <Sparkles className="w-3 h-3" /> AI
+                </span>
+              )}
             </div>
 
             <p className="text-sm text-ink mb-2">
               {annotation.selectedText || '(无文本)'}
             </p>
+
+            {isExplaining && (
+              <div className="mb-2 flex items-center gap-2 rounded-lg border border-plum/20 bg-plum/8 p-2 text-xs text-plum">
+                <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                正在生成 AI 解释…
+              </div>
+            )}
 
             {isEditing ? (
               <div className="mb-2">
@@ -263,44 +269,24 @@ export default function Sidebar({
     );
   };
 
+  // AI 解释现按选区逐条挂到对应标注（不再共用一个全局槽位）。本 Tab 汇总所有
+  // 已生成 AI 解释的标注 + 正在生成的那条，强制展开以直接看到解释内容。
   const renderAISummary = () => {
-    if (!aiSummary) {
+    const aiAnnotations = annotations.filter(
+      (a) => a.aiSummary || a.id === explainingId,
+    );
+    if (aiAnnotations.length === 0) {
       return (
         <div className="text-center py-12 text-ink-4">
           <Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p className="text-sm">选择文本后点击 AI 解释</p>
+          <p className="text-sm">选中正文 → 点「AI 解释」</p>
+          <p className="mt-1 text-xs">解释会作为一条标注留存，可逐条回看</p>
         </div>
       );
     }
-
-    const summary = aiSummary as AISummaryShape;
-
     return (
-      <div className="space-y-4">
-        {summary.coreIdea && (
-          <div className="rounded-xl p-4 bg-paper-2/60 border border-line">
-            <h4 className="overline mb-2 text-plum">核心概念</h4>
-            <p className="text-sm text-ink-2">{summary.coreIdea}</p>
-          </div>
-        )}
-        {summary.relatedConcepts && (
-          <div className="rounded-xl p-4 bg-paper-2/60 border border-line">
-            <h4 className="overline mb-2 text-ocean">相关概念</h4>
-            <p className="text-sm text-ink-2">{summary.relatedConcepts}</p>
-          </div>
-        )}
-        {summary.whyItMatters && (
-          <div className="rounded-xl p-4 bg-paper-2/60 border border-line">
-            <h4 className="overline mb-2 text-sage">为什么重要</h4>
-            <p className="text-sm text-ink-2">{summary.whyItMatters}</p>
-          </div>
-        )}
-        {summary.applications && (
-          <div className="rounded-xl p-4 bg-paper-2/60 border border-line">
-            <h4 className="overline mb-2 text-sun">潜在应用</h4>
-            <p className="text-sm text-ink-2">{summary.applications}</p>
-          </div>
-        )}
+      <div className="space-y-3">
+        {aiAnnotations.map((a) => renderAnnotationCard(a, true))}
       </div>
     );
   };
@@ -415,7 +401,7 @@ export default function Sidebar({
             <p className="text-sm">暂无{activeTab !== 'all' ? getAnnotationTypeLabel(activeTab as AnnotationType) : ''}标注</p>
           </div>
         ) : (
-          filteredAnnotations.map(renderAnnotationCard)
+          filteredAnnotations.map((a) => renderAnnotationCard(a))
         )}
       </div>
 

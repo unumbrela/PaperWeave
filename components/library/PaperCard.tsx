@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import {
-  Calendar, ChevronDown, ChevronUp, Tag, Sparkles, ExternalLink, Trash2,
+  Calendar, ChevronDown, ChevronUp, Tag, Sparkles, ExternalLink, Trash2, BookOpen,
 } from "lucide-react";
 import type { Paper, Author } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
+import { buttonClasses } from "@/components/ui";
+import { SendToTool } from "@/components/workflow/handoff-controls";
 import { CitationButton } from "./CitationButton";
 
 function formatDate(dateString: string) {
@@ -134,18 +136,37 @@ export function PaperCard({
                 </span>
               )}
             </div>
+
+            {/* 下游入口：把每篇论文变成通往工作流下游的起点（精读 / 发往 idea） */}
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <Link href={`/viewer/${paper.id}`} className={buttonClasses("primary", "sm")}>
+                <BookOpen className="h-3.5 w-3.5" />
+                精读
+              </Link>
+              <SendToTool
+                targetSlug="idea-generator"
+                label="发往 Idea 生成器"
+                payload={{
+                  from: paper.title,
+                  sourcePaperId: paper.id,
+                  fields: {
+                    direction: paper.direction ?? "",
+                    references: paper.abstract ?? paper.summary ?? "",
+                  },
+                }}
+              />
+              <button
+                onClick={onDelete}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-ink-3 transition-colors hover:text-coral"
+                title="删除论文"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">删除</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
-
-      <button
-        onClick={onDelete}
-        className="absolute bottom-4 right-4 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-ink-3 transition-colors hover:text-coral"
-        title="删除论文"
-      >
-        <Trash2 className="w-4 h-4" />
-        <span>删除</span>
-      </button>
 
       {/* AI 分析折叠组件 */}
       <div className="border-t border-line">
