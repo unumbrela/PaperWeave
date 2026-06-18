@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Share2, Copy, Check, ExternalLink, PanelRight, PanelRightClose } from 'lucide-react';
+import { ArrowLeft, Share2, Copy, Check, ExternalLink, PanelRight, PanelRightClose, Lightbulb } from 'lucide-react';
 import { AccountButton } from '@/components/auth/AccountButton';
 
 /** 精读阅读器顶栏：左侧品牌 + 返回 + 标题，右侧链接/侧栏/导出/账户。
@@ -15,6 +15,7 @@ export function ViewerHeader({
   isSidebarOpen,
   onToggleSidebar,
   onExport,
+  onSendToIdea,
   onBack,
 }: {
   title: string;
@@ -25,6 +26,8 @@ export function ViewerHeader({
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
   onExport: () => void;
+  /** 发往 Idea 生成器（把本篇精读 brief 作为已知工作） */
+  onSendToIdea?: () => void;
   onBack: () => void;
 }) {
   return (
@@ -97,6 +100,17 @@ export function ViewerHeader({
           {isSidebarOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRight className="w-4 h-4" />}
           <span className="hidden lg:inline">{isSidebarOpen ? '隐藏侧栏' : '显示侧栏'}</span>
         </button>
+
+        {onSendToIdea && (
+          <button
+            onClick={onSendToIdea}
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-ink-2 transition-colors hover:text-ink hover:bg-paper-3"
+            title="把本篇精读（批注 + 笔记）发往 Idea 生成器"
+          >
+            <Lightbulb className="w-4 h-4" />
+            <span className="hidden lg:inline">发往 Idea</span>
+          </button>
+        )}
 
         <button
           onClick={onExport}

@@ -6,6 +6,7 @@ import { Loader2, AlertCircle, Send, Sparkles, FileText } from "lucide-react";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
 import { Markdown } from "@/components/markdown";
+import { SendToTool } from "@/components/workflow/handoff-controls";
 import { repository } from "@/lib/db/repository";
 import { embeddingDB, type PaperEmbedding } from "@/lib/db/local-db";
 import { userKeyHeaders } from "@/lib/ai/user-keys";
@@ -283,6 +284,20 @@ export default function Page() {
               <div className="mt-2">
                 <Markdown>{answer}</Markdown>
               </div>
+              {!busy && (
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <SendToTool
+                    targetSlug="idea-generator"
+                    label="发往 Idea 生成器"
+                    payload={{
+                      from: TOOL.name,
+                      fields: {
+                        references: `基于论文库问答的归纳（问题：${question}）：\n\n${answer}`,
+                      },
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

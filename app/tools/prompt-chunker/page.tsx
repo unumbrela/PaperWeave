@@ -7,7 +7,7 @@ import { ToolShell } from "@/components/tool-shell";
 import { StreamOutput } from "@/components/stream-output";
 import { useStream } from "@/components/use-stream";
 import { consumeHandoff } from "@/lib/workflow/handoff";
-import { HandoffBanner } from "@/components/workflow/handoff-controls";
+import { HandoffBanner, SendToTool } from "@/components/workflow/handoff-controls";
 import { cn } from "@/lib/utils";
 
 const TOOL = getTool("prompt-chunker")!;
@@ -248,14 +248,31 @@ export default function Page() {
         </div>
 
         {/* RIGHT: streaming output */}
-        <StreamOutput
-          text={text}
-          loading={loading}
-          error={error}
-          onRetry={submit}
-          onStop={stop}
-          emptyHint="粘贴任务，让拆解器把它切成小模型也能啃的块。"
-        />
+        <div className="flex flex-col gap-3">
+          <StreamOutput
+            text={text}
+            loading={loading}
+            error={error}
+            onRetry={submit}
+            onStop={stop}
+            emptyHint="粘贴任务，让拆解器把它切成小模型也能啃的块。"
+          />
+          {text && !loading && (
+            <div className="flex flex-wrap justify-end gap-2">
+              <SendToTool
+                targetSlug="skill-maker"
+                label="封装成 Claude Code Skill"
+                payload={{
+                  from: TOOL.name,
+                  fields: {
+                    capability: text,
+                    trigger: form.task ? `用户要执行这个任务时：${form.task}` : "",
+                  },
+                }}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 管线图 */}
