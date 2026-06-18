@@ -115,9 +115,9 @@ const FOOTER_LINKS: Array<{ heading: string; items: Array<{ label: string; href:
   {
     heading: "工作流",
     items: [
-      { label: "查论文", href: "/tools/paper-search" },
-      { label: "生 idea", href: "/tools/idea-generator" },
-      { label: "论文对比", href: "/tools/paper-compare" },
+      { label: "调研搜索", href: "/tools/paper-search" },
+      { label: "创新点", href: "/tools/idea-generator" },
+      { label: "组织撰写", href: "/tools/paper-writer" },
     ],
   },
   {

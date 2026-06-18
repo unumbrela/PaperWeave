@@ -33,6 +33,7 @@ export function ResultCard({
   copied,
   analysis,
   quickSummary,
+  position,
   expanded,
   onToggleSelect,
   onCopyLink,
@@ -53,6 +54,8 @@ export function ResultCard({
   analysis?: string;
   /** LLM 一句话总结（「一键速览」批量生成） */
   quickSummary?: string;
+  /** LLM 方向定位（「一键速览」批量生成）：这篇在所属方向里的位置 */
+  position?: string;
   expanded: boolean;
   onToggleSelect: () => void;
   onCopyLink: (key: string, url: string) => void;
@@ -143,12 +146,20 @@ export function ResultCard({
             </p>
           )}
 
-          {/* 一句话速览 */}
+          {/* 一句话速览 + 方向定位 */}
           {quickSummary && (
-            <p className="mt-2 rounded-lg border border-sun/30 bg-sun/12 px-2.5 py-1.5 text-[12.5px] leading-relaxed text-ink">
-              <Sparkles className="mr-1 inline h-3 w-3 align-[-2px] text-ink-2" />
-              {quickSummary}
-            </p>
+            <div className="mt-2 rounded-lg border border-sun/30 bg-sun/12 px-2.5 py-1.5">
+              <p className="text-[12.5px] leading-relaxed text-ink">
+                <Sparkles className="mr-1 inline h-3 w-3 align-[-2px] text-ink-2" />
+                {quickSummary}
+              </p>
+              {position && (
+                <p className="mt-1 flex items-baseline gap-1.5 text-[11.5px] leading-relaxed text-ink-3">
+                  <span className="overline shrink-0 text-[9px] text-plum">定位</span>
+                  <span>{position}</span>
+                </p>
+              )}
+            </div>
           )}
 
           {/* 摘要（可展开） */}

@@ -37,7 +37,7 @@ export default function Page() {
   const router = useRouter();
   const [apiConfig, setApiConfig] = useState<Record<string, string>>({});
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedSources, setSelectedSources] = useState(["openalex", "arxiv"]);
+  const [selectedSources, setSelectedSources] = useState(["openalex", "arxiv", "crossref"]);
 
   const [searchQuery, setSearchQuery] = useState<SearchQuery>({
     field: "",
@@ -62,6 +62,7 @@ export default function Page() {
   const [importedIds, setImportedIds] = useState<Set<string>>(new Set());
   const [copiedIds, setCopiedIds] = useState<Set<string>>(new Set());
   const [quickSummaries, setQuickSummaries] = useState<Record<string, string>>({});
+  const [quickPositions, setQuickPositions] = useState<Record<string, string>>({});
   const [glancing, setGlancing] = useState(false);
 
   // 搜后客户端精炼 / 重排 / 分页展示
@@ -80,7 +81,7 @@ export default function Page() {
         // 挂载时一次性从 localStorage 水合配置，非级联渲染
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setApiConfig(config.apiConfig || {});
-        setSelectedSources(config.sources || ["openalex", "arxiv"]);
+        setSelectedSources(config.sources || ["openalex", "arxiv", "crossref"]);
       } catch {
         console.error("Failed to load search config");
       }
@@ -120,7 +121,7 @@ export default function Page() {
     try {
       const response = await fetch("/api/paper-search", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...userKeyHeaders() },
         body: JSON.stringify({
           ...query,
           sources: selectedSources,
@@ -139,6 +140,7 @@ export default function Page() {
         setDisplayCount(PAGE_SIZE);
         setSelectedPaperIds(new Set());
         setQuickSummaries({});
+        setQuickPositions({});
         if (query.keywords?.trim()) setRecent(pushRecentSearch(query.keywords));
         if (data.data.length > 0) {
           requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -266,7 +268,16 @@ export default function Page() {
       const data = await response.json();
 
       if (data.success) {
-        setQuickSummaries((prev) => ({ ...prev, ...data.data }));
+        // 后端返回 { id: { summary, position } }，拆成两张表分别喂给卡片与入库
+        const glances = data.data as Record<string, { summary: string; position?: string }>;
+        const sums: Record<string, string> = {};
+        const poss: Record<string, string> = {};
+        for (const [id, g] of Object.entries(glances)) {
+          if (g?.summary) sums[id] = g.summary;
+          if (g?.position) poss[id] = g.position;
+        }
+        setQuickSummaries((prev) => ({ ...prev, ...sums }));
+        setQuickPositions((prev) => ({ ...prev, ...poss }));
       } else {
         setError(data.error || "速览失败");
       }
@@ -552,7 +563,7 @@ export default function Page() {
                       onClick={handleQuickGlance}
                       disabled={glancing}
                       className={cn(toolbarBtn, "text-[#8a6d1a] hover:bg-sun/20 hover:text-[#8a6d1a]")}
-                      title="LLM 为每篇结果生成一句话总结（一次批量调用，最多 30 篇）"
+                      title="LLM 为每篇结果生成一句话简介 + 方向定位（一次批量调用，最多 30 篇）"
                     >
                       {glancing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                       <span className="serif-italic">{glancing ? "速览中" : "一键速览"}</span>
@@ -626,7 +637,7 @@ export default function Page() {
                     输入关键词，或点一个方向包开始
                   </p>
                   <p className="mono mt-3 text-[11px] uppercase tracking-wider text-ink-4">
-                    OpenAlex · arXiv · Semantic Scholar
+                    OpenAlex · arXiv · Crossref · Semantic Scholar
                   </p>
                 </div>
               </div>
@@ -670,6 +681,7 @@ export default function Page() {
                       copied={copiedIds.has(paper.id)}
                       analysis={analysisResults[paper.id]}
                       quickSummary={quickSummaries[paper.id]}
+                      position={quickPositions[paper.id]}
                       expanded={expandedPaperId === paper.id}
                       onToggleSelect={() => togglePaperSelection(paper.id)}
                       onCopyLink={handleCopyLink}

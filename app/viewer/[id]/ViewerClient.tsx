@@ -289,7 +289,7 @@ export default function ViewerClient() {
   };
 
   // 接回工作流：把本篇的精读 brief（批注 + 笔记 + AI 解释）作为「已知工作」
-  // 发往 Idea 生成器，并带上 sourcePaperId 以便下游回存。闭合「读文献 → 生 idea」。
+  // 发往 Idea 生成器，并带上 sourcePaperId 以便下游回存。闭合「精读定位 → 创新点」。
   const handleSendToIdea = () => {
     if (!paper) return;
     const brief = generateMarkdown({ paper, annotations, researchNotes, stickyNotes });

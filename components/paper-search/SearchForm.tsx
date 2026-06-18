@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 const LIVE_SOURCES = [
   { id: "openalex", name: "OpenAlex", dot: "var(--ocean)", hint: "2.5 亿学术作品 · 全学科" },
   { id: "arxiv", name: "arXiv", dot: "var(--coral)", hint: "预印本 · 更新最快" },
+  { id: "crossref", name: "Crossref", dot: "var(--plum)", hint: "1.5 亿 DOI · 正式出版" },
   { id: "semantic-scholar", name: "S2", fullName: "Semantic Scholar", dot: "var(--sage)", hint: "需 API key（设置中填）" },
 ] as const;
 
@@ -158,6 +159,32 @@ export function SearchForm({
           >
             <Settings2 className="h-3.5 w-3.5" />
           </button>
+
+          {/* 最新论文通道：一键把检索切到「近一年 + 最新优先」，专抓新论文/预印本 */}
+          {(() => {
+            const thisYear = new Date().getFullYear();
+            const latestOn = searchQuery.startYear === thisYear - 1 && searchQuery.sortBy === "year";
+            return (
+              <button
+                onClick={() =>
+                  setSearchQuery((prev) =>
+                    latestOn
+                      ? { ...prev, startYear: thisYear - 2, sortBy: "relevance" }
+                      : { ...prev, startYear: thisYear - 1, endYear: thisYear, sortBy: "year" },
+                  )
+                }
+                title="只看近一年、按最新排序——专抓新论文与预印本"
+                className={cn(
+                  "ml-1 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] transition-all",
+                  latestOn
+                    ? "border-coral/50 bg-coral/10 text-coral"
+                    : "border-transparent text-ink-4 hover:text-ink-2",
+                )}
+              >
+                🆕 近一年
+              </button>
+            );
+          })()}
         </div>
 
         <button

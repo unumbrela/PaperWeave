@@ -115,6 +115,15 @@ export default function Page() {
                 />
               )}
               <SendToTool
+                targetSlug="paper-writer"
+                payload={{
+                  from: TOOL.name,
+                  sourcePaperId: sourcePaperId ?? undefined,
+                  fields: { topic: direction, innovation: text },
+                }}
+                label="发往「论文撰写组织器」"
+              />
+              <SendToTool
                 targetSlug="prompt-chunker"
                 payload={{
                   from: TOOL.name,
