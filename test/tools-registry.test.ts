@@ -9,6 +9,7 @@ import {
   getToolsInPhase,
   getWorkflowTools,
   getGalleryTools,
+  getLabTools,
   getUpstreamTool,
   getDownstreamTool,
   getPhaseLeadTool,
@@ -34,11 +35,11 @@ describe('tools-registry 不变量', () => {
       expect(t.icon, `icon of ${t.slug}`).toBeTruthy();
       expect(t.gradient, `gradient of ${t.slug}`).toBeTruthy();
       expect(t.href, `href of ${t.slug}`).toBeTruthy();
-      expect(['workflow', 'gallery'], `track of ${t.slug}`).toContain(t.track);
+      expect(['workflow', 'gallery', 'lab'], `track of ${t.slug}`).toContain(t.track);
     }
   });
 
-  it('workflow 工具挂在 5 环主线；gallery 工具不属于任何工作流阶段', () => {
+  it('workflow 工具挂在 5 环主线；gallery / lab 工具不属于任何工作流阶段', () => {
     const valid = new Set(WORKFLOW_PHASES);
     for (const t of TOOLS) {
       if (t.track === 'workflow') {
@@ -48,19 +49,22 @@ describe('tools-registry 不变量', () => {
           expect(valid.has(p), `${t.slug} 含非法阶段 ${p}`).toBe(true);
         }
       } else {
-        // 展厅工具不参与阶段过滤，phases 必须为空
-        expect(t.phases.length, `gallery 工具 ${t.slug} 不应挂阶段`).toBe(0);
+        // 展厅 / lab 工具不参与阶段过滤，phases 必须为空
+        expect(t.phases.length, `${t.track} 工具 ${t.slug} 不应挂阶段`).toBe(0);
       }
     }
   });
 
-  it('getWorkflowTools / getGalleryTools 完整划分 TOOLS', () => {
+  it('getWorkflowTools / getGalleryTools / getLabTools 完整划分 TOOLS', () => {
     const wf = getWorkflowTools();
     const gal = getGalleryTools();
-    expect(wf.length + gal.length).toBe(TOOLS.length);
+    const lab = getLabTools();
+    expect(wf.length + gal.length + lab.length).toBe(TOOLS.length);
     expect(wf.every((t) => t.track === 'workflow')).toBe(true);
     expect(gal.every((t) => t.track === 'gallery')).toBe(true);
+    expect(lab.every((t) => t.track === 'lab')).toBe(true);
     expect(gal.length, '应保留至少一个展厅工具').toBeGreaterThan(0);
+    expect(lab.length, '应保留至少一个 lab 工具').toBeGreaterThan(0);
   });
 
   it('指向 /tools/<slug> 的工具确有对应页面文件', () => {

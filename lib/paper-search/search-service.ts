@@ -331,6 +331,90 @@ export async function searchSemanticScholar(query: SearchQuery, apiKey?: string)
   return results;
 }
 
+export async function searchCrossref(query: SearchQuery): Promise<PaperResult[]> {
+  const results: PaperResult[] = [];
+
+  try {
+    const keywordQuery = buildKeywordQuery(query);
+    if (!keywordQuery) return results;
+
+    const rows = Math.min(Math.max(query.maxResults || 30, 20), 100);
+    const params = new URLSearchParams();
+    params.set('query', keywordQuery);
+    params.set('rows', String(rows));
+    // 只取需要的字段，压低响应体积
+    params.set('select', 'DOI,title,author,issued,container-title,is-referenced-by-count,abstract,URL');
+
+    const filters: string[] = ['type:journal-article'];
+    if (query.startYear) filters.push(`from-pub-date:${query.startYear}-01-01`);
+    if (query.endYear) filters.push(`until-pub-date:${query.endYear}-12-31`);
+    params.set('filter', filters.join(','));
+
+    // sortBy=year/最新优先：按出版日期降序；其余走 Crossref 相关性
+    if (query.sortBy === 'year') {
+      params.set('sort', 'published');
+      params.set('order', 'desc');
+    }
+
+    const url = `https://api.crossref.org/works?${params.toString()}`;
+    const response = await fetch(url, {
+      headers: {
+        // Crossref 礼貌池：带可联系信息换取更稳定的限流配额
+        'User-Agent':
+          'PaperWeave/1.0 (https://github.com/unumbrela/toolbox; mailto:noreply@paperweave.app)',
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Crossref API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const items: unknown[] = data?.message?.items || [];
+
+    for (const raw of items) {
+      const work = raw as {
+        DOI?: string;
+        title?: string[];
+        author?: Array<{ given?: string; family?: string; name?: string }>;
+        issued?: { 'date-parts'?: number[][] };
+        'container-title'?: string[];
+        'is-referenced-by-count'?: number;
+        abstract?: string;
+        URL?: string;
+      };
+      const title = work.title?.[0]?.trim();
+      if (!title) continue; // Crossref 偶有无标题条目（如勘误），跳过
+
+      const authors = (work.author || [])
+        .map((a) => a.name || [a.given, a.family].filter(Boolean).join(' '))
+        .filter(Boolean) as string[];
+
+      const year = work.issued?.['date-parts']?.[0]?.[0];
+      // Crossref 摘要常带 JATS XML 标签，去标签留纯文本
+      const abstract = work.abstract
+        ? work.abstract.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+        : undefined;
+
+      results.push({
+        id: work.DOI ? `crossref-${work.DOI}` : `crossref-${title.slice(0, 40)}`,
+        title,
+        authors,
+        year: typeof year === 'number' ? year : undefined,
+        venue: work['container-title']?.[0],
+        url: work.URL || (work.DOI ? `https://doi.org/${work.DOI}` : ''),
+        abstract,
+        citations: work['is-referenced-by-count'],
+        source: 'crossref',
+      });
+    }
+  } catch (error) {
+    console.error('Crossref search failed:', error);
+    throw error;
+  }
+
+  return results;
+}
+
 export interface SearchOutcome {
   results: PaperResult[];
   /** 未成功返回的检索源（网络/接口错误）；单源失败不影响其余源 */
@@ -399,6 +483,7 @@ const SOURCE_LABELS: Record<string, string> = {
   openalex: 'OpenAlex',
   arxiv: 'arXiv',
   'semantic-scholar': 'Semantic Scholar',
+  crossref: 'Crossref',
 };
 
 export async function searchPapers(
@@ -419,6 +504,9 @@ export async function searchPapers(
   }
   if (sources.includes('semantic-scholar')) {
     labeled.push({ source: 'semantic-scholar', task: searchSemanticScholar(query, apiKeys?.['semantic-scholar']) });
+  }
+  if (sources.includes('crossref')) {
+    labeled.push({ source: 'crossref', task: searchCrossref(query) });
   }
 
   if (labeled.length === 0) {
@@ -461,4 +549,102 @@ export async function searchPapers(
   const finalResults = sorted.slice(0, query.maxResults || 50);
 
   return { results: finalResults, failedSources };
+}
+
+/**
+ * fan-out 综合重排：相关性模式下，命中越多子查询的论文越「中心」（覆盖广度），
+ * 叠加时新度与引用作为次权重。确定性、无 LLM，便于单测。
+ * 引用/年份模式不在此处理（调用方走原有确定性排序）。
+ */
+export function rerankFanout(
+  results: PaperResult[],
+  hitCounts: Map<string, number>,
+): PaperResult[] {
+  const nowYear = new Date().getFullYear();
+  const score = (p: PaperResult) => {
+    const hits = hitCounts.get(normalizeTitleKey(p.title)) ?? 1;
+    // 覆盖广度为主权重：命中 k 条子查询 → +k（最强信号，说明主题中心）
+    let s = hits * 10;
+    // 时新度：近 5 年线性加成（鼓励新论文，呼应「抓到最新」）
+    if (p.year) s += Math.max(0, 5 - (nowYear - p.year)) * 0.5;
+    // 引用：对数加成，避免老论文凭高引用碾压新论文
+    if (p.citations && p.citations > 0) s += Math.log10(p.citations + 1);
+    return s;
+  };
+  return [...results]
+    .map((p, i) => ({ p, i, s: score(p) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i) // 同分保持原始顺序（稳定）
+    .map((x) => x.p);
+}
+
+/**
+ * Perplexity 式 fan-out 检索：对多条子查询各自跨源检索，
+ * 合并去重后按「命中子查询数 + 时新度 + 引用」综合重排。
+ * subqueries 由调用方（API 路由）经 expandQuery 算出；
+ * 子查询 ≤1 条时退化为普通 searchPapers，行为与零 key 路径完全一致。
+ */
+export async function searchPapersExpanded(
+  query: SearchQuery,
+  sources: string[],
+  subqueries: string[],
+  apiKeys?: Record<string, string>,
+): Promise<SearchOutcome> {
+  if (subqueries.length <= 1) {
+    return searchPapers(query, sources, apiKeys);
+  }
+
+  // 每条子查询多取一些，跨源合并后再统一截断，避免召回被过早砍掉
+  const perVariantMax = Math.min(
+    100,
+    Math.max(20, Math.ceil(((query.maxResults || 30) * 1.5) / subqueries.length)),
+  );
+
+  const variants = subqueries.map((sub) =>
+    searchPapers(
+      // 子查询作为关键词；清掉自由文本意图字段，避免每条都拼上长目标稀释多样性
+      { ...query, keywords: sub, researchGoal: undefined, methodHints: undefined, maxResults: perVariantMax },
+      sources,
+      apiKeys,
+    ),
+  );
+
+  const settled = await Promise.allSettled(variants);
+
+  // 命中计数（去重前统计：一篇论文被多少条子查询召回 = 主题中心度）
+  const hitCounts = new Map<string, number>();
+  const all: PaperResult[] = [];
+  const failed = new Set<string>();
+  for (const outcome of settled) {
+    if (outcome.status !== 'fulfilled') continue;
+    outcome.value.failedSources.forEach((f) => failed.add(f));
+    const seenInThisVariant = new Set<string>();
+    for (const p of outcome.value.results) {
+      const key = normalizeTitleKey(p.title);
+      // 同一变体内同篇只计一次
+      if (!seenInThisVariant.has(key)) {
+        seenInThisVariant.add(key);
+        hitCounts.set(key, (hitCounts.get(key) ?? 0) + 1);
+      }
+      all.push(p);
+    }
+  }
+
+  const merged = mergeDuplicates(all).filter(
+    (paper) => shouldKeepPaper(paper, query) && withinYearRange(paper, query),
+  );
+
+  let sorted: PaperResult[];
+  if (query.sortBy === 'citations') {
+    sorted = [...merged].sort(
+      (a, b) => (b.citations ?? -1) - (a.citations ?? -1) || (b.year ?? 0) - (a.year ?? 0),
+    );
+  } else if (query.sortBy === 'year') {
+    sorted = [...merged].sort(
+      (a, b) => (b.year ?? 0) - (a.year ?? 0) || (b.citations ?? -1) - (a.citations ?? -1),
+    );
+  } else {
+    sorted = rerankFanout(merged, hitCounts);
+  }
+
+  return { results: sorted.slice(0, query.maxResults || 50), failedSources: [...failed] };
 }

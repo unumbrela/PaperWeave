@@ -12,6 +12,7 @@ const ACCENTS: Record<string, string> = {
   "markdown-convert": "#4bb3ff",
   "markdown-summarize": "#6b8ed6",
   "idea-generator": "#f59e0b",
+  "paper-writer": "#ec4899",
   "prompt-chunker": "#ec4899",
   "skill-maker": "#d24b7f",
   "cnn-explainer": "#f4c25a",
@@ -32,9 +33,10 @@ const MAX_TILT = 7; // degrees
 
 export function ToolCard({ tool, index }: { tool: Tool; index: number }) {
   const accent = ACCENTS[tool.slug] ?? "#8854d0";
-  // 展厅工具不属于任何工作流阶段，眉标用统一的「展厅」标签。
+  // 展厅 / lab 工具不属于任何工作流阶段，眉标用统一标签。
   const primaryPhase =
-    tool.phases[0] ?? (tool.track === "gallery" ? "展厅" : "");
+    tool.phases[0] ??
+    (tool.track === "gallery" ? "展厅" : tool.track === "lab" ? "扩展" : "");
   // Stagger: cards emerge in reading order (left→right, then top→bottom).
   // A longer 160ms step lets each card fully take its place before the next
   // starts growing in, so the "small → large" scale reads clearly.

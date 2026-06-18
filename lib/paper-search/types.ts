@@ -35,7 +35,7 @@ export interface PaperResult {
   pdfUrl?: string;
   abstract?: string;
   citations?: number;
-  source: 'semantic-scholar' | 'openalex' | 'arxiv';
+  source: 'semantic-scholar' | 'openalex' | 'arxiv' | 'crossref';
 }
 
 export interface APIConfig {
@@ -77,6 +77,14 @@ export const SEARCH_SOURCES: SearchSource[] = [
     description: '预印本平台，更新快，计算机科学为主',
     coverage: '计算机/物理/数学',
     fields: ['computer-science', 'computer-systems', 'information-systems', 'theory', 'physics', 'mathematics', 'interdisciplinary'],
+  },
+  {
+    id: 'crossref',
+    name: 'Crossref',
+    requiresKey: false,
+    description: '1.5亿+ DOI 元数据，覆盖正式出版的期刊/会议论文，免费',
+    coverage: '全学科（正式出版）',
+    fields: ['computer-science', 'computer-systems', 'information-systems', 'theory', 'biology-health', 'engineering', 'physics', 'chemistry', 'biology', 'environmental', 'social-sciences', 'mathematics', 'interdisciplinary'],
   },
   {
     id: 'ieee',

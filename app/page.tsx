@@ -1,7 +1,8 @@
 "use client";
 
 import { Fragment, useMemo, useState, type CSSProperties } from "react";
-import { Search } from "lucide-react";
+import Link from "next/link";
+import { Search, ArrowUpRight } from "lucide-react";
 import { ToolCard } from "@/components/tool-card";
 import { Reveal } from "@/components/reveal";
 import {
@@ -9,9 +10,20 @@ import {
   WORKFLOW_PHASES,
   getWorkflowTools,
   getGalleryTools,
+  getLabTools,
+  getPhaseLeadTool,
   type Phase,
 } from "@/lib/tools-registry";
 import { cn } from "@/lib/utils";
+
+/** 5 环主线每环的一句话角色说明（首页「核心论文流程」展示）。 */
+const PHASE_ROLE: Record<Phase, string> = {
+  调研搜索: "多源并发 + LLM 查询扩展检索，给每篇论文定位与简介",
+  精读定位: "标记、精读、对比，并梳理论文所在方向的发展脉络",
+  创新点: "在选定论文基础上想差异化创新点与最小验证实验",
+  组织撰写: "把创新点与素材组织成论文结构与逐段写作脚手架",
+  论文绘图: "把方法与实验结果画成出版级、可直接用的图表",
+};
 
 /** Hero 大标题逐词上浮（reveal-word 遮罩 + word-rise），重点词用流动渐变。 */
 const HEADLINE: Array<{ word: string; flow?: boolean; lineBreak?: boolean }> = [
@@ -48,6 +60,7 @@ export default function Home() {
 
   const workflowTools = useMemo(() => getWorkflowTools(), []);
   const galleryTools = useMemo(() => getGalleryTools(), []);
+  const labTools = useMemo(() => getLabTools(), []);
 
   const matchesQuery = (
     t: { name: string; description: string; phases: Phase[] },
@@ -72,6 +85,12 @@ export default function Home() {
     const q = query.trim().toLowerCase();
     return galleryTools.filter((t) => matchesQuery(t, q));
   }, [query, galleryTools]);
+
+  // 命令行 / 自动化扩展：独立于论文主线，仅按关键词过滤。
+  const filteredLab = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return labTools.filter((t) => matchesQuery(t, q));
+  }, [query, labTools]);
 
   return (
     <>
@@ -111,9 +130,9 @@ export default function Home() {
               <div className="hairline mb-4" />
               <p className="text-[13px] leading-relaxed text-ink-2 max-w-xs">
                 这里是 <span className="serif-italic text-ink">PaperWeave</span>
-                ，一个本地优先的论文工作台。查文献、生{" "}
-                <span className="serif-italic text-ink">idea</span>
-                、做验证、出图——5 环串成一条打通的工作流，上游产出即下游输入。不替你写论文，只让每一步都顺起来；另设可视化展厅放交互式教学演示。
+                ，一个以论文为核心、本地优先的研究工作台。调研搜索 → 精读定位 → 想{" "}
+                <span className="serif-italic text-ink">创新点</span>
+                {" "}→ 组织撰写 → 出图——5 环串成一条打通的论文主线，上游产出即下游输入。只搭骨架不代写正文，让每一步都顺起来。
               </p>
             </Reveal>
           </div>
@@ -124,14 +143,14 @@ export default function Home() {
         </div>
       </section>
 
-      {/* WORKFLOW STRIP */}
+      {/* 核心论文流程 —— 5 环主线，每环直达代表工具（页面中心） */}
       <section className="mx-auto w-full max-w-6xl px-6 pt-12">
         <Reveal className="flex items-baseline justify-between mb-6">
           <h2 className="serif text-[22px] sm:text-[26px] tracking-tight text-ink">
-            <span className="serif-italic text-ink-2">The</span> Workflow
+            <span className="serif-italic text-ink-2">The</span> Paper Workflow
           </h2>
           <span className="overline text-ink-3">
-            5 phases · woven end to end
+            核心论文流程 · 5 环上下游打通
           </span>
         </Reveal>
 
@@ -144,34 +163,33 @@ export default function Home() {
           >
             <div className="shimmer-line h-px w-full" />
           </div>
-          <div className="relative grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="relative grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-5">
             {WORKFLOW_PHASES.map((phase, i) => {
-              const active = selected === phase;
+              const lead = getPhaseLeadTool(phase);
               return (
-                <button
+                <Link
                   key={phase}
-                  onClick={() => setSelected(active ? "全部" : phase)}
-                  className={cn(
-                    "surface focus-ring group relative rounded-2xl p-4 text-left transition-colors",
-                    active
-                      ? "border-[var(--line-strong)] bg-paper-2/90"
-                      : "hover:border-[var(--line-strong)]",
-                  )}
+                  href={lead?.href ?? "#"}
+                  className="surface focus-ring group relative flex flex-col rounded-2xl p-4 transition-colors hover:border-[var(--line-strong)]"
                 >
                   <div className="flex items-center justify-between">
                     <span className="numeral text-[20px] leading-none text-ink-3">
                       {String(i + 1).padStart(2, "0")}
                     </span>
-                    <span
-                      className={cn(
-                        "h-1.5 w-1.5 rounded-full transition-transform",
-                        active ? "scale-150 bg-coral" : "bg-ink-4/40",
-                      )}
-                    />
+                    {lead && <span className="text-[18px] leading-none">{lead.icon}</span>}
                   </div>
-                  <div className="mt-4 serif text-[15px] leading-tight text-ink">
+                  <div className="mt-3 serif text-[15px] leading-tight text-ink">
                     {phase}
                   </div>
+                  <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-3">
+                    {PHASE_ROLE[phase]}
+                  </p>
+                  {lead && (
+                    <span className="mt-auto pt-3 inline-flex items-center gap-1 text-[11px] text-ink-2 transition-colors group-hover:text-coral">
+                      {lead.name}
+                      <ArrowUpRight className="h-3 w-3" />
+                    </span>
+                  )}
                   {/* 环间衔接箭头：暗示上游→下游流向（lg 单行时显示，最后一环不画） */}
                   {i < WORKFLOW_PHASES.length - 1 && (
                     <span
@@ -181,7 +199,7 @@ export default function Home() {
                       ›
                     </span>
                   )}
-                </button>
+                </Link>
               );
             })}
           </div>
@@ -260,6 +278,29 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {/* LAB — 命令行 / 自动化扩展，独立于论文主线 */}
+      {filteredLab.length > 0 && (
+        <section className="mx-auto w-full max-w-6xl px-6 pb-24">
+          <div className="hairline mb-12" />
+          <Reveal className="flex items-baseline justify-between mb-3">
+            <h2 className="serif text-[28px] sm:text-[34px] tracking-tight text-ink">
+              <span className="serif-italic text-ink-2">The</span> Lab
+            </h2>
+            <span className="overline">命令行 / 自动化扩展</span>
+          </Reveal>
+          <Reveal delay={60}>
+            <p className="text-[13px] leading-relaxed text-ink-2 max-w-xl mb-8">
+              偏命令行 / Claude Code 场景的研究自动化工具——把研究想法拆成可执行计划、封装成可复用的 skill。它们独立于上面的论文主线，按需取用。
+            </p>
+          </Reveal>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filteredLab.map((tool, i) => (
+              <ToolCard key={tool.slug} tool={tool} index={i + 1} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* GALLERY — 交互式教学演示，独立于工作流 */}
       {filteredGallery.length > 0 && (
