@@ -257,6 +257,50 @@ export function getTool(slug: string): Tool | undefined {
   return TOOLS.find((t) => t.slug === slug);
 }
 
+// ── 链路位置推导 ────────────────────────────────────────────
+// 让 5 环闭环在 UI 上显性化：每个 workflow 工具能算出自己处在第几环、
+// 上游/下游代表工具是谁（见 components/workflow/WorkflowRail.tsx）。
+// gallery 工具（phases 为空）不参与链路，相关函数返回 undefined。
+
+/** 工具的主环（phases[0]）。 */
+export function getPrimaryPhase(tool: Tool): Phase | undefined {
+  return tool.phases[0];
+}
+
+/** 5 环顺序中的序号（0-based），非工作流环返回 -1。 */
+export function getPhaseIndex(phase: Phase): number {
+  return WORKFLOW_PHASES.indexOf(phase);
+}
+
+/** 某一环的「代表工具」= 该环内第一个以它为主环的 workflow 工具。 */
+export function getPhaseLeadTool(phase: Phase): Tool | undefined {
+  return getWorkflowTools().find((t) => t.phases[0] === phase);
+}
+
+/** 上游工具：从本工具主环往前找第一个有代表工具的环。 */
+export function getUpstreamTool(slug: string): Tool | undefined {
+  const tool = getTool(slug);
+  const p = tool?.phases[0];
+  if (!tool || tool.track !== "workflow" || !p) return undefined;
+  for (let i = WORKFLOW_PHASES.indexOf(p) - 1; i >= 0; i--) {
+    const lead = getPhaseLeadTool(WORKFLOW_PHASES[i]);
+    if (lead) return lead;
+  }
+  return undefined;
+}
+
+/** 下游工具：从本工具主环往后找第一个有代表工具的环。 */
+export function getDownstreamTool(slug: string): Tool | undefined {
+  const tool = getTool(slug);
+  const p = tool?.phases[0];
+  if (!tool || tool.track !== "workflow" || !p) return undefined;
+  for (let i = WORKFLOW_PHASES.indexOf(p) + 1; i < WORKFLOW_PHASES.length; i++) {
+    const lead = getPhaseLeadTool(WORKFLOW_PHASES[i]);
+    if (lead) return lead;
+  }
+  return undefined;
+}
+
 export function getToolsInPhase(phase: Phase): Tool[] {
   return TOOLS.filter((t) => t.phases.includes(phase));
 }

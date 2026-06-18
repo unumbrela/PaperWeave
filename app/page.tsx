@@ -135,40 +135,56 @@ export default function Home() {
           </span>
         </Reveal>
 
-        <Reveal
-          delay={80}
-          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2"
-        >
-          {WORKFLOW_PHASES.map((phase, i) => {
-            const active = selected === phase;
-            return (
-              <button
-                key={phase}
-                onClick={() => setSelected(active ? "全部" : phase)}
-                className={cn(
-                  "surface focus-ring group relative rounded-2xl p-4 text-left transition-colors",
-                  active
-                    ? "border-[var(--line-strong)] bg-paper-2/90"
-                    : "hover:border-[var(--line-strong)]",
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="numeral text-[20px] leading-none text-ink-3">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span
-                    className={cn(
-                      "h-1.5 w-1.5 rounded-full transition-transform",
-                      active ? "scale-150 bg-coral" : "bg-ink-4/40",
-                    )}
-                  />
-                </div>
-                <div className="mt-4 serif text-[15px] leading-tight text-ink">
-                  {phase}
-                </div>
-              </button>
-            );
-          })}
+        <Reveal delay={80} className="relative">
+          {/* 织线：贯穿 5 环的一条经线（lg 单行时显示），5 环织成一条打通的链路。
+              呼应 globals.css 的 .loom 经纬隐喻，玻璃卡片是线上的「结」。 */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-6 top-1/2 hidden -translate-y-1/2 lg:block"
+          >
+            <div className="shimmer-line h-px w-full" />
+          </div>
+          <div className="relative grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            {WORKFLOW_PHASES.map((phase, i) => {
+              const active = selected === phase;
+              return (
+                <button
+                  key={phase}
+                  onClick={() => setSelected(active ? "全部" : phase)}
+                  className={cn(
+                    "surface focus-ring group relative rounded-2xl p-4 text-left transition-colors",
+                    active
+                      ? "border-[var(--line-strong)] bg-paper-2/90"
+                      : "hover:border-[var(--line-strong)]",
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="numeral text-[20px] leading-none text-ink-3">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span
+                      className={cn(
+                        "h-1.5 w-1.5 rounded-full transition-transform",
+                        active ? "scale-150 bg-coral" : "bg-ink-4/40",
+                      )}
+                    />
+                  </div>
+                  <div className="mt-4 serif text-[15px] leading-tight text-ink">
+                    {phase}
+                  </div>
+                  {/* 环间衔接箭头：暗示上游→下游流向（lg 单行时显示，最后一环不画） */}
+                  {i < WORKFLOW_PHASES.length - 1 && (
+                    <span
+                      aria-hidden
+                      className="absolute -right-[7px] top-1/2 z-10 hidden -translate-y-1/2 text-ink-4 transition-colors group-hover:text-coral lg:block"
+                    >
+                      ›
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </Reveal>
       </section>
 

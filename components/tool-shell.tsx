@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import type { CSSProperties } from "react";
 import type { Tool } from "@/lib/tools-registry";
 import { Reveal } from "@/components/reveal";
+import { WorkflowRail } from "@/components/workflow/WorkflowRail";
 
 const ACCENTS: Record<string, string> = {
   "paper-search": "#b14bff",
@@ -90,6 +91,13 @@ export function ToolShell({
           background: `linear-gradient(90deg, ${accent}55, var(--line) 40%, var(--line))`,
         }}
       />
+
+      {/* 工作流位置条：上游 ← 本步（5 环高亮）→ 下游（gallery 工具不渲染） */}
+      {tool.track === "workflow" && (
+        <Reveal delay={130} className="mt-6">
+          <WorkflowRail tool={tool} accent={accent} />
+        </Reveal>
+      )}
 
       <Reveal delay={160} className="mt-10">
         {children}

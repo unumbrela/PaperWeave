@@ -39,6 +39,39 @@ export function InlineLoading({ label = "加载中…" }: { label?: string }) {
   );
 }
 
+/** 整页居中加载态（替代各页裸 coral spinner，统一为编辑风眉标 + 旋转） */
+export function CenteredLoading({
+  label = "加载中…",
+  className,
+}: {
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex h-full min-h-[60vh] flex-col items-center justify-center", className)}>
+      <div className="mb-4 h-7 w-7 animate-spin rounded-full border-2 border-coral border-t-transparent" />
+      <p className="overline text-ink-3">{label}</p>
+    </div>
+  );
+}
+
+/** 骨架块 —— 编辑风占位（呼应 StreamOutput 的 pulse 行），可拼装行/卡。 */
+export function Skeleton({ className }: { className?: string }) {
+  return <div className={cn("animate-pulse rounded bg-[rgba(26,23,19,0.06)]", className)} aria-hidden />;
+}
+
+/** 多行文本骨架 */
+export function SkeletonLines({ lines = 3, className }: { lines?: number; className?: string }) {
+  const widths = ["w-5/6", "w-full", "w-2/3", "w-3/4", "w-4/5"];
+  return (
+    <div className={cn("space-y-3", className)} aria-hidden>
+      {Array.from({ length: lines }).map((_, i) => (
+        <Skeleton key={i} className={cn("h-3", widths[i % widths.length])} />
+      ))}
+    </div>
+  );
+}
+
 /** 空态 */
 export function EmptyState({
   icon,

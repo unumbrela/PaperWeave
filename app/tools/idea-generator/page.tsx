@@ -7,14 +7,9 @@ import { StreamOutput } from "@/components/stream-output";
 import { useStream } from "@/components/use-stream";
 import { consumeHandoff } from "@/lib/workflow/handoff";
 import { HandoffBanner, SaveToLibrary, SendToTool } from "@/components/workflow/handoff-controls";
-import { cn } from "@/lib/utils";
+import { TextField, Textarea, FieldLabel, Button } from "@/components/ui";
 
 const TOOL = getTool("idea-generator")!;
-
-const inputCls = cn(
-  "focus-ring w-full rounded-xl bg-paper-2/80 border border-line px-4 py-3",
-  "text-[13px] text-ink placeholder:text-ink-4 outline-none transition-colors focus:border-line-strong",
-);
 
 export default function Page() {
   const [direction, setDirection] = useState("");
@@ -55,49 +50,44 @@ export default function Page() {
           {handoffFrom && (
             <HandoffBanner from={handoffFrom} onDismiss={() => setHandoffFrom(null)} />
           )}
-          <label className="overline block mb-2">研究方向 / 关键词 *</label>
-          <input
+          <FieldLabel>研究方向 / 关键词 *</FieldLabel>
+          <TextField
             value={direction}
             onChange={(e) => setDirection(e.target.value)}
             placeholder="如：扩散模型在 3D 点云生成上的可控性"
-            className={inputCls}
           />
 
-          <label className="overline block mt-6 mb-2">参考论文摘要 / 已知工作</label>
-          <textarea
+          <FieldLabel className="mt-6">参考论文摘要 / 已知工作</FieldLabel>
+          <Textarea
+            mono
             value={references}
             onChange={(e) => setReferences(e.target.value)}
             placeholder="可从论文库或总结器粘贴 1–N 篇摘要（可选）"
             rows={6}
-            className={cn(inputCls, "font-mono leading-relaxed resize-y")}
           />
 
-          <label className="overline block mt-6 mb-2">要打败的 baseline</label>
-          <input
+          <FieldLabel className="mt-6">要打败的 baseline</FieldLabel>
+          <TextField
             value={baseline}
             onChange={(e) => setBaseline(e.target.value)}
             placeholder="如：Point-E / 现有 SOTA 方法名（可选）"
-            className={inputCls}
           />
 
-          <label className="overline block mt-6 mb-2">可用资源</label>
-          <input
+          <FieldLabel className="mt-6">可用资源</FieldLabel>
+          <TextField
             value={resources}
             onChange={(e) => setResources(e.target.value)}
             placeholder="如：单卡 4090，2 周，公开数据集（可选）"
-            className={inputCls}
           />
 
-          <button
+          <Button
+            variant="primary"
             onClick={submit}
             disabled={loading || direction.trim().length < 2}
-            className={cn(
-              "cta-gradient mt-8 w-full rounded-full px-5 py-3 text-[14px] font-medium",
-              "transition-all focus-ring",
-            )}
+            className="mt-8 w-full"
           >
             {loading ? "正在生成 idea…" : "生成研究 idea"}
-          </button>
+          </Button>
 
           <p className="mt-3 text-[11px] text-ink-3 text-center serif-italic">
             配 DeepSeek key 时用 deepseek-reasoner 深度推理（可能稍慢）；只配 OpenAI / Gemini 也能生成

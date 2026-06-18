@@ -42,8 +42,8 @@ export function PdfToolbar({
         >
           <ChevronLeft className="w-5 h-5 text-ink-2" />
         </button>
-        <span className="text-sm text-ink-3">
-          第 {currentPage} 页 / 共 {numPages} 页
+        <span className="text-sm text-ink-3 tabular-nums">
+          第 <span className="text-ink-2">{currentPage}</span> 页 / 共 {numPages} 页
         </span>
         <button
           onClick={onNext}

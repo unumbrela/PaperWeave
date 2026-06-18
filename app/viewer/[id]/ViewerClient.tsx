@@ -11,6 +11,7 @@ import { ViewerHeader } from '@/components/viewer/ViewerHeader';
 import { PdfToolbar } from '@/components/viewer/PdfToolbar';
 import { generateMarkdown, downloadMarkdown } from '@/lib/export/markdown';
 import { useAnnotations, useResearchNotes, useStickyNotes, useAIExplanation } from '@/lib/annotation/hooks';
+import { CenteredLoading } from '@/components/states';
 
 export default function ViewerClient() {
   const params = useParams();
@@ -28,11 +29,13 @@ export default function ViewerClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [copiedState, setCopiedState] = useState<{ [key: string]: boolean }>({});
   const [noteMode, setNoteMode] = useState(false);
+  // 正在生成 AI 解释的标注 id —— 解释逐条挂到标注，不再共用一个全局槽位。
+  const [explainingId, setExplainingId] = useState<string | null>(null);
 
   const { annotations, fetchAnnotations, createAnnotation, updateAnnotation, deleteAnnotation } = useAnnotations(params.id as string);
   const { stickyNotes, fetchStickyNotes, createStickyNote, updateStickyNote, deleteStickyNote } = useStickyNotes(params.id as string);
   const { notes: researchNotes, setNotes: setResearchNotes, fetchNotes, saveNotes } = useResearchNotes(params.id as string);
-  const { explanation: aiSummary, explain: requestAIExplanation } = useAIExplanation();
+  const { explain: requestAIExplanation } = useAIExplanation();
 
   useEffect(() => {
     const fetchPaper = async () => {
@@ -243,9 +246,27 @@ export default function ViewerClient() {
     console.log('[Viewer] Copied to clipboard:', text);
   };
 
-  const handleAIExplain = async (text: string) => {
-    console.log('[Viewer] Starting AI explanation for:', text);
-    await requestAIExplanation(text);
+  // 选区 → AI 解释：先把选区落成一条 insight 标注，再请求解释并挂到该标注的
+  // aiSummary 字段。多段选区各自成条、互不覆盖，可在侧栏逐条回看与导出。
+  const handleAIExplainSelection = async (text: string) => {
+    if (!params.id || !paper || !text.trim()) return;
+    const rects = selectionRects;
+    const created = await createAnnotation({
+      page: currentPage - 1,
+      rects,
+      selectedText: text,
+      type: 'insight',
+    });
+    setSelectionRects([]);
+    window.getSelection()?.removeAllRanges();
+    if (!created) return;
+    setExplainingId(created.id);
+    try {
+      const data = await requestAIExplanation(text);
+      if (data) await updateAnnotation(created.id, { aiSummary: data });
+    } finally {
+      setExplainingId(null);
+    }
   };
 
   const handleEditAnnotation = async (id: string, comment: string) => {
@@ -259,7 +280,6 @@ export default function ViewerClient() {
     const markdown = generateMarkdown({
       paper,
       annotations,
-      aiSummary,
       researchNotes,
       stickyNotes,
     });
@@ -344,11 +364,8 @@ export default function ViewerClient() {
 
   if (loading) {
     return (
-      <div className="h-dvh flex items-center justify-center bg-paper">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-coral border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-ink-3">正在加载论文…</p>
-        </div>
+      <div className="h-dvh bg-paper">
+        <CenteredLoading label="正在加载论文…" />
       </div>
     );
   }
@@ -401,6 +418,16 @@ export default function ViewerClient() {
             onToggleNoteMode={() => setNoteMode((v) => !v)}
           />
 
+          {/* 阅读进度条：随翻页推进（进度本身已本地持久化） */}
+          {numPages > 0 && (
+            <div className="h-0.5 w-full bg-line/40" aria-hidden>
+              <div
+                className="h-full bg-coral transition-[width] duration-300 ease-out"
+                style={{ width: `${Math.min(100, (currentPage / numPages) * 100)}%` }}
+              />
+            </div>
+          )}
+
           <div ref={pdfContainerRef} className="flex-1 overflow-auto bg-paper-3">
             {pdfFilePath ? (
               <PDFViewerDynamic
@@ -417,12 +444,7 @@ export default function ViewerClient() {
                 onLoadError={handleDocumentLoadError}
               />
             ) : (
-              <div className="flex items-center justify-center h-full min-h-[600px]">
-                <div className="text-center">
-                  <div className="w-12 h-12 border-3 border-coral border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                  <p className="text-ink-3">正在定位 PDF 文件…</p>
-                </div>
-              </div>
+              <CenteredLoading label="正在定位 PDF 文件…" />
             )}
           </div>
         </div>
@@ -431,11 +453,10 @@ export default function ViewerClient() {
           <Sidebar
             annotations={annotations}
             stickyNotes={stickyNotes}
-            aiSummary={aiSummary}
+            explainingId={explainingId}
             researchNotes={researchNotes}
             onDeleteAnnotation={deleteAnnotation}
             onEditAnnotation={handleEditAnnotation}
-            onAIExplain={handleAIExplain}
             onResearchNotesChange={setResearchNotes}
             onDeleteStickyNote={deleteStickyNote}
             onJumpToPage={(page) => setCurrentPage(page + 1)}
@@ -448,7 +469,7 @@ export default function ViewerClient() {
           position={{ x: floatingMenu.x, y: floatingMenu.y }}
           selectedText={floatingMenu.text}
           onSelect={handleCreateAnnotation}
-          onAIExplain={handleAIExplain}
+          onAIExplain={handleAIExplainSelection}
           onCopy={handleCopy}
           onClose={() => setFloatingMenu(null)}
         />

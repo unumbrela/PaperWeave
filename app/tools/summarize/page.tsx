@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
 import { StreamOutput } from "@/components/stream-output";
+import { SendToTool } from "@/components/workflow/handoff-controls";
 import { useStream } from "@/components/use-stream";
 import { cn } from "@/lib/utils";
 
@@ -89,14 +90,28 @@ function SummarizeContent() {
           </p>
         </div>
 
-        <StreamOutput
-          text={text}
-          loading={loading}
-          error={error}
-          onRetry={submit}
-          onStop={stop}
-          emptyHint="Paste a URL, press 生成摘要."
-        />
+        <div className="flex flex-col gap-3">
+          <StreamOutput
+            text={text}
+            loading={loading}
+            error={error}
+            onRetry={submit}
+            onStop={stop}
+            emptyHint="Paste a URL, press 生成摘要."
+          />
+          {text && !loading && (
+            <div className="flex flex-wrap justify-end gap-2">
+              <SendToTool
+                targetSlug="idea-generator"
+                label="发往 Idea 生成器"
+                payload={{
+                  from: TOOL.name,
+                  fields: { references: text },
+                }}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </ToolShell>
   );
