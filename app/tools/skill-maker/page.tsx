@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, Copy, Download, Sparkles } from "lucide-react";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
 import { StreamOutput } from "@/components/stream-output";
 import { useStream } from "@/components/use-stream";
+import { consumeHandoff } from "@/lib/workflow/handoff";
+import { HandoffBanner } from "@/components/workflow/handoff-controls";
 import { cn } from "@/lib/utils";
 
 const TOOL = getTool("skill-maker")!;
@@ -92,7 +94,23 @@ function stripInstallComment(text: string): string {
 
 export default function Page() {
   const [form, setForm] = useState<ExampleForm>(DEFAULT_FORM);
+  const [handoffFrom, setHandoffFrom] = useState<string | null>(null);
   const { text, loading, error, run, stop } = useStream();
+
+  useEffect(() => {
+    // 挂载时一次性消费上游 handoff（如任务规划器发来的 Runbook → 封装成 skill）
+    /* eslint-disable react-hooks/set-state-in-effect */
+    const h = consumeHandoff("skill-maker");
+    if (!h) return;
+    setForm((f) => ({
+      ...f,
+      name: h.fields.name || f.name,
+      trigger: h.fields.trigger || f.trigger,
+      capability: h.fields.capability || f.capability,
+    }));
+    setHandoffFrom(h.from);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   const nameError = useMemo(() => {
     if (!form.name) return null;
@@ -139,6 +157,9 @@ export default function Page() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         {/* LEFT: form */}
         <div className="surface rounded-[20px] p-6 space-y-5">
+          {handoffFrom && (
+            <HandoffBanner from={handoffFrom} onDismiss={() => setHandoffFrom(null)} />
+          )}
           <div>
             <label className="overline block mb-2">Skill 名称</label>
             <input

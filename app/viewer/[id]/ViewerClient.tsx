@@ -12,6 +12,7 @@ import { PdfToolbar } from '@/components/viewer/PdfToolbar';
 import { generateMarkdown, downloadMarkdown } from '@/lib/export/markdown';
 import { useAnnotations, useResearchNotes, useStickyNotes, useAIExplanation } from '@/lib/annotation/hooks';
 import { CenteredLoading } from '@/components/states';
+import { stageHandoff } from '@/lib/workflow/handoff';
 
 export default function ViewerClient() {
   const params = useParams();
@@ -287,6 +288,19 @@ export default function ViewerClient() {
     downloadMarkdown(markdown, `${paper.title.replace(/[^a-z0-9]/gi, '_')}_research_brief.md`);
   };
 
+  // 接回工作流：把本篇的精读 brief（批注 + 笔记 + AI 解释）作为「已知工作」
+  // 发往 Idea 生成器，并带上 sourcePaperId 以便下游回存。闭合「读文献 → 生 idea」。
+  const handleSendToIdea = () => {
+    if (!paper) return;
+    const brief = generateMarkdown({ paper, annotations, researchNotes, stickyNotes });
+    stageHandoff('idea-generator', {
+      from: `精读 · ${paper.title}`,
+      sourcePaperId: paper.id,
+      fields: { direction: paper.direction ?? '', references: brief },
+    });
+    router.push('/tools/idea-generator');
+  };
+
   const [pdfFilePath, setPdfFilePath] = useState<string | null>(null);
   // 当前展示的 PDF 是否来自本地离线缓存（Blob）。用于决定是否需要自动「暖缓存」。
   const [pdfFromCache, setPdfFromCache] = useState(false);
@@ -397,6 +411,7 @@ export default function ViewerClient() {
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         onExport={handleExport}
+        onSendToIdea={handleSendToIdea}
         onBack={() => router.push(`/library/${paper.id}`)}
       />
 
