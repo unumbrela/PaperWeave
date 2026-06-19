@@ -578,10 +578,40 @@ export function rerankFanout(
 }
 
 /**
+ * 有上限的并发执行：最多 limit 个任务同时在飞，结果按输入顺序返回（settled 语义）。
+ * 用于给 fan-out 限速——否则一次检索 = 子查询数 × 源数 次请求并发打上游，易触发限流。
+ */
+export async function runPooled<T>(
+  tasks: Array<() => Promise<T>>,
+  limit: number,
+): Promise<PromiseSettledResult<T>[]> {
+  const results = new Array<PromiseSettledResult<T>>(tasks.length);
+  let next = 0;
+  async function worker() {
+    while (true) {
+      const i = next++;
+      if (i >= tasks.length) return;
+      try {
+        results[i] = { status: 'fulfilled', value: await tasks[i]() };
+      } catch (reason) {
+        results[i] = { status: 'rejected', reason };
+      }
+    }
+  }
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, tasks.length)) }, worker);
+  await Promise.all(workers);
+  return results;
+}
+
+/** fan-out 时同时在飞的子查询上限（× 源数 = 实际上游并发上限）。 */
+export const FANOUT_CONCURRENCY = 2;
+
+/**
  * Perplexity 式 fan-out 检索：对多条子查询各自跨源检索，
  * 合并去重后按「命中子查询数 + 时新度 + 引用」综合重排。
  * subqueries 由调用方（API 路由）经 expandQuery 算出；
  * 子查询 ≤1 条时退化为普通 searchPapers，行为与零 key 路径完全一致。
+ * 子查询经 runPooled 限制并发，避免打爆上游。
  */
 export async function searchPapersExpanded(
   query: SearchQuery,
@@ -599,7 +629,8 @@ export async function searchPapersExpanded(
     Math.max(20, Math.ceil(((query.maxResults || 30) * 1.5) / subqueries.length)),
   );
 
-  const variants = subqueries.map((sub) =>
+  // 任务工厂（不立即执行）→ runPooled 控制同时在飞的数量，限制上游并发
+  const tasks = subqueries.map((sub) => () =>
     searchPapers(
       // 子查询作为关键词；清掉自由文本意图字段，避免每条都拼上长目标稀释多样性
       { ...query, keywords: sub, researchGoal: undefined, methodHints: undefined, maxResults: perVariantMax },
@@ -608,7 +639,7 @@ export async function searchPapersExpanded(
     ),
   );
 
-  const settled = await Promise.allSettled(variants);
+  const settled = await runPooled(tasks, FANOUT_CONCURRENCY);
 
   // 命中计数（去重前统计：一篇论文被多少条子查询召回 = 主题中心度）
   const hitCounts = new Map<string, number>();
