@@ -50,6 +50,8 @@ export async function POST(request: Request) {
         success: true,
         data: cached.results.slice(0, query.maxResults),
         failedSources: cached.failedSources,
+        expanded,
+        subqueryCount: expanded ? subqueries.length : 0,
         cached: true,
       });
     }
@@ -62,7 +64,14 @@ export async function POST(request: Request) {
     await putCached(key, queryLabel(query), results, failedSources);
 
     logEvent({ route: 'paper-search', ok: true, ms: done(), meta: { cacheHit: false, results: results.length, expanded } });
-    return NextResponse.json({ success: true, data: results, failedSources, expanded, cached: false });
+    return NextResponse.json({
+      success: true,
+      data: results,
+      failedSources,
+      expanded,
+      subqueryCount: expanded ? subqueries.length : 0,
+      cached: false,
+    });
   } catch (error) {
     console.error('[Search API] Error:', error);
     logEvent({ route: 'paper-search', ok: false, ms: done(), status: 500 });

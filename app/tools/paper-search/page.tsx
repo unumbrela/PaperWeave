@@ -51,6 +51,7 @@ export default function Page() {
   });
 
   const [results, setResults] = useState<PaperResult[]>([]);
+  const [expandInfo, setExpandInfo] = useState<{ expanded: boolean; count: number }>({ expanded: false, count: 0 });
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +135,7 @@ export default function Page() {
 
       if (data.success) {
         setResults(data.data);
+        setExpandInfo({ expanded: !!data.expanded, count: Number(data.subqueryCount) || 0 });
         // 新结果到达：清空上一轮的精炼 / 选择 / 速览，回到首屏
         setRefine(EMPTY_REFINE);
         setClientSort(query.sortBy || "relevance");
@@ -535,6 +537,15 @@ export default function Page() {
                   >
                     清除精炼
                   </button>
+                )}
+                {!isLoading && results.length > 0 && expandInfo.expanded && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full border border-plum/30 bg-plum/8 px-2 py-0.5 text-[10.5px] text-plum"
+                    title={`已用 LLM 把检索词扩展成 ${expandInfo.count} 条子查询并发检索、合并去重后重排，提升召回`}
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    {expandInfo.count} 条子查询扩展
+                  </span>
                 )}
               </div>
 
