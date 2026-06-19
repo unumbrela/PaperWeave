@@ -6,24 +6,13 @@ import { Search, ArrowUpRight } from "lucide-react";
 import { ToolCard } from "@/components/tool-card";
 import { Reveal } from "@/components/reveal";
 import {
-  PHASES,
-  WORKFLOW_PHASES,
-  getWorkflowTools,
+  CORE_FLOW,
+  getSupportingTools,
   getGalleryTools,
   getLabTools,
-  getPhaseLeadTool,
   type Phase,
 } from "@/lib/tools-registry";
 import { cn } from "@/lib/utils";
-
-/** 5 环主线每环的一句话角色说明（首页「核心论文流程」展示）。 */
-const PHASE_ROLE: Record<Phase, string> = {
-  调研搜索: "多源并发 + LLM 查询扩展检索，给每篇论文定位与简介",
-  精读定位: "标记、精读、对比，并梳理论文所在方向的发展脉络",
-  创新点: "在选定论文基础上想差异化创新点与最小验证实验",
-  组织撰写: "把创新点与素材组织成论文结构与逐段写作脚手架",
-  论文绘图: "把方法与实验结果画成出版级、可直接用的图表",
-};
 
 /** Hero 大标题逐词上浮（reveal-word 遮罩 + word-rise），重点词用流动渐变。 */
 const HEADLINE: Array<{ word: string; flow?: boolean; lineBreak?: boolean }> = [
@@ -51,14 +40,11 @@ function formatDisplayDate(date: Date) {
   return `${values.year}.${values.month}.${values.day}`;
 }
 
-type Selection = "全部" | Phase;
-
 export default function Home() {
-  const [selected, setSelected] = useState<Selection>("全部");
   const [query, setQuery] = useState("");
   const currentDate = formatDisplayDate(new Date());
 
-  const workflowTools = useMemo(() => getWorkflowTools(), []);
+  const supportingTools = useMemo(() => getSupportingTools(), []);
   const galleryTools = useMemo(() => getGalleryTools(), []);
   const labTools = useMemo(() => getLabTools(), []);
 
@@ -71,26 +57,20 @@ export default function Home() {
     t.description.toLowerCase().includes(q) ||
     t.phases.some((p) => p.toLowerCase().includes(q));
 
-  // 工作流网格：按 5 环阶段 + 关键词过滤。
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return workflowTools.filter((t) => {
-      if (selected !== "全部" && !t.phases.includes(selected)) return false;
-      return matchesQuery(t, q);
-    });
-  }, [selected, query, workflowTools]);
-
-  // 展厅：独立于工作流阶段，仅按关键词过滤。
-  const filteredGallery = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return galleryTools.filter((t) => matchesQuery(t, q));
-  }, [query, galleryTools]);
-
-  // 命令行 / 自动化扩展：独立于论文主线，仅按关键词过滤。
-  const filteredLab = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return labTools.filter((t) => matchesQuery(t, q));
-  }, [query, labTools]);
+  // 首页核心流程之下的工具一律按关键词过滤（不再按阶段过滤——核心流程已显式列出）。
+  const q = query.trim().toLowerCase();
+  const filteredSupporting = useMemo(
+    () => supportingTools.filter((t) => matchesQuery(t, q)),
+    [q, supportingTools],
+  );
+  const filteredLab = useMemo(
+    () => labTools.filter((t) => matchesQuery(t, q)),
+    [q, labTools],
+  );
+  const filteredGallery = useMemo(
+    () => galleryTools.filter((t) => matchesQuery(t, q)),
+    [q, galleryTools],
+  );
 
   return (
     <>
@@ -130,9 +110,9 @@ export default function Home() {
               <div className="hairline mb-4" />
               <p className="text-[13px] leading-relaxed text-ink-2 max-w-xs">
                 这里是 <span className="serif-italic text-ink">PaperWeave</span>
-                ，一个以论文为核心、本地优先的研究工作台。调研搜索 → 精读定位 → 想{" "}
+                ，一个以论文为核心、本地优先的研究工作台。从调研搜索最新论文，到总结、精读挑选、想{" "}
                 <span className="serif-italic text-ink">创新点</span>
-                {" "}→ 组织撰写 → 出图——5 环串成一条打通的论文主线，上游产出即下游输入。只搭骨架不代写正文，让每一步都顺起来。
+                、撰写、出图——一条线走完。只搭骨架不代写正文，让每一步都顺起来。
               </p>
             </Reveal>
           </div>
@@ -143,136 +123,98 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 核心论文流程 —— 5 环主线，每环直达代表工具（页面中心） */}
+      {/* 核心论文流程 —— 围绕一篇论文的线性主线，每步直达对应工具（页面中心） */}
       <section className="mx-auto w-full max-w-6xl px-6 pt-12">
         <Reveal className="flex items-baseline justify-between mb-6">
           <h2 className="serif text-[22px] sm:text-[26px] tracking-tight text-ink">
             <span className="serif-italic text-ink-2">The</span> Paper Workflow
           </h2>
-          <span className="overline text-ink-3">
-            核心论文流程 · 5 环上下游打通
-          </span>
+          <span className="overline text-ink-3">核心论文流程 · 一条线走完</span>
         </Reveal>
 
         <Reveal delay={80} className="relative">
-          {/* 织线：贯穿 5 环的一条经线（lg 单行时显示），5 环织成一条打通的链路。
-              呼应 globals.css 的 .loom 经纬隐喻，玻璃卡片是线上的「结」。 */}
+          {/* 织线：贯穿全流程的一条经线（lg 单行时显示），各步织成一条打通的链路。 */}
           <div
             aria-hidden
             className="pointer-events-none absolute inset-x-6 top-1/2 hidden -translate-y-1/2 lg:block"
           >
             <div className="shimmer-line h-px w-full" />
           </div>
-          <div className="relative grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-            {WORKFLOW_PHASES.map((phase, i) => {
-              const lead = getPhaseLeadTool(phase);
-              return (
-                <Link
-                  key={phase}
-                  href={lead?.href ?? "#"}
-                  className="surface focus-ring group relative flex flex-col rounded-2xl p-4 transition-colors hover:border-[var(--line-strong)]"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="numeral text-[20px] leading-none text-ink-3">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    {lead && <span className="text-[18px] leading-none">{lead.icon}</span>}
-                  </div>
-                  <div className="mt-3 serif text-[15px] leading-tight text-ink">
-                    {phase}
-                  </div>
-                  <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-3">
-                    {PHASE_ROLE[phase]}
-                  </p>
-                  {lead && (
-                    <span className="mt-auto pt-3 inline-flex items-center gap-1 text-[11px] text-ink-2 transition-colors group-hover:text-coral">
-                      {lead.name}
-                      <ArrowUpRight className="h-3 w-3" />
-                    </span>
-                  )}
-                  {/* 环间衔接箭头：暗示上游→下游流向（lg 单行时显示，最后一环不画） */}
-                  {i < WORKFLOW_PHASES.length - 1 && (
-                    <span
-                      aria-hidden
-                      className="absolute -right-[7px] top-1/2 z-10 hidden -translate-y-1/2 text-ink-4 transition-colors group-hover:text-coral lg:block"
-                    >
-                      ›
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        </Reveal>
-      </section>
-
-      {/* SEARCH + FILTER */}
-      <section className="mx-auto w-full max-w-6xl px-6 pt-12">
-        <Reveal className="grid grid-cols-12 gap-6 items-center">
-          <div className="col-span-12 lg:col-span-7">
-            <label className="relative block">
-              <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-3" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={`搜索工具 ·  try "idea"…`}
-                className={cn(
-                  "surface focus-ring w-full rounded-full",
-                  "pl-11 pr-20 py-3 text-[14px] text-ink placeholder:text-ink-3/80",
-                  "outline-none transition-colors",
-                  "hover:border-[var(--line-strong)]",
+          <div className="relative grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {CORE_FLOW.map((step, i) => (
+              <Link
+                key={step.title}
+                href={step.href}
+                className="surface focus-ring group relative flex flex-col rounded-2xl p-4 transition-colors hover:border-[var(--line-strong)]"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="numeral text-[20px] leading-none text-ink-3">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="text-[18px] leading-none">{step.icon}</span>
+                </div>
+                <div className="mt-3 serif text-[15px] leading-tight text-ink">
+                  {step.title}
+                </div>
+                <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-3">
+                  {step.blurb}
+                </p>
+                <span className="mt-auto pt-3 inline-flex items-center gap-1 text-[11px] text-ink-2 transition-colors group-hover:text-coral">
+                  打开
+                  <ArrowUpRight className="h-3 w-3" />
+                </span>
+                {/* 步间衔接箭头：暗示上游→下游流向（lg 单行时显示，最后一步不画） */}
+                {i < CORE_FLOW.length - 1 && (
+                  <span
+                    aria-hidden
+                    className="absolute -right-[7px] top-1/2 z-10 hidden -translate-y-1/2 text-ink-4 transition-colors group-hover:text-coral lg:block"
+                  >
+                    ›
+                  </span>
                 )}
-              />
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                <kbd>⌘</kbd>
-                <kbd>K</kbd>
-              </span>
-            </label>
-          </div>
-          <div className="col-span-12 lg:col-span-5 flex items-center gap-2 lg:justify-end flex-wrap">
-            <span className="overline mr-1">分类</span>
-            <div className="surface rounded-full p-1 flex items-center gap-0.5 flex-wrap">
-              {PHASES.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setSelected(p)}
-                  className={cn(
-                    "px-3 py-1 text-[12px] rounded-full transition-colors whitespace-nowrap",
-                    selected === p
-                      ? "bg-ink text-paper-2"
-                      : "text-ink-2 hover:text-ink",
-                  )}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
+              </Link>
+            ))}
           </div>
         </Reveal>
       </section>
 
-      {/* TOOLS */}
-      <section className="mx-auto w-full max-w-6xl px-6 pt-12 pb-24">
+      {/* SEARCH（仅用于过滤核心流程之下的配套 / 扩展 / 展厅工具） */}
+      <section className="mx-auto w-full max-w-6xl px-6 pt-16">
+        <Reveal>
+          <label className="relative block max-w-xl">
+            <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-3" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`搜索配套工具 ·  try "对比"…`}
+              className={cn(
+                "surface focus-ring w-full rounded-full",
+                "pl-11 pr-5 py-3 text-[14px] text-ink placeholder:text-ink-3/80",
+                "outline-none transition-colors",
+                "hover:border-[var(--line-strong)]",
+              )}
+            />
+          </label>
+        </Reveal>
+      </section>
+
+      {/* 配套工具 —— 围绕主线的补充工具（网页速读 / 整理 / 对比 / 问库 / 图谱 / 提示词…） */}
+      <section className="mx-auto w-full max-w-6xl px-6 pt-10 pb-24">
         <Reveal className="flex items-baseline justify-between mb-8">
           <h2 className="serif text-[28px] sm:text-[34px] tracking-tight text-ink">
-            <span className="serif-italic text-ink-2">The</span> Collection
+            <span className="serif-italic text-ink-2">Supporting</span> Tools
           </h2>
-          <span className="overline">
-            {String(filtered.length).padStart(2, "0")} /{" "}
-            {String(workflowTools.length).padStart(2, "0")}
-          </span>
+          <span className="overline">配套工具 · 按需取用</span>
         </Reveal>
 
-        {filtered.length === 0 ? (
+        {filteredSupporting.length === 0 ? (
           <div className="surface rounded-2xl p-12 text-center">
             <p className="serif-italic text-2xl text-ink-2">No match found.</p>
-            <p className="mt-2 text-sm text-ink-3">
-              Try a different search term.
-            </p>
+            <p className="mt-2 text-sm text-ink-3">Try a different search term.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map((tool, i) => (
+            {filteredSupporting.map((tool, i) => (
               <ToolCard key={tool.slug} tool={tool} index={i + 1} />
             ))}
           </div>

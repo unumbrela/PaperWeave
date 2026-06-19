@@ -10,6 +10,9 @@ import {
   getWorkflowTools,
   getGalleryTools,
   getLabTools,
+  getSupportingTools,
+  CORE_FLOW,
+  CORE_FLOW_SLUGS,
   getUpstreamTool,
   getDownstreamTool,
   getPhaseLeadTool,
@@ -90,6 +93,38 @@ describe('tools-registry 不变量', () => {
     for (const phase of WORKFLOW_PHASES) {
       expect(getToolsInPhase(phase).length, `${phase} 无工具`).toBeGreaterThan(0);
     }
+  });
+
+  describe('CORE_FLOW（首页核心论文流程）', () => {
+    it('每步字段非空，工具步的 toolSlug 命中真实工具且 href 一致', () => {
+      expect(CORE_FLOW.length).toBeGreaterThanOrEqual(5);
+      for (const step of CORE_FLOW) {
+        expect(step.title, 'title').toBeTruthy();
+        expect(step.blurb, `blurb of ${step.title}`).toBeTruthy();
+        expect(step.href, `href of ${step.title}`).toBeTruthy();
+        expect(step.icon, `icon of ${step.title}`).toBeTruthy();
+        if (step.toolSlug) {
+          const tool = getTool(step.toolSlug);
+          expect(tool, `core step ${step.title} 指向不存在的工具 ${step.toolSlug}`).toBeDefined();
+          expect(tool!.href).toBe(step.href); // href 与注册表一致，避免漂移
+          expect(tool!.track).toBe('workflow');
+        }
+      }
+    });
+
+    it('CORE_FLOW_SLUGS = 各步 toolSlug，且唯一', () => {
+      expect(new Set(CORE_FLOW_SLUGS).size).toBe(CORE_FLOW_SLUGS.length);
+      expect(CORE_FLOW_SLUGS.every((s) => !!getTool(s))).toBe(true);
+    });
+
+    it('配套工具 = workflow 工具 - 核心流程工具（完整划分，不重不漏）', () => {
+      const supporting = getSupportingTools();
+      const wf = getWorkflowTools();
+      expect(supporting.length + CORE_FLOW_SLUGS.length).toBe(wf.length);
+      // 配套工具不含任何核心流程工具
+      expect(supporting.some((t) => CORE_FLOW_SLUGS.includes(t.slug))).toBe(false);
+      expect(supporting.every((t) => t.track === 'workflow')).toBe(true);
+    });
   });
 
   it('getTool 命中 / 未命中行为正确', () => {

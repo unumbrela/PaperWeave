@@ -122,7 +122,7 @@ export const TOOLS: Tool[] = [
     slug: "idea-generator",
     name: "Idea 生成器",
     description:
-      "基于参考论文与可用资源，输出有差异化假设、最小验证实验、风险清单的研究 idea。",
+      "先拆解参考论文的现有创新点与局限，再在其之上衍生有差异化假设、最小验证实验、风险清单的新研究 idea。",
     phases: ["创新点"],
     track: "workflow",
     icon: "💡",
@@ -260,6 +260,76 @@ export const TOOLS: Tool[] = [
     href: "/tools/skill-maker",
   },
 ];
+
+// ── 核心论文流程（首页主线）────────────────────────────────
+// 围绕「一篇论文」的线性旅程：搜 → 总结 → 精读挑选 → 创新 → 撰写 → 绘图。
+// 这是首页一上来就展示的核心；其余工具（配套 / lab / 展厅）一律下放。
+// 与 Phase/Track 解耦：Phase 用于分类与 handoff，CORE_FLOW 是面向用户的旅程地图。
+export type CoreStep = {
+  /** 步骤名（首页大字） */
+  title: string;
+  /** 一句话角色说明 */
+  blurb: string;
+  /** 目标路由（工具页或 /library 等核心页面） */
+  href: string;
+  icon: string;
+  /** 对应工具 slug（工具页才有）；用于把核心工具从「配套工具」中排除，避免重复露出。 */
+  toolSlug?: string;
+};
+
+export const CORE_FLOW: CoreStep[] = [
+  {
+    title: "调研搜索",
+    blurb: "多源并发检索最新论文，LLM 查询扩展不重不漏，逐篇定位 + 一句话速览。",
+    href: "/tools/paper-search",
+    icon: "🔎",
+    toolSlug: "paper-search",
+  },
+  {
+    title: "总结提炼",
+    blurb: "把论文结构化拆成要点 / 方法 / 实验设置 / 引文，快速判断价值。",
+    href: "/tools/markdown-summarize",
+    icon: "📚",
+    toolSlug: "markdown-summarize",
+  },
+  {
+    title: "精读挑选",
+    blurb: "导入论文库，PDF 精读批注，标记 / 挑出感兴趣的那一篇。",
+    href: "/library",
+    icon: "📖",
+  },
+  {
+    title: "分析创新点",
+    blurb: "拆解选中论文的现有创新点与局限，在其之上衍生可验证的差异化新创新。",
+    href: "/tools/idea-generator",
+    icon: "💡",
+    toolSlug: "idea-generator",
+  },
+  {
+    title: "组织撰写",
+    blurb: "把创新点与素材搭成论文结构、逐节要点与段落脚手架（不代写正文）。",
+    href: "/tools/paper-writer",
+    icon: "✍️",
+    toolSlug: "paper-writer",
+  },
+  {
+    title: "论文绘图",
+    blurb: "出版级绘图代码 + 文生图科研绘图提示词，把方法与结果画清楚。",
+    href: "/tools/figure-generator",
+    icon: "📈",
+    toolSlug: "figure-generator",
+  },
+];
+
+/** 核心流程占用的工具 slug 集合（用于从「配套工具」中排除）。 */
+export const CORE_FLOW_SLUGS: string[] = CORE_FLOW.map((s) => s.toolSlug).filter(
+  (s): s is string => !!s,
+);
+
+/** 配套工具 = workflow 工具中不在核心流程里的那些（下放到首页核心流程之下）。 */
+export function getSupportingTools(): Tool[] {
+  return getWorkflowTools().filter((t) => !CORE_FLOW_SLUGS.includes(t.slug));
+}
 
 export const PHASES: ("全部" | Phase)[] = [
   "全部",
