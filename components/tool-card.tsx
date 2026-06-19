@@ -13,6 +13,7 @@ const ACCENTS: Record<string, string> = {
   "markdown-summarize": "#6b8ed6",
   "idea-generator": "#f59e0b",
   "paper-writer": "#ec4899",
+  "figure-prompt": "#4bb3ff",
   "prompt-chunker": "#ec4899",
   "skill-maker": "#d24b7f",
   "cnn-explainer": "#f4c25a",

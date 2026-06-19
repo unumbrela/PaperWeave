@@ -155,6 +155,17 @@ export const TOOLS: Tool[] = [
     gradient: "from-[#10b981] to-[#4bb3ff]",
     href: "/tools/figure-generator",
   },
+  {
+    slug: "figure-prompt",
+    name: "科研绘图提示词生成器",
+    description:
+      "把主题与要展示的内容，组织成可直接粘贴给文生图模型（DALL·E / Midjourney / 即梦等）的科研图形摘要 / 示意图提示词：横向流程、矢量插画质感、配色语义、克制约束一应俱全。",
+    phases: ["论文绘图"],
+    track: "workflow",
+    icon: "🎨",
+    gradient: "from-[#4bb3ff] to-[#b14bff]",
+    href: "/tools/figure-prompt",
+  },
 
   // ── 可视化展厅（gallery）：交互式教学演示，独立于工作流 ──────
   {
