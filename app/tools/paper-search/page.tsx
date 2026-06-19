@@ -51,7 +51,8 @@ export default function Page() {
   });
 
   const [results, setResults] = useState<PaperResult[]>([]);
-  const [expandInfo, setExpandInfo] = useState<{ expanded: boolean; count: number }>({ expanded: false, count: 0 });
+  const [expandInfo, setExpandInfo] = useState<{ expanded: boolean; count: number; reranked: boolean }>({ expanded: false, count: 0, reranked: false });
+  const [llmRerank, setLlmRerank] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,6 +128,7 @@ export default function Page() {
           ...query,
           sources: selectedSources,
           apiKeys: { "semantic-scholar": apiConfig["semantic-scholar"] },
+          llmRerank,
         }),
         signal: ctl.signal,
       });
@@ -135,7 +137,7 @@ export default function Page() {
 
       if (data.success) {
         setResults(data.data);
-        setExpandInfo({ expanded: !!data.expanded, count: Number(data.subqueryCount) || 0 });
+        setExpandInfo({ expanded: !!data.expanded, count: Number(data.subqueryCount) || 0, reranked: !!data.reranked });
         // 新结果到达：清空上一轮的精炼 / 选择 / 速览，回到首屏
         setRefine(EMPTY_REFINE);
         setClientSort(query.sortBy || "relevance");
@@ -471,6 +473,8 @@ export default function Page() {
           selectedSources={selectedSources}
           toggleSource={toggleSource}
           toggleVenue={toggleVenue}
+          llmRerank={llmRerank}
+          setLlmRerank={setLlmRerank}
           isLoading={isLoading}
           onSearch={() => handleSearch()}
           onSearchWith={handleSearchWith}
@@ -545,6 +549,15 @@ export default function Page() {
                   >
                     <Sparkles className="h-3 w-3" />
                     {expandInfo.count} 条子查询扩展
+                  </span>
+                )}
+                {!isLoading && results.length > 0 && expandInfo.reranked && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full border border-sage/40 bg-sage/10 px-2 py-0.5 text-[10.5px] text-sage"
+                    title="已用 LLM 对前 20 篇按与研究目标的契合度精排"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    AI 精排
                   </span>
                 )}
               </div>
