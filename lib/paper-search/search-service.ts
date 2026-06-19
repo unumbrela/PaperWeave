@@ -120,6 +120,7 @@ export async function searchOpenAlex(query: SearchQuery): Promise<PaperResult[]>
           pdfUrl: work.open_access?.oa_url,
           abstract: work.abstract || restoreOpenAlexAbstract(work.abstract_inverted_index),
           citations: work.cited_by_count,
+          doi: normalizeDoi(work.doi),
           source: 'openalex',
         });
       }
@@ -259,6 +260,7 @@ export async function searchArXiv(query: SearchQuery): Promise<PaperResult[]> {
         url: `https://arxiv.org/abs/${id}`,
         pdfUrl: pdfUrl,
         abstract: summary,
+        arxivId: id,
         source: 'arxiv',
       });
     }
@@ -404,11 +406,104 @@ export async function searchCrossref(query: SearchQuery): Promise<PaperResult[]>
         url: work.URL || (work.DOI ? `https://doi.org/${work.DOI}` : ''),
         abstract,
         citations: work['is-referenced-by-count'],
+        doi: normalizeDoi(work.DOI),
         source: 'crossref',
       });
     }
   } catch (error) {
     console.error('Crossref search failed:', error);
+    throw error;
+  }
+
+  return results;
+}
+
+export async function searchEuropePMC(query: SearchQuery): Promise<PaperResult[]> {
+  const results: PaperResult[] = [];
+
+  try {
+    const keywordQuery = buildKeywordQuery(query);
+    if (!keywordQuery) return results;
+
+    const pageSize = Math.min(Math.max(query.maxResults || 30, 20), 100);
+
+    // Europe PMC 查询语法支持 PUB_YEAR 闭区间；预印本（bioRxiv/medRxiv）source=PPR
+    let q = keywordQuery;
+    if (query.startYear || query.endYear) {
+      const start = query.startYear || 1900;
+      const end = query.endYear || new Date().getFullYear();
+      q += ` AND (PUB_YEAR:[${start} TO ${end}])`;
+    }
+
+    const params = new URLSearchParams();
+    params.set('query', q);
+    params.set('format', 'json');
+    params.set('pageSize', String(pageSize));
+    params.set('resultType', 'core'); // core 才带 abstractText
+    if (query.sortBy === 'year') params.set('sort', 'P_PDATE_D desc');
+    else if (query.sortBy === 'citations') params.set('sort', 'CITED desc');
+
+    const url = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?${params.toString()}`;
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'PaperWeave/1.0 (https://github.com/unumbrela/toolbox; mailto:noreply@paperweave.app)',
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Europe PMC API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const items: unknown[] = data?.resultList?.result || [];
+
+    for (const raw of items) {
+      const r = raw as {
+        id?: string;
+        source?: string;
+        doi?: string;
+        title?: string;
+        authorString?: string;
+        pubYear?: string;
+        citedByCount?: number;
+        abstractText?: string;
+        journalInfo?: { journal?: { title?: string } };
+        bookOrReportDetails?: { publisher?: string };
+        fullTextUrlList?: { fullTextUrl?: Array<{ documentStyle?: string; url?: string }> };
+      };
+      const title = r.title?.trim();
+      if (!title) continue;
+
+      const authors = r.authorString
+        ? r.authorString.replace(/\.\s*$/, '').split(/,\s*/).filter(Boolean)
+        : [];
+      const year = r.pubYear ? parseInt(r.pubYear, 10) : undefined;
+      const pdfUrl = (r.fullTextUrlList?.fullTextUrl || []).find(
+        (u) => (u.documentStyle || '').toLowerCase() === 'pdf' && u.url,
+      )?.url;
+      const venue = r.journalInfo?.journal?.title || r.bookOrReportDetails?.publisher;
+      const articlePath = r.source && r.id ? `${r.source}/${r.id}` : undefined;
+
+      results.push({
+        id: r.doi ? `europepmc-${r.doi}` : `europepmc-${r.source}-${r.id}`,
+        title,
+        authors,
+        year: Number.isFinite(year) ? year : undefined,
+        venue,
+        url: articlePath
+          ? `https://europepmc.org/article/${articlePath}`
+          : r.doi
+            ? `https://doi.org/${r.doi}`
+            : '',
+        pdfUrl,
+        abstract: r.abstractText,
+        citations: typeof r.citedByCount === 'number' ? r.citedByCount : undefined,
+        doi: normalizeDoi(r.doi),
+        source: 'europepmc',
+      });
+    }
+  } catch (error) {
+    console.error('Europe PMC search failed:', error);
     throw error;
   }
 
@@ -426,28 +521,98 @@ export function normalizeTitleKey(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
+/** 归一化 DOI：去 doi.org/dx.doi.org 前缀、小写、去空白。空值返回 undefined。 */
+export function normalizeDoi(doi?: string): string | undefined {
+  if (!doi) return undefined;
+  const v = doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').trim().toLowerCase();
+  return v || undefined;
+}
+
+/** arXiv id 归一化：去版本号 vN，便于 v1/v2 视为同篇。 */
+function arxivBase(id: string): string {
+  return id.replace(/v\d+$/i, '').trim().toLowerCase();
+}
+
+// arXiv 自家 DataCite DOI 形如 10.48550/arXiv.2401.00001 —— 据此把 OpenAlex/Crossref
+// 记录桥接回 arXiv 预印本（二者共享同一 arxivId，标题再不一致也能合并）。
+const ARXIV_DOI_RE = /^10\.48550\/arxiv\.(.+)$/i;
+
 /**
- * 跨源合并：同一篇论文在多个源出现时合并为一条（而非丢弃后到的），
+ * 一篇论文的全部身份键：DOI > arXiv id > 标题。
+ * 共享任一键即视为同一篇（并查集合并），DOI/arXiv 主键消除标题细微差异导致的漏合并，
+ * 标题键兜底（无任何标识时仍能去重）。
+ */
+export function identityKeys(p: PaperResult): string[] {
+  const keys: string[] = [];
+  const doi = normalizeDoi(p.doi);
+  if (doi) {
+    keys.push(`doi:${doi}`);
+    const m = doi.match(ARXIV_DOI_RE);
+    if (m) keys.push(`arxiv:${arxivBase(m[1])}`);
+  }
+  if (p.arxivId) keys.push(`arxiv:${arxivBase(p.arxivId)}`);
+  keys.push(`title:${normalizeTitleKey(p.title)}`);
+  return keys;
+}
+
+/** 缺失字段从重复条目补齐（保留先到者身份；引用数 0 不被当成缺失覆盖）。 */
+function fillMissing(into: PaperResult, from: PaperResult): void {
+  if (into.citations == null && from.citations != null) into.citations = from.citations;
+  if (!into.pdfUrl && from.pdfUrl) into.pdfUrl = from.pdfUrl;
+  if (!into.venue && from.venue) into.venue = from.venue;
+  if (!into.abstract && from.abstract) into.abstract = from.abstract;
+  if (!into.year && from.year) into.year = from.year;
+  if (into.authors.length === 0 && from.authors.length > 0) into.authors = from.authors;
+  if (!into.doi && from.doi) into.doi = from.doi;
+  if (!into.arxivId && from.arxivId) into.arxivId = from.arxivId;
+}
+
+/**
+ * 跨源合并：用并查集按「DOI / arXiv id / 标题」任一共享键把同一篇论文合并为一条，
  * 保留先到源的身份字段，缺失字段从重复条目补齐——
- * 典型收益：OpenAlex 提供引用数，arXiv 提供稳定 PDF 链接。
+ * 典型收益：OpenAlex 提供引用数、arXiv 提供稳定 PDF；DOI/arXiv 主键修掉
+ * 「预印本 vs 正式出版版」标题细微差异（副标题/大小写/vN）导致的漏合并。
  */
 export function mergeDuplicates(results: PaperResult[]): PaperResult[] {
-  const byKey = new Map<string, PaperResult>();
-  for (const paper of results) {
-    const key = normalizeTitleKey(paper.title);
-    const existing = byKey.get(key);
-    if (!existing) {
-      byKey.set(key, { ...paper });
-      continue;
+  const n = results.length;
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const find = (x: number): number => {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
     }
-    if (existing.citations == null && paper.citations != null) existing.citations = paper.citations;
-    if (!existing.pdfUrl && paper.pdfUrl) existing.pdfUrl = paper.pdfUrl;
-    if (!existing.venue && paper.venue) existing.venue = paper.venue;
-    if (!existing.abstract && paper.abstract) existing.abstract = paper.abstract;
-    if (!existing.year && paper.year) existing.year = paper.year;
-    if (existing.authors.length === 0 && paper.authors.length > 0) existing.authors = paper.authors;
+    return x;
+  };
+  // union 总把较大下标指向较小下标 → 每个连通分量的根 = 最先到的那篇
+  const union = (a: number, b: number) => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb);
+  };
+
+  const keyOwner = new Map<string, number>();
+  for (let i = 0; i < n; i++) {
+    for (const k of identityKeys(results[i])) {
+      const owner = keyOwner.get(k);
+      if (owner === undefined) keyOwner.set(k, i);
+      else union(i, owner);
+    }
   }
-  return [...byKey.values()];
+
+  // 按根分组：根（最小下标）先被遍历到 → 作为代表，其余条目补齐其缺失字段
+  const byRoot = new Map<number, PaperResult>();
+  const order: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const r = find(i);
+    const existing = byRoot.get(r);
+    if (!existing) {
+      byRoot.set(r, { ...results[i] });
+      order.push(r);
+    } else {
+      fillMissing(existing, results[i]);
+    }
+  }
+  return order.map((r) => byRoot.get(r)!);
 }
 
 /**
@@ -484,6 +649,7 @@ const SOURCE_LABELS: Record<string, string> = {
   arxiv: 'arXiv',
   'semantic-scholar': 'Semantic Scholar',
   crossref: 'Crossref',
+  europepmc: 'Europe PMC',
 };
 
 export async function searchPapers(
@@ -507,6 +673,9 @@ export async function searchPapers(
   }
   if (sources.includes('crossref')) {
     labeled.push({ source: 'crossref', task: searchCrossref(query) });
+  }
+  if (sources.includes('europepmc')) {
+    labeled.push({ source: 'europepmc', task: searchEuropePMC(query) });
   }
 
   if (labeled.length === 0) {

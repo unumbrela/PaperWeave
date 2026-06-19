@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { searchPapers, searchPapersExpanded } from '@/lib/paper-search/search-service';
 import { expandQuery } from '@/lib/paper-search/query-expand';
+import { llmRerankTopK } from '@/lib/paper-search/llm-rerank';
 import { cacheKey, queryLabel, getCached, putCached } from '@/lib/paper-search/cache';
 import { resolveKeys, hasAnyKey } from '@/lib/ai/keys';
 import { enforceRateLimit } from '@/lib/api/http';
@@ -40,9 +41,18 @@ export async function POST(request: Request) {
     const subqueries = wantExpand ? await expandQuery(query, keys) : [];
     const expanded = subqueries.length > 1;
 
+    // LLM 精排：默认关（body.llmRerank=true 才开），仅相关性模式有意义，需 key
+    const wantRerank =
+      body.llmRerank === true &&
+      hasAnyKey(keys) &&
+      (query.sortBy ?? 'relevance') === 'relevance';
+
     // ── 缓存层（配了 Supabase service-role 才启用，否则全程降级直连上游）──
-    // 扩展检索结果不同于普通检索，缓存键加 'x:expand' 哨兵区分，避免互相污染。
-    const key = cacheKey(query, expanded ? [...sources, 'x:expand'] : sources);
+    // 不同处理路径用哨兵区分缓存键，避免互相污染（扩展 / 精排各一枚）。
+    const sentinels: string[] = [];
+    if (expanded) sentinels.push('x:expand');
+    if (wantRerank) sentinels.push('x:llmrerank');
+    const key = cacheKey(query, [...sources, ...sentinels]);
     const cached = await getCached(key);
     if (cached) {
       logEvent({ route: 'paper-search', ok: true, ms: done(), meta: { cacheHit: true } });
@@ -52,24 +62,31 @@ export async function POST(request: Request) {
         failedSources: cached.failedSources,
         expanded,
         subqueryCount: expanded ? subqueries.length : 0,
+        reranked: wantRerank,
         cached: true,
       });
     }
 
-    const { results, failedSources } = expanded
+    const outcome = expanded
       ? await searchPapersExpanded(query, sources, subqueries, apiKeys)
       : await searchPapers(query, sources, apiKeys);
+    const failedSources = outcome.failedSources;
+    // 精排前若上游全失败则跳过（无可排内容）；失败一律原样返回（llmRerankTopK 内已守）
+    const results = wantRerank
+      ? await llmRerankTopK(outcome.results, query, keys)
+      : outcome.results;
 
     // 回写缓存：best-effort，不 await 也行，但 await 保证落库（serverless 下进程随响应结束）
     await putCached(key, queryLabel(query), results, failedSources);
 
-    logEvent({ route: 'paper-search', ok: true, ms: done(), meta: { cacheHit: false, results: results.length, expanded } });
+    logEvent({ route: 'paper-search', ok: true, ms: done(), meta: { cacheHit: false, results: results.length, expanded, reranked: wantRerank } });
     return NextResponse.json({
       success: true,
       data: results,
       failedSources,
       expanded,
       subqueryCount: expanded ? subqueries.length : 0,
+      reranked: wantRerank,
       cached: false,
     });
   } catch (error) {

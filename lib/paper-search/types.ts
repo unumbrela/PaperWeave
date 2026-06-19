@@ -35,7 +35,11 @@ export interface PaperResult {
   pdfUrl?: string;
   abstract?: string;
   citations?: number;
-  source: 'semantic-scholar' | 'openalex' | 'arxiv' | 'crossref';
+  /** 归一化 DOI（小写、去 doi.org 前缀）；跨源合并的首选主键 */
+  doi?: string;
+  /** arXiv id（可能带版本号 vN）；与 OpenAlex 的 arXiv DOI 互为桥接 */
+  arxivId?: string;
+  source: 'semantic-scholar' | 'openalex' | 'arxiv' | 'crossref' | 'europepmc';
 }
 
 export interface APIConfig {
@@ -85,6 +89,14 @@ export const SEARCH_SOURCES: SearchSource[] = [
     description: '1.5亿+ DOI 元数据，覆盖正式出版的期刊/会议论文，免费',
     coverage: '全学科（正式出版）',
     fields: ['computer-science', 'computer-systems', 'information-systems', 'theory', 'biology-health', 'engineering', 'physics', 'chemistry', 'biology', 'environmental', 'social-sciences', 'mathematics', 'interdisciplinary'],
+  },
+  {
+    id: 'europepmc',
+    name: 'Europe PMC',
+    requiresKey: false,
+    description: '4000万+ 生物医学文献与预印本（含 bioRxiv / medRxiv），关键词可检索，免费',
+    coverage: '生物医学（含预印本）',
+    fields: ['biology-health', 'biology', 'chemistry', 'environmental'],
   },
   {
     id: 'ieee',

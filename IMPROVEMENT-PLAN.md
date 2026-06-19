@@ -137,3 +137,13 @@
 | 不变量单测 | ✅ track 扩展为 workflow/gallery/lab；三者完整划分 TOOLS；lab/gallery phases 为空 |
 
 定位微调：既定「不替你写论文」收紧为「**只搭骨架、给段落级写作建议，不代写连贯正文**」（用户确认）。
+
+**第四轮·补强（检索质量第二档）**：
+
+| 项 | 动作 |
+| --- | --- |
+| fan-out 加固 | ✅ `test/fan-out.test.ts`(15 例) 钉死 rerank/降级；`runPooled` 并发上限 `FANOUT_CONCURRENCY=2`（上游并发 ≤2×源数）；路由回传 `expanded/subqueryCount`，检索页徽标显性化 |
+| 跨源标识去重 | ✅ `PaperResult` 加 `doi/arxivId`；`mergeDuplicates` 改并查集，按「DOI > arXiv id > 标题」任一共享键合并；arXiv DataCite DOI(`10.48550/arXiv.x`) 派生 arxivId 桥接预印本↔OpenAlex，修掉标题细微差异漏合并 |
+| Europe PMC 源 | ✅ 新增 `searchEuropePMC`（免 key，生物医学 + bioRxiv/medRxiv 预印本关键词检索）。注：bioRxiv 原生 API 不支持关键词搜索，用 Europe PMC 实现等价能力 |
+| LLM 精排（可选） | ✅ `lib/paper-search/llm-rerank.ts`：相关性模式对 top-20 按与研究目标契合度重排；**默认关**（`body.llmRerank`），无 key/失败原样返回；SearchForm「✨ AI 精排」开关 |
+| 单测 | ✅ `test/search-quality.test.ts`(20 例)；总数 181→216 |

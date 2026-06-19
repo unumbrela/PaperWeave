@@ -18,7 +18,8 @@ const LIVE_SOURCES = [
   { id: "openalex", name: "OpenAlex", dot: "var(--ocean)", hint: "2.5 亿学术作品 · 全学科" },
   { id: "arxiv", name: "arXiv", dot: "var(--coral)", hint: "预印本 · 更新最快" },
   { id: "crossref", name: "Crossref", dot: "var(--plum)", hint: "1.5 亿 DOI · 正式出版" },
-  { id: "semantic-scholar", name: "S2", fullName: "Semantic Scholar", dot: "var(--sage)", hint: "需 API key（设置中填）" },
+  { id: "europepmc", name: "Europe PMC", dot: "var(--sage)", hint: "生物医学 · 含 bioRxiv/medRxiv 预印本" },
+  { id: "semantic-scholar", name: "S2", fullName: "Semantic Scholar", dot: "var(--ocean)", hint: "需 API key（设置中填）" },
 ] as const;
 
 /** 快速方向包：一键填充关键词并立即检索。 */
@@ -60,6 +61,8 @@ export function SearchForm({
   selectedSources,
   toggleSource,
   toggleVenue,
+  llmRerank,
+  setLlmRerank,
   isLoading,
   onSearch,
   onSearchWith,
@@ -70,6 +73,8 @@ export function SearchForm({
   selectedSources: string[];
   toggleSource: (id: string) => void;
   toggleVenue: (venue: string) => void;
+  llmRerank: boolean;
+  setLlmRerank: (v: boolean) => void;
   isLoading: boolean;
   onSearch: () => void;
   /** 用给定关键词覆盖输入框并立即检索（快速方向包 / 热门 / 最近检索用） */
@@ -185,6 +190,20 @@ export function SearchForm({
               </button>
             );
           })()}
+
+          {/* LLM 精排：默认关，开启后对相关性模式前 20 篇按与研究目标契合度重排（需 AI key） */}
+          <button
+            onClick={() => setLlmRerank(!llmRerank)}
+            title="对相关性排序的前 20 篇用 LLM 按与研究目标的契合度精排（多一次 AI 调用，需 API key）"
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] transition-all",
+              llmRerank
+                ? "border-sage/50 bg-sage/10 text-sage"
+                : "border-transparent text-ink-4 hover:text-ink-2",
+            )}
+          >
+            ✨ AI 精排
+          </button>
         </div>
 
         <button
