@@ -82,7 +82,7 @@ export function HandoffBanner({
 /**
  * 「回存到论文库」按钮 —— 闭合工作流的最后一环。
  *
- * 下游工具（结构化总结 / Idea 生成器）产出后，若本次链路来自某篇论文
+ * 下游工具（要点提炼 / 创新点立论）产出后，若本次链路来自某篇论文
  * （handoff 携带 `sourcePaperId`），即可把产出写回该论文条目对应字段。
  * 仓储为本地 Dexie 单一真相源（见 PROJECT-SUMMARY.md §六·1）。
  *

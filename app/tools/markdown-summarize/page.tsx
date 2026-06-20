@@ -56,7 +56,7 @@ export default function Page() {
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
             }}
-            placeholder="粘贴论文 Markdown（通常来自「论文资料整理器」的输出）…"
+            placeholder="粘贴论文 Markdown（通常来自「文献格式转译」的输出）…"
             rows={14}
             className={cn(
               "focus-ring w-full rounded-xl bg-paper-2/80 border border-line px-4 py-3",
@@ -91,7 +91,7 @@ export default function Page() {
               "transition-all focus-ring",
             )}
           >
-            {loading ? "正在总结…" : "结构化总结"}
+            {loading ? "正在总结…" : "要点提炼"}
           </button>
 
           <p className="mt-3 text-[11px] text-ink-3 text-center">
@@ -111,7 +111,7 @@ export default function Page() {
             error={error}
             onRetry={submit}
             onStop={stop}
-            emptyHint="粘贴论文 Markdown，点击结构化总结。"
+            emptyHint="粘贴论文 Markdown，点击要点提炼。"
           />
           {text && !loading && (
             <div className="flex flex-wrap justify-end gap-2">
@@ -130,7 +130,7 @@ export default function Page() {
                   sourcePaperId: sourcePaperId ?? undefined,
                   fields: { references: text },
                 }}
-                label="把总结发往「Idea 生成器」"
+                label="把总结发往「创新点立论」"
               />
             </div>
           )}

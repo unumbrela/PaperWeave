@@ -102,7 +102,7 @@ export default function SettingsPage() {
       </div>
 
       <p className="text-[14px] leading-relaxed text-ink-3 mb-6">
-        本站的 AI 功能（论文分析、网页速读、结构化总结、idea 生成、研究规划、技能封装、选区解释）
+        本站的 AI 功能（论文分析、网页速读、要点提炼、创新点立论、研究任务分解、技能封装、选区解释）
         都在你的浏览器里用<strong className="text-ink">你自己的 API Key</strong> 调用。
         无需注册、零门槛，检索 / 阅读 / PDF 批注 / 模型可视化等功能<strong className="text-ink">不需要 key 也能用</strong>。
       </p>

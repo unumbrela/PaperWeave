@@ -28,7 +28,7 @@ export default function OpengraphImage() {
           研究型论文助手
         </div>
         <div style={{ fontSize: 32, marginTop: 28, color: "#5c554c", maxWidth: 900, lineHeight: 1.4 }}>
-          调研搜索 · 精读定位 · 创新点 · 组织撰写 · 论文绘图
+          检索 · 精读 · 提炼 · 立论 · 撰写 · 制图
           串成一条打通的论文主线
         </div>
         <div style={{ display: "flex", marginTop: 40, gap: 16 }}>

@@ -115,9 +115,9 @@ const FOOTER_LINKS: Array<{ heading: string; items: Array<{ label: string; href:
   {
     heading: "工作流",
     items: [
-      { label: "调研搜索", href: "/tools/paper-search" },
-      { label: "创新点", href: "/tools/idea-generator" },
-      { label: "组织撰写", href: "/tools/paper-writer" },
+      { label: "文献检索", href: "/tools/paper-search" },
+      { label: "创新点立论", href: "/tools/idea-generator" },
+      { label: "结构撰写", href: "/tools/paper-writer" },
     ],
   },
   {
@@ -131,8 +131,8 @@ const FOOTER_LINKS: Array<{ heading: string; items: Array<{ label: string; href:
   {
     heading: "关于",
     items: [
-      { label: "问你的论文库", href: "/tools/library-qa" },
-      { label: "引用图谱", href: "/tools/citation-graph" },
+      { label: "文库问答", href: "/tools/library-qa" },
+      { label: "引文网络图谱", href: "/tools/citation-graph" },
       { label: "首页", href: "/" },
     ],
   },

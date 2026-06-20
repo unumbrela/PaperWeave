@@ -103,7 +103,7 @@ function SummarizeContent() {
             <div className="flex flex-wrap justify-end gap-2">
               <SendToTool
                 targetSlug="idea-generator"
-                label="发往 Idea 生成器"
+                label="发往 创新点立论"
                 payload={{
                   from: TOOL.name,
                   fields: { references: text },

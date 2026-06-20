@@ -392,7 +392,7 @@ export default function LibraryPage() {
             hint={
               searchQuery || selectedTag || selectedDirection
                 ? "换个关键词或清除筛选条件试试。"
-                : "从「论文调研搜索」入库，或点右上角按钮导入 arXiv / PDF。"
+                : "从「文献检索」入库，或点右上角按钮导入 arXiv / PDF。"
             }
             action={
               <button

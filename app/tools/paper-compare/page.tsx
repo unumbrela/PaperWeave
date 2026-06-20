@@ -123,7 +123,7 @@ export default function Page() {
             </div>
           ) : papers.length === 0 ? (
             <p className="py-8 text-center text-sm text-ink-3">
-              论文库还是空的。先去「论文调研搜索」或「论文库」入库几篇再来对比。
+              论文库还是空的。先去「文献检索」或「论文库」入库几篇再来对比。
             </p>
           ) : (
             <div className="max-h-[320px] space-y-1.5 overflow-auto">
@@ -207,7 +207,7 @@ export default function Page() {
                 {!isGenerating && (
                   <SendToTool
                     targetSlug="idea-generator"
-                    label="发往 Idea 生成器"
+                    label="发往 创新点立论"
                     payload={{
                       from: TOOL.name,
                       fields: {

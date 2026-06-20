@@ -1,11 +1,12 @@
-// 以论文为核心的工作流主线 5 环：调研搜索 → 精读定位 → 创新点 → 组织撰写 → 论文绘图。
-// 旧标签（查论文/读文献/生 idea/做验证）已重排为论文主线叙事；做验证向的命令行工具迁入 lab。
+// 以论文为核心的工作流主线 5 环：检索 → 精读 → 立论 → 撰写 → 制图。
+// 阶段标签统一为二字动词，与首页主线动词链（检索·精读·提炼·立论·撰写·制图）同源；
+// 「提炼」是精读环内的结构化要点工序，故并入「精读」阶段。命令行/自动化工具迁入 lab。
 export type Phase =
-  | "调研搜索"
-  | "精读定位"
-  | "创新点"
-  | "组织撰写"
-  | "论文绘图";
+  | "检索"
+  | "精读"
+  | "立论"
+  | "撰写"
+  | "制图";
 
 // workflow：挂在 5 环主线、参与一键流转闭环的工具。
 // gallery：交互式教学演示（模型可视化 / 科研叙事），独立于工作流，不参与阶段过滤与 handoff。
@@ -26,13 +27,13 @@ export type Tool = {
 };
 
 export const TOOLS: Tool[] = [
-  // ── 查论文 ──────────────────────────────────────────────
+  // ── 检索 ──────────────────────────────────────────────
   {
     slug: "paper-search",
-    name: "论文调研搜索",
+    name: "文献检索",
     description:
       "从关键词或领域出发，多源并发检索 + LLM 查询扩展（不重不漏），整理成可继续处理的论文库。预设关键词包 + 自定义领域 + 最新优先。",
-    phases: ["调研搜索"],
+    phases: ["检索"],
     track: "workflow",
     icon: "🔎",
     gradient: "from-[#ff4f8b] to-[#b14bff]",
@@ -40,10 +41,10 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "citation-graph",
-    name: "引用网络图谱",
+    name: "引文网络图谱",
     description:
       "输入一篇论文（OpenAlex），用 D3 力导向图展开它的引用网络：参考文献 + 被引文献一张图，圆越大被引越多。从检索结果一键直达。",
-    phases: ["调研搜索"],
+    phases: ["检索"],
     track: "workflow",
     icon: "🕸️",
     gradient: "from-[#b14bff] to-[#4bb3ff]",
@@ -51,22 +52,22 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "research-genealogy",
-    name: "研究方向发展族谱",
+    name: "研究脉络族谱",
     description:
       "图谱看单篇，族谱看方向：配套 Claude Code skill 深度调研一个方向的发展脉络（奠基 → 路线分叉 → 前沿，引文边均经核验），产出的 lineage.json 在本页渲染成可点击的族谱树。",
-    phases: ["调研搜索"],
+    phases: ["检索"],
     track: "workflow",
     icon: "🌳",
     gradient: "from-[#2e9e6b] to-[#b14bff]",
     href: "/tools/research-genealogy",
   },
 
-  // ── 读文献 ──────────────────────────────────────────────
+  // ── 精读（含提炼工序）────────────────────────────────────
   {
     slug: "summarize",
-    name: "文献网页速读器",
+    name: "网页文献速览",
     description: "粘贴 URL，拿到 30 秒能读完的结构化要点与关键引述。",
-    phases: ["精读定位"],
+    phases: ["精读"],
     track: "workflow",
     icon: "📰",
     gradient: "from-[#ff4f8b] to-[#b14bff]",
@@ -74,10 +75,10 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "markdown-convert",
-    name: "论文资料整理器",
+    name: "文献格式转译",
     description:
       "拖拽批量上传 Word/PDF/HTML/TXT，本地解析输出带 LaTeX 公式与表格的干净 Markdown。",
-    phases: ["精读定位"],
+    phases: ["精读"],
     track: "workflow",
     icon: "📄",
     gradient: "from-[#4bb3ff] to-[#b14bff]",
@@ -85,10 +86,10 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "markdown-summarize",
-    name: "论文内容结构化总结",
+    name: "要点提炼",
     description:
-      "输入一篇论文的 Markdown，结构化提取关键点、方法、实验设置、引文，便于后续串联与对比。",
-    phases: ["精读定位"],
+      "输入一篇论文的 Markdown，结构化提炼关键点、方法、实验设置、引文，便于后续串联与对比。",
+    phases: ["精读"],
     track: "workflow",
     icon: "📚",
     gradient: "from-[#6b8ed6] to-[#4bb3ff]",
@@ -96,10 +97,10 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "paper-compare",
-    name: "多篇论文对比表",
+    name: "文献对比矩阵",
     description:
       "从论文库勾选 2-6 篇，AI 生成「研究问题/方法/数据集/指标/创新点/局限」横向对比矩阵，一键导出 Markdown，综述写作刚需。",
-    phases: ["精读定位"],
+    phases: ["精读"],
     track: "workflow",
     icon: "📊",
     gradient: "from-[#4bb3ff] to-[#6b8ed6]",
@@ -107,49 +108,49 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "library-qa",
-    name: "问你的论文库",
+    name: "文库问答",
     description:
       "对入库论文建语义索引，用自然语言提问（embedding 检索 + LLM 归纳），返回带引用、可溯源到具体论文的答案。无 embedding key 时自动降级本地关键词检索。",
-    phases: ["精读定位"],
+    phases: ["精读"],
     track: "workflow",
     icon: "💬",
     gradient: "from-[#b14bff] to-[#6b8ed6]",
     href: "/tools/library-qa",
   },
 
-  // ── 生 idea ─────────────────────────────────────────────
+  // ── 立论 ────────────────────────────────────────────────
   {
     slug: "idea-generator",
-    name: "Idea 生成器",
+    name: "创新点立论",
     description:
-      "先拆解参考论文的现有创新点与局限，再在其之上衍生有差异化假设、最小验证实验、风险清单的新研究 idea。",
-    phases: ["创新点"],
+      "先拆解参考论文的现有创新点与局限，再在其之上立起有差异化假设、最小验证实验、风险清单的新研究创新点。",
+    phases: ["立论"],
     track: "workflow",
     icon: "💡",
     gradient: "from-[#f59e0b] to-[#ec4899]",
     href: "/tools/idea-generator",
   },
 
-  // ── 组织撰写 ─────────────────────────────────────────────
+  // ── 撰写 ────────────────────────────────────────────────
   {
     slug: "paper-writer",
-    name: "论文撰写组织器",
+    name: "结构撰写",
     description:
       "把创新点、参考论文与精读产出组织成论文结构：章节大纲 + 每节要点 + Related Work 分组 + 每段写作脚手架（主题句/应含要点/过渡）。只搭骨架与表述建议，不替你写正文。",
-    phases: ["组织撰写"],
+    phases: ["撰写"],
     track: "workflow",
     icon: "✍️",
     gradient: "from-[#ec4899] to-[#f59e0b]",
     href: "/tools/paper-writer",
   },
 
-  // ── 论文绘图 ─────────────────────────────────────────────
+  // ── 制图 ────────────────────────────────────────────────
   {
     slug: "figure-generator",
-    name: "论文绘图代码生成器",
+    name: "图表制图",
     description:
       "描述想画的图（可附数据），生成可直接运行的出版级绘图代码：matplotlib / seaborn / plotly / TikZ，内置色盲友好配色、期刊单双栏尺寸与投稿自查清单。",
-    phases: ["论文绘图"],
+    phases: ["制图"],
     track: "workflow",
     icon: "📈",
     gradient: "from-[#10b981] to-[#4bb3ff]",
@@ -157,10 +158,10 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "figure-prompt",
-    name: "科研绘图提示词生成器",
+    name: "科研示意图提示词",
     description:
       "把主题与要展示的内容，组织成可直接粘贴给文生图模型（DALL·E / Midjourney / 即梦等）的科研图形摘要 / 示意图提示词：横向流程、矢量插画质感、配色语义、克制约束一应俱全。",
-    phases: ["论文绘图"],
+    phases: ["制图"],
     track: "workflow",
     icon: "🎨",
     gradient: "from-[#4bb3ff] to-[#b14bff]",
@@ -239,7 +240,7 @@ export const TOOLS: Tool[] = [
   // ── 命令行 / 自动化扩展（lab）：独立于论文主线的研究自动化工具 ──────
   {
     slug: "prompt-chunker",
-    name: "研究任务规划器",
+    name: "研究任务分解",
     description:
       "把一个模糊的研究想法拆成原子子问题 + 验收清单 + 可直接执行的 Runbook。小模型也能稳跑。",
     phases: [],
@@ -250,7 +251,7 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "skill-maker",
-    name: "研究自动化封装器",
+    name: "技能封装",
     description:
       "描述需求，产出可直接落地到 ~/.claude/skills 的 SKILL.md。也可用来封装论文绘图流程。",
     phases: [],
@@ -262,7 +263,7 @@ export const TOOLS: Tool[] = [
 ];
 
 // ── 核心论文流程（首页主线）────────────────────────────────
-// 围绕「一篇论文」的线性旅程：搜 → 总结 → 精读挑选 → 创新 → 撰写 → 绘图。
+// 围绕「一篇论文」的线性旅程，二字动词链：检索 → 精读 → 提炼 → 立论 → 撰写 → 制图。
 // 这是首页一上来就展示的核心；其余工具（配套 / lab / 展厅）一律下放。
 // 与 Phase/Track 解耦：Phase 用于分类与 handoff，CORE_FLOW 是面向用户的旅程地图。
 export type CoreStep = {
@@ -279,42 +280,42 @@ export type CoreStep = {
 
 export const CORE_FLOW: CoreStep[] = [
   {
-    title: "调研搜索",
-    blurb: "多源并发检索最新论文，LLM 查询扩展不重不漏，逐篇定位 + 一句话速览。",
+    title: "检索",
+    blurb: "多源并发检索最新论文，LLM 查询扩展不重不漏，逐篇定位 + 一句话速览入库。",
     href: "/tools/paper-search",
     icon: "🔎",
     toolSlug: "paper-search",
   },
   {
-    title: "总结提炼",
-    blurb: "把论文结构化拆成要点 / 方法 / 实验设置 / 引文，快速判断价值。",
+    title: "精读",
+    blurb: "导入论文库，PDF 精读批注，挑出真正值得深读的那一篇。",
+    href: "/library",
+    icon: "📖",
+  },
+  {
+    title: "提炼",
+    blurb: "把精读的论文结构化拆成要点 / 方法 / 实验设置 / 引文，沉淀可复用素材。",
     href: "/tools/markdown-summarize",
     icon: "📚",
     toolSlug: "markdown-summarize",
   },
   {
-    title: "精读挑选",
-    blurb: "导入论文库，PDF 精读批注，标记 / 挑出感兴趣的那一篇。",
-    href: "/library",
-    icon: "📖",
-  },
-  {
-    title: "分析创新点",
-    blurb: "拆解选中论文的现有创新点与局限，在其之上衍生可验证的差异化新创新。",
+    title: "立论",
+    blurb: "拆解选中论文的现有创新点与局限，在其之上立起可验证的差异化新创新点。",
     href: "/tools/idea-generator",
     icon: "💡",
     toolSlug: "idea-generator",
   },
   {
-    title: "组织撰写",
+    title: "撰写",
     blurb: "把创新点与素材搭成论文结构、逐节要点与段落脚手架（不代写正文）。",
     href: "/tools/paper-writer",
     icon: "✍️",
     toolSlug: "paper-writer",
   },
   {
-    title: "论文绘图",
-    blurb: "出版级绘图代码 + 文生图科研绘图提示词，把方法与结果画清楚。",
+    title: "制图",
+    blurb: "出版级绘图代码 + 文生图科研示意图提示词，把方法与结果画清楚。",
     href: "/tools/figure-generator",
     icon: "📈",
     toolSlug: "figure-generator",
@@ -333,20 +334,20 @@ export function getSupportingTools(): Tool[] {
 
 export const PHASES: ("全部" | Phase)[] = [
   "全部",
-  "调研搜索",
-  "精读定位",
-  "创新点",
-  "组织撰写",
-  "论文绘图",
+  "检索",
+  "精读",
+  "立论",
+  "撰写",
+  "制图",
 ];
 
 // 仅主线 5 环（不含「全部」）用于首页 Workflow 走廊
 export const WORKFLOW_PHASES: Phase[] = [
-  "调研搜索",
-  "精读定位",
-  "创新点",
-  "组织撰写",
-  "论文绘图",
+  "检索",
+  "精读",
+  "立论",
+  "撰写",
+  "制图",
 ];
 
 export function getTool(slug: string): Tool | undefined {

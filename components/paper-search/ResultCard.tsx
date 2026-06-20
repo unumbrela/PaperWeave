@@ -255,7 +255,7 @@ export function ResultCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(actionBtn, "text-ink-3 hover:bg-paper-3 hover:text-ink")}
-                title="查看引用网络图谱"
+                title="查看引文网络图谱"
               >
                 <Network className="h-3 w-3" />
                 引用网络

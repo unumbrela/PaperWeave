@@ -5,13 +5,13 @@
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
 [![React 19](https://img.shields.io/badge/React-19-61dafb)](https://react.dev/)
 
-**一个本地优先的论文精读与研究推进工作台。** 它不替你写论文，而是把写论文**之外**的每一步——查、读、想、验、画——从散落在十几个网站之间的状态，收回到同一条工作流里，以**浏览器内的论文库**为唯一真相源。
+**一个本地优先的论文精读与研究推进工作台。** 它不替你写论文，而是把写一篇论文**之外**的每一步——从找到它，到读懂它、想清楚、写下来、画出来——从散落在十几个网站之间的状态，收回到同一条工作流里，以**浏览器内的论文库**为唯一真相源。
 
 ```
-查论文 → 读文献 → 生 idea → 做验证 → 论文绘图
+检索 → 精读 → 提炼 → 立论 → 撰写 → 制图
 ```
 
-上游工具的输出，就是下游工具的输入。首页把这 5 个阶段并排展开，点任意一环即可按阶段过滤全部工作流工具。论文进库即拥有，在库里读 / 批注 / 问，基于库内容生成（总结 / 对比 / idea / 验证计划 / 绘图），产出再一键回存论文条目——闭合「检索—精读—生成—回存」回环。
+主线是一条二字动词链，读下来就是一篇论文从无到有的旅程：**检索**最新文献 → 入库 **精读** 批注 → 结构化 **提炼** 要点 → 在已有创新点之上 **立论** → 把素材搭成结构 **撰写** → 出版级 **制图**。上游工具的输出，就是下游工具的输入；首页把这条主线并排展开，点任意一环即可按阶段过滤全部工作流工具。论文进库即拥有，在库里读 / 批注 / 问，基于库内容生成（提炼 / 对比 / 立论 / 撰写 / 制图），产出再一键回存论文条目——闭合「检索—精读—生成—回存」回环。
 
 > 此外另设一个**可视化展厅**（CNN / Transformer / GAN / 扩散模型 / 医学分割等交互式教学演示 + iGEM 科研叙事页）：浏览器内真实推理 / 回放，纯粹用来「看懂」与「讲清」。它**独立于工作流**，不入论文库、不参与一键流转。
 
@@ -19,26 +19,26 @@
 
 ## ✨ 功能总览
 
-### 🔎 查论文
-- **多源聚合检索**（[`/tools/paper-search`](app/tools/paper-search/page.tsx)）：OpenAlex + arXiv 双源并发检索，`Promise.allSettled` 保证单源故障不拖垮整体；支持领域包（CV / NLP / Mamba / 扩散模型…）、必含/排除关键词、年份与会议过滤、检索中途取消。**一键速览**：LLM 把当前结果打包成一次批量调用，逐篇生成一句话中文总结（入库时随 `summary` 落库供下游复用）；每条结果可**一键阅读**——自动入库去重后直达 PDF 阅读器。
+### 🔎 检索
+- **文献检索 · 多源聚合**（[`/tools/paper-search`](app/tools/paper-search/page.tsx)）：OpenAlex + arXiv 双源并发检索，`Promise.allSettled` 保证单源故障不拖垮整体；支持领域包（CV / NLP / Mamba / 扩散模型…）、必含/排除关键词、年份与会议过滤、检索中途取消。**一键速览**：LLM 把当前结果打包成一次批量调用，逐篇生成一句话中文总结（入库时随 `summary` 落库供下游复用）；每条结果可**一键阅读**——自动入库去重后直达 PDF 阅读器。
 - **服务端检索缓存**（可选）：配置 Supabase 后热门查询直接命中 Postgres 缓存（14 天 TTL），检索页展示「🔥 热门检索」；不配置则透明降级为直连上游。
-- **引用网络图谱**（[`/tools/citation-graph`](app/tools/citation-graph/page.tsx)）：任选一篇 OpenAlex 论文，参考文献 + 被引文献汇成一张 **D3 力导向图**，圆越大被引越多，支持缩放/拖拽/点击直达。
-- **研究方向发展族谱**（[`/tools/research-genealogy`](app/tools/research-genealogy/page.tsx)）：图谱看单篇，**族谱看整个方向**——配套的 [`research-genealogy`](skills/research-genealogy/SKILL.md) skill 在终端做多轮检索 + 引文滚雪球，产出「奠基 → 路线分叉 → 并行竞争 → 前沿」的发展族谱（每条 builds-on 边经真实引文核验，绝不凭记忆报论文）；产物 `lineage.json` 粘贴回站内即渲染成可点击的族谱树。
+- **引文网络图谱**（[`/tools/citation-graph`](app/tools/citation-graph/page.tsx)）：任选一篇 OpenAlex 论文，参考文献 + 被引文献汇成一张 **D3 力导向图**，圆越大被引越多，支持缩放/拖拽/点击直达。
+- **研究脉络族谱**（[`/tools/research-genealogy`](app/tools/research-genealogy/page.tsx)）：图谱看单篇，**族谱看整个方向**——配套的 [`research-genealogy`](skills/research-genealogy/SKILL.md) skill 在终端做多轮检索 + 引文滚雪球，产出「奠基 → 路线分叉 → 并行竞争 → 前沿」的发展族谱（每条 builds-on 边经真实引文核验，绝不凭记忆报论文）；产物 `lineage.json` 粘贴回站内即渲染成可点击的族谱树。
 
-### 📚 论文库（本地优先）
-- **入库即拥有**（[`/library`](app/library/page.tsx)）：元数据、摘要、AI 结构化总结、研究笔记、标签，全部存在浏览器 IndexedDB（Dexie），**无需注册、断网可用**。
+### 📖 精读 · 论文库（本地优先）
+- **入库即拥有**（[`/library`](app/library/page.tsx)）：元数据、摘要、AI 要点提炼、研究笔记、标签，全部存在浏览器 IndexedDB（Dexie），**无需注册、断网可用**。
 - **PDF 阅读器 + 四类批注 + 页面便签**（[`/viewer/[id]`](app/viewer/[id]/page.tsx)）：高亮 / 洞见 / 待办 / 可迁移四种标注，选区 AI 解释，阅读进度自动保存；**📒 页面便签**——点击页面任意位置贴一个便签，点开即写（段落大意 / 名词解释），可拖动移位，侧边栏汇总可跳页，随精读导出与只读分享；PDF 首次在线打开后静默缓存为本地 Blob，之后**断网也能读**。
 - **引文导出**：每篇一键导出 BibTeX + APA / MLA / GB/T 7714，整库一键导出 `.bib`——纯本地纯函数，无需任何 API key。
 - **统计看板**（[`/library/stats`](app/library/stats/page.tsx)）：来源 / 年份 / 月度入库 / 批注分类分布、标签云、被引 Top 5，零配置即用。
 
-### 🤖 AI 工作流
-- **结构化总结 / Idea 生成 / 任务规划 / 论文绘图**：论文 Markdown → 关键点提取 → 差异化研究假设（含最小验证实验与风险清单）→ 原子子问题 + Runbook → 为验证实验生成**出版级绘图代码**（matplotlib / seaborn / plotly / TikZ，色盲友好配色 + 期刊单双栏尺寸 + 投稿自查清单），全程通过**一键流转**串联，零复制粘贴；产出可一键**回存**到论文条目，闭合工作流回环。
-- **多篇论文对比**（[`/tools/paper-compare`](app/tools/paper-compare/page.tsx)）：从库中勾选 2–6 篇，AI 生成「研究问题 / 方法 / 数据集 / 指标 / 创新点 / 局限」横向对比矩阵，导出 Markdown。
-- **问你的论文库（RAG）**（[`/tools/library-qa`](app/tools/library-qa/page.tsx)）：对入库论文建 embedding 语义索引（向量缓存在本机，重复提问不重复计费），自然语言提问 → 余弦检索 top-k → LLM 归纳出**带 [n] 引用、可溯源到具体论文**的答案，逐字流式输出；没配 embedding key 时**自动降级为本地 BM25 关键词检索**（零费用），只配 DeepSeek 也能用。
-- **文献速读 / 资料整理**：URL 或 Word / PDF / HTML 文件 → 带 LaTeX 公式与表格的干净 Markdown（OMML→LaTeX 转换自研）。
+### 🤖 提炼 · 立论 · 撰写 · 制图（AI 工作流）
+- **要点提炼 → 创新点立论 → 结构撰写 → 图表制图**：论文 Markdown → 结构化提炼关键点 → 在已有创新点之上立起差异化假设（含最小验证实验与风险清单）→ 把素材搭成论文结构与段落脚手架 → 为方法与结果生成**出版级绘图代码**（matplotlib / seaborn / plotly / TikZ，色盲友好配色 + 期刊单双栏尺寸 + 投稿自查清单），全程通过**一键流转**串联，零复制粘贴；产出可一键**回存**到论文条目，闭合工作流回环。
+- **文献对比矩阵**（[`/tools/paper-compare`](app/tools/paper-compare/page.tsx)）：从库中勾选 2–6 篇，AI 生成「研究问题 / 方法 / 数据集 / 指标 / 创新点 / 局限」横向对比矩阵，导出 Markdown。
+- **文库问答（RAG）**（[`/tools/library-qa`](app/tools/library-qa/page.tsx)）：对入库论文建 embedding 语义索引（向量缓存在本机，重复提问不重复计费），自然语言提问 → 余弦检索 top-k → LLM 归纳出**带 [n] 引用、可溯源到具体论文**的答案，逐字流式输出；没配 embedding key 时**自动降级为本地 BM25 关键词检索**（零费用），只配 DeepSeek 也能用。
+- **网页文献速览 / 文献格式转译**：URL 或 Word / PDF / HTML 文件 → 带 LaTeX 公式与表格的干净 Markdown（OMML→LaTeX 转换自研）。
 
 ### 🧠 可视化展厅（独立于工作流的交互式教学演示）
-> 这一组**不属于上面的 5 环工作流**，不入论文库、不参与一键流转——它们是用来「看懂」一个模型、「讲清」一个项目的交互式演示，单独在首页展厅区呈现。
+> 这一组**不属于上面的主线工作流**，不入论文库、不参与一键流转——它们是用来「看懂」一个模型、「讲清」一个项目的交互式演示，单独在首页展厅区呈现。
 - **CNN 端到端讲解**：tiny-VGG 用 TensorFlow.js **在浏览器里真实推理**，逐层查看 feature map 流动。
 - **医学图像分割**：FWMamba-UNet 真实中间层激活离线预计算 + 交互回放。
 - **Transformer / GAN / 扩散模型**：注意力热图、潜向量交互、逐步去噪可视化。
@@ -50,7 +50,7 @@
 ### 🧰 带出浏览器：Claude Code Skills
 - 四个核心能力封装成可安装的 [Claude Code skills](./skills/README.md)：**`paper-search`**（终端里免 key 查 OpenAlex/arXiv）、**`research-genealogy`**（方向发展族谱：树 + 叙事报告，stdlib-only 脚本，免 key）、**`cite-paper`**（arXiv ID / DOI / 标题 → 真实元数据 → BibTeX + GB/T 7714）、**`paper-figure`**（出版级绘图规范 + 本地运行验证）。`cp -r skills/* ~/.claude/skills/` 即装即用。
 - 「上游输出即下游输入」不止于站内：`research-genealogy` 在终端产出的 `lineage.json`，回到站内一键渲染成族谱树。
-- 站内的「研究自动化封装器」可以继续生成你自己的 SKILL.md。
+- 站内的「技能封装」工具可以继续生成你自己的 SKILL.md。
 
 ---
 
