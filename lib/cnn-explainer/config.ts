@@ -53,60 +53,15 @@ export const overviewConfig = {
   ],
 } as const;
 
-export const layerIndexDict: Record<string, number> = {
-  input: 0,
-  conv_1_1: 1,
-  relu_1_1: 2,
-  conv_1_2: 3,
-  relu_1_2: 4,
-  max_pool_1: 5,
-  conv_2_1: 6,
-  relu_2_1: 7,
-  conv_2_2: 8,
-  relu_2_2: 9,
-  max_pool_2: 10,
-  output: 11,
-};
-
-export const layerLabelsShort = [
-  "input",
-  "conv_1_1",
-  "relu_1_1",
-  "conv_1_2",
-  "relu_1_2",
-  "max_pool_1",
-  "conv_2_1",
-  "relu_2_1",
-  "conv_2_2",
-  "relu_2_2",
-  "max_pool_2",
-  "output",
-];
-
-export const layerLabelsDetailed = [
-  "input(64, 64, 3)",
-  "conv_1_1(62, 62, 10)",
-  "relu_1_1(62, 62, 10)",
-  "conv_1_2(60, 60, 10)",
-  "relu_1_2(60, 60, 10)",
-  "max_pool_1(30, 30, 10)",
-  "conv_2_1(28, 28, 10)",
-  "relu_2_1(28, 28, 10)",
-  "conv_2_2(26, 26, 10)",
-  "relu_2_2(26, 26, 10)",
-  "max_pool_2(13, 13, 10)",
-  "output(10)",
-];
-
 export const imageOptions = [
-  { file: "boat_1.jpeg", class: "lifeboat", label: "救生艇" },
-  { file: "bug_1.jpeg", class: "ladybug", label: "瓢虫" },
-  { file: "pizza_1.jpeg", class: "pizza", label: "披萨" },
-  { file: "pepper_1.jpeg", class: "bell pepper", label: "甜椒" },
-  { file: "bus_1.jpeg", class: "bus", label: "校车" },
-  { file: "koala_1.jpeg", class: "koala", label: "考拉" },
-  { file: "espresso_1.jpeg", class: "espresso", label: "浓缩咖啡" },
-  { file: "panda_1.jpeg", class: "red panda", label: "小熊猫" },
-  { file: "orange_1.jpeg", class: "orange", label: "橙子" },
-  { file: "car_1.jpeg", class: "sport car", label: "跑车" },
+  { file: "boat_1.jpeg", label: "救生艇" },
+  { file: "bug_1.jpeg", label: "瓢虫" },
+  { file: "pizza_1.jpeg", label: "披萨" },
+  { file: "pepper_1.jpeg", label: "甜椒" },
+  { file: "bus_1.jpeg", label: "校车" },
+  { file: "koala_1.jpeg", label: "考拉" },
+  { file: "espresso_1.jpeg", label: "浓缩咖啡" },
+  { file: "panda_1.jpeg", label: "小熊猫" },
+  { file: "orange_1.jpeg", label: "橙子" },
+  { file: "car_1.jpeg", label: "跑车" },
 ] as const;
