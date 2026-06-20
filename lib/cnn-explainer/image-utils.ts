@@ -2,145 +2,44 @@ import * as tf from "@tensorflow/tfjs";
 
 const networkInputSize = 64;
 
-function cropCentralSquare(arr: number[][][]): number[][][] {
-  const width = arr.length;
-  const height = arr[0].length;
-
-  if (width < networkInputSize || height < networkInputSize) {
-    const cropDimensions = Math.min(width, height);
-    const startX = Math.floor(width / 2) - cropDimensions / 2;
-    const startY = Math.floor(height / 2) - cropDimensions / 2;
-    return arr
-      .slice(startX, startX + cropDimensions)
-      .map((row) => row.slice(startY, startY + cropDimensions));
-  }
-  const startX = Math.floor(width / 2) - Math.floor(networkInputSize / 2);
-  const startY = Math.floor(height / 2) - Math.floor(networkInputSize / 2);
-  return arr
-    .slice(startX, startX + networkInputSize)
-    .map((row) => row.slice(startY, startY + networkInputSize));
-}
-
-function imageDataTo3DTensor(
-  imageData: Uint8ClampedArray,
-  width: number,
-  height: number,
-  normalize = true,
-): tf.Tensor3D {
-  let imageArray = tf.fill([width, height, 3], 0).arraySync() as number[][][];
-
-  for (let i = 0; i < imageData.length; i++) {
-    const pixelIndex = Math.floor(i / 4);
-    const channelIndex = i % 4;
-    const row =
-      width === height
-        ? Math.floor(pixelIndex / width)
-        : pixelIndex % width;
-    const column =
-      width === height
-        ? pixelIndex % width
-        : Math.floor(pixelIndex / width);
-
-    if (channelIndex < 3) {
-      const curEntry = imageData[i];
-      const value = normalize ? curEntry / 255 : curEntry;
-      imageArray[row][column][channelIndex] = value;
-    }
-  }
-
-  if (width !== networkInputSize && height !== networkInputSize) {
-    imageArray = cropCentralSquare(imageArray);
-  }
-
-  return tf.tensor3d(imageArray);
+/**
+ * Load an <img> from a URL or data: URI, resolving once it has decoded.
+ */
+function loadImageElement(imgFile: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = (e) => reject(e);
+    img.src = imgFile;
+  });
 }
 
 /**
- * Load an image from URL, crop/resize to 64x64, return a Tensor3D (HWC).
+ * Load an image (bundled path or uploaded data URL), center-crop it to a
+ * square, and resize to 64x64. Returns a Tensor3D in HWC layout, optionally
+ * normalized to [0, 1]. All intermediate tensors are reclaimed by tf.tidy.
  */
-export function getInputImageArray(
+export async function getInputImageArray(
   imgFile: string,
   normalize = true,
 ): Promise<tf.Tensor3D> {
-  const canvas = document.createElement("canvas");
-  canvas.style.cssText = "display:none;";
-  document.body.appendChild(canvas);
-  const context = canvas.getContext("2d")!;
+  const img = await loadImageElement(imgFile);
 
-  return new Promise((resolve, reject) => {
-    const inputImage = new Image();
-    inputImage.crossOrigin = "Anonymous";
-    inputImage.src = imgFile;
-    let canvasImage: ImageData;
+  return tf.tidy(() => {
+    const pixels = tf.browser.fromPixels(img); // [h, w, 3], 0..255
+    const [h, w] = pixels.shape;
 
-    inputImage.onload = () => {
-      canvas.width = inputImage.width;
-      canvas.height = inputImage.height;
+    const side = Math.min(h, w);
+    const top = Math.floor((h - side) / 2);
+    const left = Math.floor((w - side) / 2);
+    const cropped = tf.slice(pixels, [top, left, 0], [side, side, 3]);
 
-      if (
-        inputImage.width > networkInputSize ||
-        inputImage.height > networkInputSize
-      ) {
-        const resizeCanvas = document.createElement("canvas");
-        const resizeContext = resizeCanvas.getContext("2d")!;
-        const smallerDimension = Math.min(inputImage.width, inputImage.height);
-        const resizeFactor = (networkInputSize + 1) / smallerDimension;
-        resizeCanvas.width = inputImage.width * resizeFactor;
-        resizeCanvas.height = inputImage.height * resizeFactor;
-        resizeContext.drawImage(
-          inputImage,
-          0,
-          0,
-          resizeCanvas.width,
-          resizeCanvas.height,
-        );
+    const resized = tf.image.resizeBilinear(cropped, [
+      networkInputSize,
+      networkInputSize,
+    ]);
 
-        if (inputImage.width !== inputImage.height) {
-          context.translate(resizeCanvas.width, 0);
-          context.scale(-1, 1);
-          context.translate(
-            resizeCanvas.width / 2,
-            resizeCanvas.height / 2,
-          );
-          context.rotate((90 * Math.PI) / 180);
-          context.drawImage(
-            resizeCanvas,
-            -resizeCanvas.width / 2,
-            -resizeCanvas.height / 2,
-          );
-        } else {
-          context.drawImage(resizeCanvas, 0, 0);
-        }
-
-        canvasImage = context.getImageData(
-          0,
-          0,
-          resizeCanvas.width,
-          resizeCanvas.height,
-        );
-      } else {
-        context.drawImage(inputImage, 0, 0);
-        canvasImage = context.getImageData(
-          0,
-          0,
-          inputImage.width,
-          inputImage.height,
-        );
-      }
-
-      const imageData = canvasImage.data;
-      const imageWidth = canvasImage.width;
-      const imageHeight = canvasImage.height;
-
-      canvas.parentNode?.removeChild(canvas);
-
-      resolve(
-        imageDataTo3DTensor(imageData, imageWidth, imageHeight, normalize),
-      );
-    };
-    inputImage.onerror = (e) => {
-      canvas.parentNode?.removeChild(canvas);
-      reject(e);
-    };
+    return (normalize ? resized.div(255) : resized) as tf.Tensor3D;
   });
 }

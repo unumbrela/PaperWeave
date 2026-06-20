@@ -51,6 +51,8 @@ function inferLayerType(name: string): NodeType {
   return "fc";
 }
 
+// Runs inside a tf.tidy: all intermediate tensors created here are reclaimed
+// by the enclosing scope; model weights (kernel/bias.val) are only read.
 function constructCNNFromOutputs(
   allOutputs: tf.Tensor[],
   model: tf.LayersModel,
@@ -73,8 +75,7 @@ function constructCNNFromOutputs(
 
   for (let l = 0; l < model.layers.length; l++) {
     const layer = model.layers[l] as AnyLayer;
-    const squeezed = allOutputs[l].squeeze();
-    const outputs = squeezed.arraySync() as number[] | number[][] | number[][][];
+    const outputs = allOutputs[l].arraySync() as number[] | number[][] | number[][][];
     const type = inferLayerType(layer.name);
     const curLayerNodes: CNNNode[] = [];
 
@@ -177,8 +178,6 @@ function constructCNNFromOutputs(
 
     cnn.push(curLayerNodes);
     curLayerIndex++;
-
-    squeezed.dispose();
   }
 
   return cnn as CNN;
@@ -188,64 +187,45 @@ export async function loadTrainedModel(modelFile: string): Promise<tf.LayersMode
   return tf.loadLayersModel(modelFile);
 }
 
+// Synchronous forward pass + construction; run inside tf.tidy so every
+// intermediate tensor (per-layer activations, squeezes, transposes) is
+// reclaimed. Returns a plain-JS CNN holding no live tensors.
+function buildCNNFromInput(
+  inputImageTensor: tf.Tensor3D,
+  model: tf.LayersModel,
+): CNN {
+  let preTensor: tf.Tensor = tf.stack([inputImageTensor]);
+  const outputs: tf.Tensor[] = [];
+
+  for (let l = 0; l < model.layers.length; l++) {
+    const curTensor = model.layers[l].apply(preTensor) as tf.Tensor;
+
+    let output = curTensor.squeeze();
+    if (output.shape.length === 3) {
+      output = output.transpose([2, 0, 1]);
+    }
+    outputs.push(output);
+    preTensor = curTensor;
+  }
+
+  return constructCNNFromOutputs(outputs, model, inputImageTensor);
+}
+
 export async function constructCNN(
   inputImageFile: string,
   model: tf.LayersModel,
 ): Promise<CNN> {
   const inputImageTensor = await getInputImageArray(inputImageFile, true);
-  const inputImageTensorBatch = tf.stack([inputImageTensor]);
-
-  let preTensor: tf.Tensor = inputImageTensorBatch;
-  const outputs: tf.Tensor[] = [];
-
-  for (let l = 0; l < model.layers.length; l++) {
-    const curTensor = model.layers[l].apply(preTensor) as tf.Tensor;
-
-    let output = curTensor.squeeze();
-    if (output.shape.length === 3) {
-      output = output.transpose([2, 0, 1]);
-    }
-    outputs.push(output);
-    preTensor = curTensor;
-  }
-
-  const cnn = constructCNNFromOutputs(outputs, model, inputImageTensor);
-
-  // Clean up tensors
+  // Capture via closure: the CNN is plain JS (no tensors), but tf.tidy's
+  // return type must be a TensorContainer, so the scope returns an empty one.
+  let cnn!: CNN;
+  tf.tidy(() => {
+    cnn = buildCNNFromInput(inputImageTensor, model);
+    return {};
+  });
   inputImageTensor.dispose();
-  inputImageTensorBatch.dispose();
-  outputs.forEach((t) => t.dispose());
 
   // Ignore the flatten layer but keep it as a side-channel for softmax
-  const flatten = cnn[cnn.length - 2];
-  cnn.splice(cnn.length - 2, 1);
-  cnn.flatten = flatten;
-  return cnn;
-}
-
-export async function constructCNNFromTensor(
-  inputImageTensor: tf.Tensor3D,
-  model: tf.LayersModel,
-): Promise<CNN> {
-  const inputImageTensorBatch = tf.stack([inputImageTensor]);
-  let preTensor: tf.Tensor = inputImageTensorBatch;
-  const outputs: tf.Tensor[] = [];
-
-  for (let l = 0; l < model.layers.length; l++) {
-    const curTensor = model.layers[l].apply(preTensor) as tf.Tensor;
-    let output = curTensor.squeeze();
-    if (output.shape.length === 3) {
-      output = output.transpose([2, 0, 1]);
-    }
-    outputs.push(output);
-    preTensor = curTensor;
-  }
-
-  const cnn = constructCNNFromOutputs(outputs, model, inputImageTensor);
-
-  inputImageTensorBatch.dispose();
-  outputs.forEach((t) => t.dispose());
-
   const flatten = cnn[cnn.length - 2];
   cnn.splice(cnn.length - 2, 1);
   cnn.flatten = flatten;
