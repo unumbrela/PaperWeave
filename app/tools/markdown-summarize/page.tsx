@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Library, Loader2 } from "lucide-react";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
 import { StreamOutput } from "@/components/stream-output";
 import { useStream } from "@/components/use-stream";
 import { consumeHandoff } from "@/lib/workflow/handoff";
 import { HandoffBanner, SendToTool, SaveToLibrary } from "@/components/workflow/handoff-controls";
+import { repository } from "@/lib/db/repository";
+import type { Paper } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
 const TOOL = getTool("markdown-summarize")!;
@@ -23,7 +26,36 @@ export default function Page() {
   const [focus, setFocus] = useState<(typeof FOCUS)[number]["value"]>("balanced");
   const [handoffFrom, setHandoffFrom] = useState<string | null>(null);
   const [sourcePaperId, setSourcePaperId] = useState<string | null>(null);
+  const [libPapers, setLibPapers] = useState<Paper[] | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [loadingLib, setLoadingLib] = useState(false);
   const { text, loading, error, run, stop } = useStream();
+
+  // 从论文库选篇：首次打开时懒加载列表（本地 Dexie）。
+  const togglePicker = async () => {
+    const next = !pickerOpen;
+    setPickerOpen(next);
+    if (next && libPapers === null) {
+      setLoadingLib(true);
+      try {
+        setLibPapers(await repository.listPapers());
+      } catch {
+        setLibPapers([]);
+      } finally {
+        setLoadingLib(false);
+      }
+    }
+  };
+
+  // 选中一篇：把标题 + 摘要（+ 已有速览）带入输入框（库内无全文，以摘要起步）。
+  const pickPaper = (p: Paper) => {
+    const parts = [`# ${p.title}`];
+    if (p.abstract) parts.push(p.abstract);
+    if (p.summary) parts.push(`## 已有速览\n\n${p.summary}`);
+    setMarkdown(parts.join("\n\n"));
+    setSourcePaperId(p.id);
+    setPickerOpen(false);
+  };
 
   useEffect(() => {
     // 挂载时一次性消费上游 handoff 并水合输入，非级联渲染
@@ -49,7 +81,46 @@ export default function Page() {
           {handoffFrom && (
             <HandoffBanner from={handoffFrom} onDismiss={() => setHandoffFrom(null)} />
           )}
-          <label className="overline block mb-2">论文 Markdown</label>
+          <div className="mb-2 flex items-center justify-between">
+            <label className="overline">论文 Markdown</label>
+            <button
+              onClick={togglePicker}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] transition-all",
+                pickerOpen
+                  ? "border-plum/50 bg-plum/10 text-plum"
+                  : "border-line bg-paper-2/60 text-ink-2 hover:border-line-strong hover:text-ink",
+              )}
+            >
+              {loadingLib ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Library className="h-3.5 w-3.5" />}
+              从论文库选篇
+            </button>
+          </div>
+
+          {pickerOpen && (
+            <div className="mb-3 max-h-56 overflow-y-auto rounded-xl border border-line bg-paper-2/60 p-1.5">
+              {loadingLib ? (
+                <p className="px-2 py-3 text-center text-[12px] text-ink-3">读取论文库…</p>
+              ) : libPapers && libPapers.length > 0 ? (
+                libPapers.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => pickPaper(p)}
+                    className="block w-full rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-paper-3"
+                  >
+                    <div className="line-clamp-1 text-[13px] text-ink">{p.title}</div>
+                    <div className="mt-0.5 line-clamp-1 text-[11px] text-ink-4">
+                      {p.abstract ? p.abstract.slice(0, 90) : "（无摘要）"}
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <p className="px-2 py-3 text-center text-[12px] text-ink-3">
+                  论文库还是空的——先去「调研搜索」入库几篇。
+                </p>
+              )}
+            </div>
+          )}
           <textarea
             value={markdown}
             onChange={(e) => setMarkdown(e.target.value)}
