@@ -1,130 +1,319 @@
 "use client"
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type * as tfType from '@tensorflow/tfjs'
-import { createGenerator, createDiscriminator } from '@/lib/ganModel'
-import { sampleNoise, sampleReal, Distribution } from '@/lib/sampler'
+import { GANLabModel, LossType } from '@/lib/ganModel'
+import {
+  Distribution,
+  DrawingPositions,
+  discriminatorGrid,
+  manifoldNoiseGrid,
+  sampleNoise,
+  sampleReal,
+} from '@/lib/sampler'
 
-export function useGANTraining(initial: { lr?: number; batch?: number; distribution?: Distribution } = {}) {
-  const tfRef = useRef<any>(null)
-  const stateRef = useRef<any>({})
+type TF = typeof tfType
+
+// 可视化参数
+const NUM_SAMPLES = 300 // 叠加显示的真/假样本数
+const NUM_GRADIENTS = 80 // 梯度箭头数量
+const MANIFOLD_CELLS = 20 // 流形网格分辨率
+const HEATMAP_RES = 40 // 判别器热力图分辨率
+const REFRESH_EVERY = 2 // 每多少步刷新一次可视化
+const MAX_LOSS_POINTS = 200
+
+export interface VizState {
+  tf: TF | null
+  model: GANLabModel | null
+  realSamples: number[][]
+  fakeSamples: number[][]
+  manifoldVertices: number[][]
+  manifoldCells: number
+  gradSamples: number[][]
+  gradVectors: number[][]
+  heatmap: Float32Array | null
+  heatmapRes: number
+}
+
+export interface GANTrainingOptions {
+  lr?: number
+  batch?: number
+  distribution?: Distribution
+  lossType?: LossType
+  drawing?: DrawingPositions
+}
+
+function jsDivergence(real: number[][], fake: number[][], res: number): number {
+  const rh = new Float64Array(res * res)
+  const fh = new Float64Array(res * res)
+  const bin = (p: number[]) => {
+    const xi = Math.min(res - 1, Math.max(0, Math.floor(p[0] * res)))
+    const yi = Math.min(res - 1, Math.max(0, Math.floor(p[1] * res)))
+    return yi * res + xi
+  }
+  real.forEach((p) => (rh[bin(p)] += 1))
+  fake.forEach((p) => (fh[bin(p)] += 1))
+  const norm = (a: Float64Array) => {
+    const s = a.reduce((x, y) => x + y, 0) || 1
+    for (let i = 0; i < a.length; ++i) a[i] /= s
+  }
+  norm(rh)
+  norm(fh)
+  let js = 0
+  for (let i = 0; i < rh.length; ++i) {
+    const m = 0.5 * (rh[i] + fh[i])
+    if (rh[i] > 0) js += 0.5 * rh[i] * Math.log(rh[i] / m)
+    if (fh[i] > 0) js += 0.5 * fh[i] * Math.log(fh[i] / m)
+  }
+  return js
+}
+
+export function useGANTraining(initial: GANTrainingOptions = {}) {
+  const tfRef = useRef<TF | null>(null)
+  const stateRef = useRef<VizState>({
+    tf: null,
+    model: null,
+    realSamples: [],
+    fakeSamples: [],
+    manifoldVertices: [],
+    manifoldCells: MANIFOLD_CELLS,
+    gradSamples: [],
+    gradVectors: [],
+    heatmap: null,
+    heatmapRes: HEATMAP_RES,
+  })
+
+  // 训练配置放进 ref，避免闭包过期
+  const cfgRef = useRef({
+    lr: initial.lr ?? 0.02,
+    batch: initial.batch ?? 64,
+    distribution: initial.distribution ?? ('gaussians' as Distribution),
+    lossType: initial.lossType ?? ('log' as LossType),
+    drawing: initial.drawing ?? ([] as DrawingPositions),
+    slowMo: false,
+  })
+  const optsRef = useRef<{ g: tfType.Optimizer; d: tfType.Optimizer } | null>(null)
   const runningRef = useRef(false)
+
+  const [ready, setReady] = useState(false)
   const [running, setRunning] = useState(false)
   const [genLoss, setGenLoss] = useState<number[]>([])
   const [disLoss, setDisLoss] = useState<number[]>([])
   const [steps, setSteps] = useState(0)
-  const [epoch, setEpoch] = useState(0)
   const [divergence, setDivergence] = useState(0)
+  const [vizVersion, setVizVersion] = useState(0)
 
+  const makeOptimizers = useCallback((tf: TF, lr: number) => {
+    optsRef.current?.g.dispose()
+    optsRef.current?.d.dispose()
+    optsRef.current = { g: tf.train.adam(lr, 0.9, 0.999), d: tf.train.adam(lr, 0.9, 0.999) }
+  }, [])
+
+  const refreshViz = useCallback(() => {
+    const tf = tfRef.current
+    const model = stateRef.current.model
+    if (!tf || !model) return
+    const cfg = cfgRef.current
+
+    const out = tf.tidy(() => {
+      const real = sampleReal(NUM_SAMPLES, cfg.distribution, tf, cfg.drawing)
+      const z = sampleNoise(NUM_SAMPLES, tf, model.noiseSize)
+      const fake = model.generator(z)
+
+      // 流形顶点
+      const mGrid = manifoldNoiseGrid(MANIFOLD_CELLS, tf)
+      const mOut = model.generator(mGrid)
+
+      // 判别器热力图
+      const hGrid = discriminatorGrid(HEATMAP_RES, tf)
+      const hOut = model.discriminator(hGrid).reshape([HEATMAP_RES * HEATMAP_RES])
+
+      // 梯度场：对生成样本位置求 gLoss 的下降方向
+      const gradPts = (fake.slice([0, 0], [NUM_GRADIENTS, 2]) as tfType.Tensor2D)
+      const gradFn = tf.grads((pts) =>
+        model.gLoss(model.discriminator(pts as tfType.Tensor2D)),
+      )
+      const [grad] = gradFn([gradPts]) as tfType.Tensor2D[]
+
+      return {
+        real: real.arraySync() as number[][],
+        fake: fake.arraySync() as number[][],
+        manifold: mOut.arraySync() as number[][],
+        heatmap: hOut.dataSync() as Float32Array,
+        gradPts: gradPts.arraySync() as number[][],
+        // 下降方向 = -grad
+        gradVec: (grad.mul(-1).arraySync() as number[][]),
+      }
+    })
+
+    const s = stateRef.current
+    s.realSamples = out.real
+    s.fakeSamples = out.fake
+    s.manifoldVertices = out.manifold
+    s.gradSamples = out.gradPts
+    s.gradVectors = out.gradVec
+    s.heatmap = Float32Array.from(out.heatmap)
+
+    setDivergence(jsDivergence(out.real, out.fake, 20))
+    setVizVersion((v) => v + 1)
+  }, [])
+
+  // 初始化 tf + 模型
   useEffect(() => {
     let mounted = true
     ;(async () => {
       const tf = await import('@tensorflow/tfjs')
-      await tf.setBackend('webgl')
-      tfRef.current = tf
-
-      const gen = createGenerator(tf)
-      const dis = createDiscriminator(tf)
-
-      const gOpt = tf.train.adam(initial.lr ?? 0.001)
-      const dOpt = tf.train.adam(initial.lr ?? 0.001)
-
-      dis.compile({ optimizer: dOpt, loss: 'binaryCrossentropy' })
-
-      stateRef.current = { tf, gen, dis, gOpt, dOpt, distribution: initial.distribution ?? 'gaussian', batch: initial.batch ?? 64 }
+      try {
+        await tf.setBackend('webgl')
+      } catch {
+        await tf.setBackend('cpu')
+      }
+      await tf.ready()
       if (!mounted) return
+      tfRef.current = tf
+      const model = new GANLabModel(tf, { lossType: cfgRef.current.lossType })
+      stateRef.current.tf = tf
+      stateRef.current.model = model
+      makeOptimizers(tf, cfgRef.current.lr)
+      setReady(true)
+      refreshViz()
     })()
-    return () => { mounted = false }
+    return () => {
+      mounted = false
+      runningRef.current = false
+      stateRef.current.model?.dispose()
+      optsRef.current?.g.dispose()
+      optsRef.current?.d.dispose()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function step() {
-    const s = stateRef.current
-    if (!s || !s.tf) return
-    const tf = s.tf
-    const batch = s.batch || 64
+  const step = useCallback(() => {
+    const tf = tfRef.current
+    const model = stateRef.current.model
+    const opt = optsRef.current
+    if (!tf || !model || !opt) return
+    const cfg = cfgRef.current
+    const batch = cfg.batch
 
-    // discriminator
-    const real = sampleReal(batch, s.distribution as Distribution, tf)
-    const z = sampleNoise(batch, tf)
-    const fake = s.gen.predict(z) as any
-    const x = tf.concat([real, fake], 0)
-    const y = tf.concat([tf.ones([batch, 1]), tf.zeros([batch, 1])], 0)
+    // 判别器一步
+    const dCost = opt.d.minimize(
+      () =>
+        tf.tidy(() => {
+          const real = sampleReal(batch, cfg.distribution, tf, cfg.drawing)
+          const z = sampleNoise(batch, tf, model.noiseSize)
+          const fake = model.generator(z)
+          return model.dLoss(model.discriminator(real), model.discriminator(fake))
+        }),
+      true,
+      model.dVariables,
+    )
+    // 生成器一步
+    const gCost = opt.g.minimize(
+      () =>
+        tf.tidy(() => {
+          const z = sampleNoise(batch, tf, model.noiseSize)
+          const fake = model.generator(z)
+          return model.gLoss(model.discriminator(fake))
+        }),
+      true,
+      model.gVariables,
+    )
 
-    const dLoss = await s.dis.trainOnBatch(x, y) as number
+    const d = dCost ? dCost.dataSync()[0] : 0
+    const g = gCost ? gCost.dataSync()[0] : 0
+    dCost?.dispose()
+    gCost?.dispose()
 
-    // generator
-    const genLossTensor = s.gOpt.minimize(() => {
-      const z2 = sampleNoise(batch, tf)
-      const gOut = s.gen.apply(z2) as any
-      const dOut = s.dis.apply(gOut) as any
-      const loss = tf.losses.logLoss(tf.onesLike(dOut), dOut)
-      return loss
-    }, true) as any
+    setDisLoss((p) => p.concat(d).slice(-MAX_LOSS_POINTS))
+    setGenLoss((p) => p.concat(g).slice(-MAX_LOSS_POINTS))
+    setSteps((n) => {
+      const next = n + 1
+      if (next % REFRESH_EVERY === 0) refreshViz()
+      return next
+    })
+  }, [refreshViz])
 
-    const gLoss = genLossTensor ? genLossTensor.dataSync()[0] : 0
-    if (genLossTensor) genLossTensor.dispose()
-
-    tf.dispose([real, z, fake, x, y])
-
-    setGenLoss(prev => prev.concat(gLoss).slice(-1000))
-    setDisLoss(prev => prev.concat(dLoss as number).slice(-1000))
-    setSteps(s => s + 1)
-
-    // compute simple divergence snapshot (lightweight)
-    try {
-      const grid = 32
-      const coords: number[][] = []
-      for (let y = 0; y < grid; y++) for (let x = 0; x < grid; x++) coords.push([x / (grid - 1), y / (grid - 1)])
-      const pts = tf.tensor2d(coords)
-      const preds = s.dis.predict(pts) as any
-      const probs = preds.dataSync()
-      // simple metric: variance of probs distance from 0.5
-      let v = 0
-      for (let i = 0; i < probs.length; i++) v += Math.abs(probs[i] - 0.5)
-      setDivergence(v / probs.length)
-      tf.dispose([pts, preds])
-    } catch (e) {}
-
-    return { gLoss, dLoss }
-  }
-
-  async function loop() {
-    setRunning(true)
+  const loop = useCallback(async () => {
     runningRef.current = true
+    setRunning(true)
     while (runningRef.current) {
-      await step()
-      await new Promise(r => setTimeout(r, 0))
+      step()
+      const delay = cfgRef.current.slowMo ? 250 : 0
+      await new Promise((r) => setTimeout(r, delay))
     }
     setRunning(false)
-  }
+  }, [step])
 
-  function start() { if (!runningRef.current) loop() }
-  function stop() { runningRef.current = false }
-  function reset() {
-    const s = stateRef.current
-    if (!s || !s.tf) return
-    s.gen = createGenerator(s.tf)
-    s.dis = createDiscriminator(s.tf)
-    s.dis.compile({ optimizer: s.dOpt, loss: 'binaryCrossentropy' })
-    setGenLoss([]); setDisLoss([]); setSteps(0); setEpoch(0)
-  }
+  const start = useCallback(() => {
+    if (!runningRef.current) loop()
+  }, [loop])
+  const stop = useCallback(() => {
+    runningRef.current = false
+  }, [])
 
-  function setDistribution(d: Distribution) { if (stateRef.current) stateRef.current.distribution = d }
-  function setBatchSize(b: number) { if (stateRef.current) stateRef.current.batch = b }
+  const reset = useCallback(() => {
+    const tf = tfRef.current
+    const model = stateRef.current.model
+    if (!tf || !model) return
+    model.initializeVariables()
+    makeOptimizers(tf, cfgRef.current.lr)
+    setGenLoss([])
+    setDisLoss([])
+    setSteps(0)
+    refreshViz()
+  }, [makeOptimizers, refreshViz])
+
+  const setLr = useCallback(
+    (lr: number) => {
+      cfgRef.current.lr = lr
+      const tf = tfRef.current
+      if (tf) makeOptimizers(tf, lr)
+    },
+    [makeOptimizers],
+  )
+  const setBatch = useCallback((b: number) => {
+    cfgRef.current.batch = b
+  }, [])
+  const setDistribution = useCallback(
+    (d: Distribution) => {
+      cfgRef.current.distribution = d
+      refreshViz()
+    },
+    [refreshViz],
+  )
+  const setDrawing = useCallback(
+    (positions: DrawingPositions) => {
+      cfgRef.current.drawing = positions
+      if (cfgRef.current.distribution === 'drawing') refreshViz()
+    },
+    [refreshViz],
+  )
+  const setLossType = useCallback((t: LossType) => {
+    cfgRef.current.lossType = t
+    if (stateRef.current.model) stateRef.current.model.lossType = t
+  }, [])
+  const setSlowMo = useCallback((v: boolean) => {
+    cfgRef.current.slowMo = v
+  }, [])
 
   return {
     stateRef,
-    tfRef,
-    start,
-    stop,
-    step,
-    reset,
+    ready,
     running,
     genLoss,
     disLoss,
     steps,
-    epoch,
     divergence,
+    vizVersion,
+    start,
+    stop,
+    step,
+    reset,
+    setLr,
+    setBatch,
     setDistribution,
-    setBatchSize
+    setDrawing,
+    setLossType,
+    setSlowMo,
   }
 }

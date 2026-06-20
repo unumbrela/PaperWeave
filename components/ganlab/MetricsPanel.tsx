@@ -1,17 +1,43 @@
+"use client"
 import React from 'react'
 import { LossChart } from './LossChart'
 
-export function MetricsPanel({ genLoss, disLoss, divergence }: { genLoss: number[]; disLoss: number[]; divergence: number }) {
+export function MetricsPanel({
+  genLoss,
+  disLoss,
+  divergence,
+}: {
+  genLoss: number[]
+  disLoss: number[]
+  divergence: number
+}) {
+  const last = (a: number[]) => (a.length ? a[a.length - 1] : 0)
   return (
-    <div className="bg-white p-3 rounded shadow space-y-3">
+    <div className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
       <div className="flex items-center justify-between">
-        <span className="font-medium">Metrics</span>
-        <span className="text-sm text-gray-600">JS Divergence: {divergence.toFixed(3)}</span>
+        <span className="text-sm font-semibold text-stone-700">训练指标</span>
+        <span className="text-xs text-stone-500">JS 散度越小越收敛</span>
       </div>
+
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="rounded bg-stone-50 p-2">
+          <div className="text-[10px] text-stone-400">判别器损失</div>
+          <div className="font-mono text-sm text-violet-700">{last(disLoss).toFixed(3)}</div>
+        </div>
+        <div className="rounded bg-stone-50 p-2">
+          <div className="text-[10px] text-stone-400">生成器损失</div>
+          <div className="font-mono text-sm text-emerald-600">{last(genLoss).toFixed(3)}</div>
+        </div>
+        <div className="rounded bg-stone-50 p-2">
+          <div className="text-[10px] text-stone-400">JS 散度</div>
+          <div className="font-mono text-sm text-stone-700">{divergence.toFixed(3)}</div>
+        </div>
+      </div>
+
       <LossChart genLoss={genLoss} disLoss={disLoss} />
-      <div className="grid grid-cols-1 gap-2">
-        <div className="text-xs text-gray-500">辅助指标（占位）</div>
-        <div className="h-12 bg-gray-50 rounded flex items-center justify-center text-sm text-gray-400">KL / JS 小图表</div>
+      <div className="text-xs text-stone-400">
+        <span className="text-violet-600">紫线</span> 判别器 ·{' '}
+        <span className="text-emerald-600">绿线</span> 生成器
       </div>
     </div>
   )

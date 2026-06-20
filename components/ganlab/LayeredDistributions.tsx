@@ -1,6 +1,128 @@
+"use client"
 import React, { useEffect, useRef } from 'react'
+import type { VizState } from '@/hooks/useGANTraining'
 
-export function LayeredDistributions({ stateRef, distribution, steps, onDivergence }: any) {
+export interface LayerToggles {
+  heatmap: boolean
+  manifold: boolean
+  real: boolean
+  fake: boolean
+  gradients: boolean
+}
+
+// 数据坐标 [0,1] → 画布像素（y 轴朝上，原点左下，与 GAN Lab 一致）
+const toPx = (x: number, y: number, w: number, h: number): [number, number] => [x * w, (1 - y) * h]
+
+function drawHeatmap(ctx: CanvasRenderingContext2D, s: VizState, w: number, h: number) {
+  if (!s.heatmap) return
+  const res = s.heatmapRes
+  const cw = w / res
+  const ch = h / res
+  for (let row = 0; row < res; ++row) {
+    for (let col = 0; col < res; ++col) {
+      const p = s.heatmap[row * res + col]
+      // 绿色=判为真, 紫色=判为假, 0.5 处接近透明
+      let r: number, g: number, b: number, a: number
+      if (p >= 0.5) {
+        r = 16; g = 185; b = 129; a = (p - 0.5) * 2 * 0.55
+      } else {
+        r = 124; g = 58; b = 237; a = (0.5 - p) * 2 * 0.55
+      }
+      ctx.fillStyle = `rgba(${r},${g},${b},${a.toFixed(3)})`
+      const px = col * cw
+      const py = (res - 1 - row) * ch
+      ctx.fillRect(px, py, cw + 1, ch + 1)
+    }
+  }
+}
+
+function drawManifold(ctx: CanvasRenderingContext2D, s: VizState, w: number, h: number) {
+  const verts = s.manifoldVertices
+  const cells = s.manifoldCells
+  const side = cells + 1
+  if (verts.length < side * side) return
+  const idx = (i: number, j: number) => i * side + j
+  ctx.lineWidth = 0.5
+  ctx.strokeStyle = 'rgba(245,158,11,0.35)'
+  for (let i = 0; i < cells; ++i) {
+    for (let j = 0; j < cells; ++j) {
+      const a = verts[idx(i, j)]
+      const b = verts[idx(i + 1, j)]
+      const c = verts[idx(i + 1, j + 1)]
+      const d = verts[idx(i, j + 1)]
+      const pa = toPx(a[0], a[1], w, h)
+      const pb = toPx(b[0], b[1], w, h)
+      const pc = toPx(c[0], c[1], w, h)
+      const pd = toPx(d[0], d[1], w, h)
+      // 四边形面积（shoelace），面积越小密度越高 → 越不透明
+      const area =
+        0.5 *
+        Math.abs(
+          pa[0] * pb[1] - pb[0] * pa[1] +
+            pb[0] * pc[1] - pc[0] * pb[1] +
+            pc[0] * pd[1] - pd[0] * pc[1] +
+            pd[0] * pa[1] - pa[0] * pd[1],
+        )
+      const baseArea = (w / cells) * (h / cells)
+      const opacity = Math.min(0.6, (baseArea / (area + 1)) * 0.25)
+      ctx.fillStyle = `rgba(249,115,22,${opacity.toFixed(3)})`
+      ctx.beginPath()
+      ctx.moveTo(pa[0], pa[1])
+      ctx.lineTo(pb[0], pb[1])
+      ctx.lineTo(pc[0], pc[1])
+      ctx.lineTo(pd[0], pd[1])
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+    }
+  }
+}
+
+function drawPoints(
+  ctx: CanvasRenderingContext2D,
+  pts: number[][],
+  w: number,
+  h: number,
+  color: string,
+) {
+  ctx.fillStyle = color
+  for (const p of pts) {
+    const [px, py] = toPx(p[0], p[1], w, h)
+    ctx.beginPath()
+    ctx.arc(px, py, 2, 0, Math.PI * 2)
+    ctx.fill()
+  }
+}
+
+function drawGradients(ctx: CanvasRenderingContext2D, s: VizState, w: number, h: number) {
+  const pts = s.gradSamples
+  const vec = s.gradVectors
+  if (!pts.length || pts.length !== vec.length) return
+  ctx.strokeStyle = 'rgba(236,72,153,0.9)'
+  ctx.lineWidth = 1
+  const scale = 0.15 // 显示用缩放
+  for (let i = 0; i < pts.length; ++i) {
+    const [x, y] = pts[i]
+    const dx = vec[i][0] * scale
+    const dy = vec[i][1] * scale
+    const [px, py] = toPx(x, y, w, h)
+    const [qx, qy] = toPx(x + dx, y + dy, w, h)
+    ctx.beginPath()
+    ctx.moveTo(px, py)
+    ctx.lineTo(qx, qy)
+    ctx.stroke()
+  }
+}
+
+export function LayeredDistributions({
+  stateRef,
+  vizVersion,
+  layers,
+}: {
+  stateRef: React.MutableRefObject<VizState>
+  vizVersion: number
+  layers: LayerToggles
+}) {
   const ref = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {
@@ -9,106 +131,17 @@ export function LayeredDistributions({ stateRef, distribution, steps, onDivergen
     const ctx = canvas.getContext('2d')!
     const w = canvas.width
     const h = canvas.height
-
     const s = stateRef.current
-    if (!s || !s.tf) return
-    const tf = s.tf
-    const gen = s.gen
-    const dis = s.dis
+    ctx.clearRect(0, 0, w, h)
+    ctx.fillStyle = '#fafaf9'
+    ctx.fillRect(0, 0, w, h)
 
-    // compute classifier map
-    const gridSize = 64
-    const img = ctx.createImageData(gridSize, gridSize)
-    const coords: number[][] = []
-    for (let y = 0; y < gridSize; y++) for (let x = 0; x < gridSize; x++) coords.push([x / (gridSize - 1), y / (gridSize - 1)]);
+    if (layers.heatmap) drawHeatmap(ctx, s, w, h)
+    if (layers.manifold) drawManifold(ctx, s, w, h)
+    if (layers.real) drawPoints(ctx, s.realSamples, w, h, 'rgba(16,185,129,0.85)')
+    if (layers.fake) drawPoints(ctx, s.fakeSamples, w, h, 'rgba(124,58,237,0.85)')
+    if (layers.gradients) drawGradients(ctx, s, w, h)
+  }, [stateRef, vizVersion, layers])
 
-    (async () => {
-      const pts = tf.tensor2d(coords)
-      const preds = dis.predict(pts) as any
-      const probs = await preds.data()
-
-      // fill heatmap (purple = fake, green = real)
-      for (let i = 0; i < probs.length; i++) {
-        const p = probs[i]
-        const x = i % gridSize
-        const y = Math.floor(i / gridSize)
-        // purple-green mix
-        const gp = Math.floor((1 - p) * 255)
-        const rp = Math.floor(p * 200)
-        const idx = (y * gridSize + x) * 4
-        img.data[idx + 0] = Math.min(255, rp + 80)
-        img.data[idx + 1] = gp
-        img.data[idx + 2] = Math.floor((p) * 255)
-        img.data[idx + 3] = 230
-      }
-
-      // draw scaled up
-      const tmp = document.createElement('canvas')
-      tmp.width = gridSize
-      tmp.height = gridSize
-      tmp.getContext('2d')!.putImageData(img, 0, 0)
-      ctx.imageSmoothingEnabled = false
-      ctx.clearRect(0, 0, w, h)
-      ctx.drawImage(tmp, 0, 0, w, h)
-
-      // overlay samples
-      const real = (() => {
-        switch (distribution) {
-          case 'gaussian': return tf.add(tf.randomNormal([256, 2], 0.5, 0.12), 0)
-          case 'ring': {
-            const r = tf.add(tf.randomNormal([256, 1], 0.4, 0.05).abs(), 0)
-            const theta = tf.randomUniform([256, 1], 0, Math.PI * 2)
-            const x = tf.mul(r, tf.cos(theta))
-            const y = tf.mul(r, tf.sin(theta))
-            return tf.concat([x.add(0.5), y.add(0.5)], 1)
-          }
-          case 'moons': {
-            const half = 128
-            const a = tf.add(tf.randomNormal([half, 2], 0.35, 0.08), tf.tensor([0.25, 0.5]))
-            const b = tf.add(tf.randomNormal([256 - half, 2], 0.75, 0.08), tf.tensor([0.0, -0.1]))
-            return tf.concat([a, b], 0)
-          }
-        }
-      })()
-
-      const realArr = await real.array()
-      ctx.fillStyle = 'rgba(16,185,129,0.9)'
-      realArr.forEach((p: number[]) => ctx.fillRect(p[0] * w, p[1] * h, 2, 2))
-
-      // fake samples from generator
-      let fakeArr: number[][] = []
-      if (gen) {
-        const z = tf.randomNormal([256, 2])
-        const gOut = gen.predict(z) as any
-        fakeArr = await gOut.array()
-        ctx.fillStyle = 'rgba(99,102,241,0.9)'
-        fakeArr.forEach((p: number[]) => ctx.fillRect(p[0] * w, p[1] * h, 2, 2))
-        tf.dispose([z, gOut])
-      }
-
-      // compute simple JS divergence on grid
-      const realHist = new Float32Array(gridSize * gridSize).fill(0)
-      const fakeHist = new Float32Array(gridSize * gridSize).fill(0)
-      realArr.forEach((p: number[]) => { const xi = Math.floor(p[0] * (gridSize - 1)); const yi = Math.floor(p[1] * (gridSize - 1)); realHist[yi * gridSize + xi] += 1 })
-      fakeArr.forEach((p: number[]) => { const xi = Math.floor(p[0] * (gridSize - 1)); const yi = Math.floor(p[1] * (gridSize - 1)); fakeHist[yi * gridSize + xi] += 1 })
-      const normalize = (arr: Float32Array) => { const s = arr.reduce((a, b) => a + b, 0) || 1; for (let i = 0; i < arr.length; i++) arr[i] /= s }
-      normalize(realHist); normalize(fakeHist)
-      const m = new Float32Array(realHist.length)
-      for (let i = 0; i < m.length; i++) m[i] = 0.5 * (realHist[i] + fakeHist[i])
-      function kl(a: Float32Array, b: Float32Array) { let s = 0; for (let i = 0; i < a.length; i++) if (a[i] > 0) s += a[i] * Math.log(a[i] / (b[i] + 1e-12) + 1e-12); return s }
-      const js = 0.5 * (kl(realHist, m) + kl(fakeHist, m))
-
-      onDivergence && onDivergence(js)
-
-      tf.dispose([pts, preds, real])
-    })()
-  }, [stateRef, distribution, steps])
-
-  return (
-    <div className="bg-white p-3 rounded shadow">
-      <h4 className="font-medium">Layered Distributions</h4>
-      <canvas ref={ref} width={320} height={320} className="mt-2 w-full border" />
-      <div className="text-xs text-gray-500 mt-2">绿色: 真实样本, 蓝色: 生成样本。背景颜色为判别器判别置信度。</div>
-    </div>
-  )
+  return <canvas ref={ref} width={420} height={420} className="w-full rounded border border-stone-200" />
 }
