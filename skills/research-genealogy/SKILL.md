@@ -12,6 +12,8 @@ description: >
 
 # Research Genealogy
 
+> 站内对应工具：「**研究脉络族谱**」（`/tools/research-genealogy`）——本 skill 在终端产出的 `lineage.json` 粘回站内即渲染成可点击的族谱树。
+
 Turn a research direction into a readable, **non-linear development genealogy**.
 
 The value is NOT "another paper search". It is the *lineage*: founding work →

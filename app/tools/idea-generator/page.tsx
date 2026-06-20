@@ -121,7 +121,7 @@ export default function Page() {
                   sourcePaperId: sourcePaperId ?? undefined,
                   fields: { topic: direction, innovation: text },
                 }}
-                label="发往「论文撰写组织器」"
+                label="发往「结构撰写」"
               />
               <SendToTool
                 targetSlug="prompt-chunker"
@@ -130,7 +130,7 @@ export default function Page() {
                   sourcePaperId: sourcePaperId ?? undefined,
                   fields: { task: `把下面这个研究 idea 的最小验证实验拆成可执行计划：\n\n${text}` },
                 }}
-                label="发往「研究任务规划器」"
+                label="发往「研究任务分解」"
               />
               <SendToTool
                 targetSlug="figure-generator"

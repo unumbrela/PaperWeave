@@ -82,7 +82,7 @@ cp -r skills/research-genealogy ~/.claude/skills/
             </div>
             <p className="text-[13.5px] leading-relaxed text-ink-2 mb-3">
               skill 的中间产物是一份 <code className="text-[12px] bg-paper-2/80 border border-line rounded px-1.5 py-0.5">lineage.json</code>。
-              粘贴到下面即可在站内渲染成可点击的族谱树——与「引用网络图谱」互补：
+              粘贴到下面即可在站内渲染成可点击的族谱树——与「引文网络图谱」互补：
               图谱看<strong>单篇</strong>的引用邻域，族谱看<strong>整个方向</strong>的来龙去脉。
             </p>
             <textarea

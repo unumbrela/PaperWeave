@@ -586,7 +586,7 @@ function PreviewPane({
             <SendToTool
               targetSlug="markdown-summarize"
               payload={{ from: TOOL.name, fields: { markdown: body } }}
-              label="发往结构化总结"
+              label="发往要点提炼"
               className="px-2.5 py-1"
             />
           )}

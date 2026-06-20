@@ -110,7 +110,7 @@ function CitationGraphInner() {
             </button>
           </div>
           <p className="mt-2 text-[12px] text-ink-4">
-            数据源 OpenAlex（无需 API key）。在「论文调研搜索」里对 OpenAlex 论文点「引用网络」可直接带入。
+            数据源 OpenAlex（无需 API key）。在「文献检索」里对 OpenAlex 论文点「引用网络」可直接带入。
           </p>
         </div>
 

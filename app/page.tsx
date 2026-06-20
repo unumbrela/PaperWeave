@@ -110,9 +110,9 @@ export default function Home() {
               <div className="hairline mb-4" />
               <p className="text-[13px] leading-relaxed text-ink-2 max-w-xs">
                 这里是 <span className="serif-italic text-ink">PaperWeave</span>
-                ，一个以论文为核心、本地优先的研究工作台。从调研搜索最新论文，到总结、精读挑选、想{" "}
-                <span className="serif-italic text-ink">创新点</span>
-                、撰写、出图——一条线走完。只搭骨架不代写正文，让每一步都顺起来。
+                ，一个以论文为核心、本地优先的研究工作台。从检索最新论文，到精读、提炼、{" "}
+                <span className="serif-italic text-ink">立论</span>
+                、撰写、制图——一条线走完。只搭骨架不代写正文，让每一步都顺起来。
               </p>
             </Reveal>
           </div>

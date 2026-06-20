@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   const system = `你是一个严谨的学术论文结构化助手。输出 Markdown，使用中文。务必：
 - 只从给定原文出发，不编造数据或引用。
 - 信息不足的字段写"原文未明确提及"，不要硬凑。
-- 字段名用加粗，结构清晰，便于下游 Idea 生成器直接消费。`;
+- 字段名用加粗，结构清晰，便于下游 创新点立论直接消费。`;
 
   const prompt = `请对下面这篇论文 Markdown 做结构化总结。
 **提取侧重**：${FOCUS_HINT[parsed.focus]}

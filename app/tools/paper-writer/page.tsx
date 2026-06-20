@@ -68,7 +68,7 @@ export default function Page() {
           <Textarea
             value={innovation}
             onChange={(e) => setInnovation(e.target.value)}
-            placeholder="可从 Idea 生成器一键流转，或简述你的 1–3 条贡献（可选）"
+            placeholder="可从 创新点立论一键流转，或简述你的 1–3 条贡献（可选）"
             rows={4}
           />
 
@@ -77,7 +77,7 @@ export default function Page() {
             mono
             value={references}
             onChange={(e) => setReferences(e.target.value)}
-            placeholder="可从论文库、对比表或结构化总结粘贴关键工作与要点（可选）"
+            placeholder="可从论文库、对比表或要点提炼粘贴关键工作与要点（可选）"
             rows={6}
           />
 

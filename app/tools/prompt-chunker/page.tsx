@@ -104,7 +104,7 @@ export default function Page() {
   const { text, loading, error, run, stop } = useStream();
 
   useEffect(() => {
-    // 挂载时一次性消费上游 handoff（如 Idea 生成器发来的验证计划）并水合输入
+    // 挂载时一次性消费上游 handoff（如 创新点立论发来的验证计划）并水合输入
     /* eslint-disable react-hooks/set-state-in-effect */
     const h = consumeHandoff("prompt-chunker");
     if (!h) return;

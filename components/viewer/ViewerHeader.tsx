@@ -26,7 +26,7 @@ export function ViewerHeader({
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
   onExport: () => void;
-  /** 发往 Idea 生成器（把本篇精读 brief 作为已知工作） */
+  /** 发往 创新点立论（把本篇精读 brief 作为已知工作） */
   onSendToIdea?: () => void;
   onBack: () => void;
 }) {
@@ -105,7 +105,7 @@ export function ViewerHeader({
           <button
             onClick={onSendToIdea}
             className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-ink-2 transition-colors hover:text-ink hover:bg-paper-3"
-            title="把本篇精读（批注 + 笔记）发往 Idea 生成器"
+            title="把本篇精读（批注 + 笔记）发往 创新点立论"
           >
             <Lightbulb className="w-4 h-4" />
             <span className="hidden lg:inline">发往 Idea</span>

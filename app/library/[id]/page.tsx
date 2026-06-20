@@ -373,7 +373,7 @@ export default function PaperDetailPage({ params }: { params: Promise<{ id: stri
                 ].join("\n"),
               },
             }}
-            label="做结构化总结"
+            label="做要点提炼"
           />
           <SendToTool
             targetSlug="idea-generator"
@@ -437,7 +437,7 @@ export default function PaperDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           )}
 
-          {/* 研究笔记（含从「Idea 生成器」回存的产出） */}
+          {/* 研究笔记（含从「创新点立论」回存的产出） */}
           {paper.notes && paper.notes.trim() && (
             <div className="surface rounded-2xl p-6">
               <h2 className="serif text-lg text-ink mb-3 flex items-center gap-2">
