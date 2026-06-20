@@ -16,6 +16,7 @@ import {
 } from "@/lib/paper-search/refine";
 import { getRecentSearches, pushRecentSearch, clearRecentSearches } from "@/lib/paper-search/history";
 import { repository } from "@/lib/db/repository";
+import { stageHandoff } from "@/lib/workflow/handoff";
 import { userKeyHeaders } from "@/lib/ai/user-keys";
 import { ApiSettings } from "@/components/paper-search/ApiSettings";
 import { SearchForm } from "@/components/paper-search/SearchForm";
@@ -241,6 +242,18 @@ export default function Page() {
   const handleRead = async (paper: PaperResult) => {
     const id = await handleImport(paper);
     if (id) router.push(`/viewer/${id}`);
+  };
+
+  /** 核心流程 ①→②：入库后把标题 + 摘要带入「结构化总结」（无全文时以摘要起步）。 */
+  const handleSendToSummary = async (paper: PaperResult) => {
+    const id = await handleImport(paper);
+    const md = `# ${paper.title}\n\n${paper.abstract || "（该论文暂无摘要，请补充正文或先用「资料整理器」把 PDF 转为 Markdown）"}`;
+    stageHandoff("markdown-summarize", {
+      from: TOOL.name,
+      sourcePaperId: id ?? undefined,
+      fields: { markdown: md },
+    });
+    router.push("/tools/markdown-summarize");
   };
 
   // 客户端精炼 + 重排后的展示集
@@ -711,6 +724,7 @@ export default function Page() {
                       onCopyLink={handleCopyLink}
                       onAnalyze={() => handleAnalyze(paper)}
                       onSummarize={() => openSummarizer(paper)}
+                      onSendToSummary={() => handleSendToSummary(paper)}
                       onImport={() => handleImport(paper)}
                       onRead={() => handleRead(paper)}
                       onToggleExpand={() => setExpandedPaperId(expandedPaperId === paper.id ? null : paper.id)}

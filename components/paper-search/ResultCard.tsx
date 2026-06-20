@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   ExternalLink, Loader2, Sparkles, ChevronRight, FileText, Copy, Check,
-  Plus, Network, BookOpen, Download,
+  Plus, Network, BookOpen, Download, Layers,
 } from "lucide-react";
 import type { PaperResult } from "@/lib/paper-search/types";
 import { formatCitations } from "@/lib/paper-search/refine";
@@ -13,6 +13,8 @@ const SOURCE_META: Record<string, { label: string; dot: string }> = {
   arxiv: { label: "arXiv", dot: "var(--coral)" },
   openalex: { label: "OpenAlex", dot: "var(--ocean)" },
   "semantic-scholar": { label: "S2", dot: "var(--sage)" },
+  crossref: { label: "Crossref", dot: "var(--plum)" },
+  europepmc: { label: "Europe PMC", dot: "var(--sage)" },
 };
 
 /** 摘要超过该长度才显示「展开」 */
@@ -39,6 +41,7 @@ export function ResultCard({
   onCopyLink,
   onAnalyze,
   onSummarize,
+  onSendToSummary,
   onImport,
   onRead,
   onToggleExpand,
@@ -61,6 +64,8 @@ export function ResultCard({
   onCopyLink: (key: string, url: string) => void;
   onAnalyze: () => void;
   onSummarize: () => void;
+  /** 入库并发往「论文内容结构化总结」（核心流程 ①→② handoff） */
+  onSendToSummary?: () => void;
   onImport: () => void;
   /** 一键阅读：自动入库后直达 PDF 阅读器 */
   onRead?: () => void;
@@ -249,6 +254,17 @@ export function ResultCard({
               <FileText className="h-3 w-3" />
               速读
             </button>
+            {onSendToSummary && (
+              <button
+                onClick={onSendToSummary}
+                disabled={importing}
+                className={cn(actionBtn, "text-ink-3 hover:bg-paper-3 hover:text-ink")}
+                title="入库并发往「论文内容结构化总结」"
+              >
+                {importing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Layers className="h-3 w-3" />}
+                总结
+              </button>
+            )}
             {paper.source === "openalex" && (
               <a
                 href={`/tools/citation-graph?id=${encodeURIComponent(paper.id)}&title=${encodeURIComponent(paper.title)}`}
