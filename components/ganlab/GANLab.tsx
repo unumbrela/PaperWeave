@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import { TopControls } from './TopControls'
 import { GANGraph } from './GANGraph'
 import { GeneratedResult } from './GeneratedResult'
-import { TargetGrid } from './TargetGrid'
+import { TargetSelector } from './TargetSelector'
 import { MetricsPanel } from './MetricsPanel'
 import { Article } from './Article'
 import { useGANTraining } from '@/hooks/useGANTraining'
@@ -25,10 +25,12 @@ export default function GANLab() {
     convergence,
     reached,
     vizVersion,
+    targetIndex,
     start,
     stop,
     step,
     reset,
+    setTarget,
     setLr,
     setLossType,
     setSlowMo,
@@ -75,20 +77,25 @@ export default function GANLab() {
         <div className="text-center text-xs text-stone-400">正在加载 TensorFlow.js…</div>
       )}
 
-      <GANGraph stateRef={stateRef} vizVersion={vizVersion} />
+      <GANGraph stateRef={stateRef} vizVersion={vizVersion} targetIndex={targetIndex} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="lg:col-span-7">
-          <GeneratedResult stateRef={stateRef} vizVersion={vizVersion} reached={reached} />
+          <GeneratedResult
+            stateRef={stateRef}
+            vizVersion={vizVersion}
+            reached={reached}
+            targetIndex={targetIndex}
+          />
         </div>
         <div className="space-y-4 lg:col-span-5">
+          <TargetSelector targetIndex={targetIndex} onSelect={setTarget} />
           <MetricsPanel
             genLoss={genLoss}
             disLoss={disLoss}
             convergence={convergence}
             reached={reached}
           />
-          <TargetGrid />
         </div>
       </div>
 

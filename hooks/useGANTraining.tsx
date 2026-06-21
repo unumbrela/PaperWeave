@@ -8,7 +8,7 @@ import {
   TARGET_IMAGES,
   sampleNoise,
   sampleReal,
-  targetsTensor,
+  targetTensor,
 } from '@/lib/sampler'
 
 type TF = typeof tfType
@@ -16,32 +16,39 @@ type TF = typeof tfType
 const NUM_CANDIDATES = 24 // 内部生成的候选图数量（只展示其中最好的一张）
 const REFRESH_EVERY = 3
 const MAX_LOSS_POINTS = 200
-const REACHED_THRESHOLD = 0.85 // 收敛度达到即判定"达到目标"并自动停止
+const REACHED_THRESHOLD = 0.98 // 收敛度达到即判定"达到目标"并自动停止（越高越像）
 const NOISE_DECAY_STEPS = 600 // 实例噪声在此步数内衰减
 const NOISE_MAX = 0.1 // 实例噪声初始强度
 const NOISE_FLOOR = 0.03 // 实例噪声下限（不降到 0，避免判别器过强）
 const ADV_WEIGHT = 0.3 // 对抗项权重（调低，让重建项主导以稳定收敛）
 const RECON_WEIGHT = 15 // 重建引导项权重
 const HIDDEN = 160 // 生成器/判别器隐藏层宽度
-const MAX_AUTO_STEPS = 800 // 训练步数硬上限，保证一定会停下来
+const MAX_AUTO_STEPS = 1500 // 训练步数硬上限，保证一定会停下来
 
 export interface VizState {
   tf: TF | null
   model: GANLabModel | null
-  bestImage: number[] // 当前最佳生成图（最接近某个目标），长度 IMG_DIM
-  bestTargetName: string // 该最佳图匹配到的目标名
+  bestImage: number[] // 当前最佳生成图（最接近选定目标），长度 IMG_DIM
+  targetName: string // 当前选定目标名
 }
 
 export interface GANTrainingOptions {
   lr?: number
   batch?: number
   lossType?: LossType
+  targetIndex?: number
 }
 
 export function useGANTraining(initial: GANTrainingOptions = {}) {
   const tfRef = useRef<TF | null>(null)
-  const stateRef = useRef<VizState>({ tf: null, model: null, bestImage: [], bestTargetName: '' })
+  const stateRef = useRef<VizState>({
+    tf: null,
+    model: null,
+    bestImage: [],
+    targetName: TARGET_IMAGES[initial.targetIndex ?? 0].name,
+  })
   const seedsRef = useRef<tfType.Tensor2D | null>(null)
+  const targetTensorRef = useRef<tfType.Tensor2D | null>(null) // 选定目标 [1, IMG_DIM]
   const baselineRef = useRef<number | null>(null)
   const optsRef = useRef<{ g: tfType.Optimizer; d: tfType.Optimizer } | null>(null)
   const runningRef = useRef(false)
@@ -52,8 +59,11 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
     lr: initial.lr ?? 0.001,
     batch: initial.batch ?? 64,
     lossType: initial.lossType ?? ('log' as LossType),
+    targetIndex: initial.targetIndex ?? 0,
     slowMo: false,
   })
+
+  const [targetIndex, setTargetIndexState] = useState(initial.targetIndex ?? 0)
 
   const [ready, setReady] = useState(false)
   const [running, setRunning] = useState(false)
@@ -76,42 +86,35 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
     seedsRef.current = tf.randomNormal([NUM_CANDIDATES, LATENT_DIM]) as tfType.Tensor2D
   }, [])
 
+  const buildTarget = useCallback((tf: TF, idx: number) => {
+    targetTensorRef.current?.dispose()
+    targetTensorRef.current = tf.keep(targetTensor(idx, tf))
+    stateRef.current.targetName = TARGET_IMAGES[idx].name
+  }, [])
+
   const refreshViz = useCallback(() => {
     const tf = tfRef.current
     const model = stateRef.current.model
     const seeds = seedsRef.current
-    if (!tf || !model || !seeds) return
+    const target = targetTensorRef.current
+    if (!tf || !model || !seeds || !target) return
 
     const out = tf.tidy(() => {
       const gen = model.generator(seeds) // [N, IMG_DIM]
-      const targets = targetsTensor(tf) // [K, IMG_DIM]
-      // 每张生成图到每个目标图的均方距离
-      const g3 = gen.reshape([NUM_CANDIDATES, 1, IMG_DIM])
-      const t3 = targets.reshape([1, targets.shape[0], IMG_DIM])
-      const dist = g3.sub(t3).square().mean(2) // [N, K]
+      // 每张生成图到「选定目标」的均方距离
+      const dist = gen.sub(target).square().mean(1) // [N]
       return {
         images: gen.arraySync() as number[][],
-        dist: dist.arraySync() as number[][],
+        dist: dist.arraySync() as number[],
       }
     })
 
-    // 在 JS 里挑出"最接近某个目标"的那一张候选图
-    const K = TARGET_IMAGES.length
+    // 挑出最接近选定目标的那一张候选图
     let best = 0
-    let bestMse = Infinity
-    let bestK = 0
-    for (let i = 0; i < out.dist.length; i++) {
-      let kMin = 0
-      for (let k = 1; k < K; k++) if (out.dist[i][k] < out.dist[i][kMin]) kMin = k
-      if (out.dist[i][kMin] < bestMse) {
-        bestMse = out.dist[i][kMin]
-        best = i
-        bestK = kMin
-      }
-    }
+    for (let i = 1; i < out.dist.length; i++) if (out.dist[i] < out.dist[best]) best = i
+    const bestMse = out.dist[best]
 
     stateRef.current.bestImage = out.images[best]
-    stateRef.current.bestTargetName = TARGET_IMAGES[bestK].name
 
     if (baselineRef.current == null) baselineRef.current = Math.max(bestMse, 1e-4)
     const conv = Math.min(1, Math.max(0, 1 - bestMse / baselineRef.current))
@@ -139,6 +142,7 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
       stateRef.current.tf = tf
       stateRef.current.model = model
       newSeeds(tf)
+      buildTarget(tf, cfgRef.current.targetIndex)
       makeOptimizers(tf, cfgRef.current.lr)
       setReady(true)
       refreshViz()
@@ -148,6 +152,7 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
       runningRef.current = false
       stateRef.current.model?.dispose()
       seedsRef.current?.dispose()
+      targetTensorRef.current?.dispose()
       optsRef.current?.g.dispose()
       optsRef.current?.d.dispose()
     }
@@ -166,10 +171,14 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
     const sd = Math.max(NOISE_FLOOR, NOISE_MAX * (1 - n / NOISE_DECAY_STEPS))
     stepCountRef.current = n + 1
 
+    const target = targetTensorRef.current
+    if (!target) return
+    const targetIdx = cfgRef.current.targetIndex
+
     const dCost = opt.d.minimize(
       () =>
         tf.tidy(() => {
-          const real = sampleReal(batch, tf)
+          const real = sampleReal(batch, targetIdx, tf)
           const z = sampleNoise(batch, tf)
           const fake = model.generator(z)
           const realN = real.add(tf.randomNormal(real.shape, 0, sd)) as tfType.Tensor2D
@@ -185,7 +194,7 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
           const fake = model.generator(sampleNoise(batch, tf))
           const fakeN = fake.add(tf.randomNormal(fake.shape, 0, sd)) as tfType.Tensor2D
           const adv = model.gLoss(model.discriminator(fakeN)).mul(ADV_WEIGHT)
-          return adv.add(model.reconLoss(fake).mul(RECON_WEIGHT)) as tfType.Scalar
+          return adv.add(model.reconLoss(fake, target).mul(RECON_WEIGHT)) as tfType.Scalar
         }),
       true,
       model.gVariables,
@@ -246,6 +255,25 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
     refreshViz()
   }, [makeOptimizers, newSeeds, refreshViz])
 
+  // 切换目标图：更新目标 → 重置（清空权重/进度）→ 若原本在训练则自动继续训练新目标
+  const setTarget = useCallback(
+    (idx: number) => {
+      if (idx === cfgRef.current.targetIndex) return
+      const tf = tfRef.current
+      if (!tf) return
+      const wasRunning = runningRef.current
+      runningRef.current = false
+      cfgRef.current.targetIndex = idx
+      setTargetIndexState(idx)
+      buildTarget(tf, idx)
+      reset()
+      if (wasRunning) loop()
+    },
+    // reset/loop 在下方定义，但运行时已就绪；用 eslint 关闭依赖告警
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [buildTarget],
+  )
+
   const setLr = useCallback(
     (lr: number) => {
       cfgRef.current.lr = lr
@@ -275,10 +303,12 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
     convergence,
     reached,
     vizVersion,
+    targetIndex,
     start,
     stop,
     step,
     reset,
+    setTarget,
     setLr,
     setBatch,
     setLossType,

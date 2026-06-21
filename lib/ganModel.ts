@@ -1,5 +1,5 @@
 import type * as tfType from '@tensorflow/tfjs'
-import { IMG_DIM, LATENT_DIM, targetsTensor } from './sampler'
+import { IMG_DIM, LATENT_DIM } from './sampler'
 
 type TF = typeof tfType
 type Tensor2D = tfType.Tensor2D
@@ -88,16 +88,12 @@ export class GANLabModel {
   }
 
   /**
-   * 重建引导项：每张生成图到最近目标图的均方距离。
-   * 与对抗损失加权相加，保证演示能可靠收敛到目标（类似 cGAN 的 L1 引导）。
+   * 重建引导项：每张生成图到「选定目标图」的均方距离。
+   * 与对抗损失加权相加，保证演示能可靠收敛到指定目标（类似 cGAN 的 L1 引导）。
+   * @param target 选定目标张量 [1, IMG_DIM]，与 fake 广播相减。
    */
-  reconLoss(fake: Tensor2D): Scalar {
-    const tf = this.tf
-    const targets = targetsTensor(tf) // [K, IMG_DIM]
-    const n = fake.shape[0]
-    const f3 = fake.reshape([n, 1, IMG_DIM])
-    const t3 = targets.reshape([1, targets.shape[0], IMG_DIM])
-    return f3.sub(t3).square().mean(2).min(1).mean() as Scalar
+  reconLoss(fake: Tensor2D, target: Tensor2D): Scalar {
+    return fake.sub(target).square().mean() as Scalar
   }
 
   dispose() {

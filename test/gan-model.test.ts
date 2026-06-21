@@ -7,7 +7,7 @@ import {
   TARGET_IMAGES,
   sampleNoise,
   sampleReal,
-  targetsTensor,
+  targetTensor,
 } from '@/lib/sampler'
 
 beforeAll(async () => {
@@ -15,14 +15,11 @@ beforeAll(async () => {
   await tf.ready()
 })
 
-// 最佳候选图到最近目标的均方距离（与页面展示「最好一张」的口径一致）。
-function bestTargetMSE(model: GANLabModel, seeds: tf.Tensor2D): number {
+// 最佳候选图到「选定目标」的均方距离（与页面展示「最好一张」的口径一致）。
+function bestTargetMSE(model: GANLabModel, seeds: tf.Tensor2D, target: tf.Tensor2D): number {
   return tf.tidy(() => {
     const gen = model.generator(seeds)
-    const targets = targetsTensor(tf)
-    const g3 = gen.reshape([seeds.shape[0], 1, IMG_DIM])
-    const t3 = targets.reshape([1, targets.shape[0], IMG_DIM])
-    return g3.sub(t3).square().mean(2).min(1).min().dataSync()[0]
+    return gen.sub(target).square().mean(1).min().dataSync()[0]
   })
 }
 
@@ -35,8 +32,8 @@ describe('sampler / 目标图', () => {
     }
   })
 
-  it('真实批与噪声形状正确', () => {
-    const real = sampleReal(32, tf)
+  it('真实批按选定目标采样，与噪声形状正确', () => {
+    const real = sampleReal(32, 0, tf)
     const z = sampleNoise(32, tf)
     expect(real.shape).toEqual([32, IMG_DIM])
     expect(z.shape).toEqual([32, LATENT_DIM])
@@ -57,7 +54,7 @@ describe('GANLabModel / 图像生成', () => {
 
   it('判别器输出 [n,1] 概率', () => {
     const model = new GANLabModel(tf, {})
-    const x = sampleReal(8, tf)
+    const x = sampleReal(8, 0, tf)
     const out = model.discriminator(x)
     expect(out.shape).toEqual([8, 1])
     expect(Array.from(out.dataSync()).every((v) => v >= 0 && v <= 1)).toBe(true)
@@ -65,23 +62,25 @@ describe('GANLabModel / 图像生成', () => {
     model.dispose()
   })
 
-  it('训练若干步后，生成图到最近目标的 MSE 明显下降（收敛）', () => {
+  it('训练若干步后，生成图收敛到「选定目标」（达到 98% 收敛度对应水平）', () => {
     // 与页面一致的收敛配方：hidden=160，对抗项 ×0.3、重建项 ×15，实例噪声带下限
+    const TARGET = 0 // 笑脸
     const model = new GANLabModel(tf, { hidden: 160 })
     const gOpt = tf.train.adam(0.001, 0.5, 0.999)
     const dOpt = tf.train.adam(0.001, 0.5, 0.999)
     const seeds = tf.randomNormal([16, LATENT_DIM]) as tf.Tensor2D
+    const target = targetTensor(TARGET, tf)
     const batch = 64
 
-    const before = bestTargetMSE(model, seeds)
-    const STEPS = 300
+    const before = bestTargetMSE(model, seeds, target)
+    const STEPS = 400
 
     for (let i = 0; i < STEPS; i++) {
       const sd = Math.max(0.03, 0.1 * (1 - i / 600))
       dOpt.minimize(
         () =>
           tf.tidy(() => {
-            const real = sampleReal(batch, tf)
+            const real = sampleReal(batch, TARGET, tf)
             const z = sampleNoise(batch, tf)
             const fake = model.generator(z)
             const realN = real.add(tf.randomNormal(real.shape, 0, sd)) as tf.Tensor2D
@@ -97,19 +96,19 @@ describe('GANLabModel / 图像生成', () => {
             const fake = model.generator(sampleNoise(batch, tf))
             const fakeN = fake.add(tf.randomNormal(fake.shape, 0, sd)) as tf.Tensor2D
             const adv = model.gLoss(model.discriminator(fakeN)).mul(0.3)
-            return adv.add(model.reconLoss(fake).mul(15)) as tf.Scalar
+            return adv.add(model.reconLoss(fake, target).mul(15)) as tf.Scalar
           }),
         false,
         model.gVariables,
       )
     }
 
-    const after = bestTargetMSE(model, seeds)
-    // 最佳生成图应高度贴合某个目标（收敛到很低的绝对水平）
-    expect(after).toBeLessThan(before * 0.2)
-    expect(after).toBeLessThan(0.02)
+    const after = bestTargetMSE(model, seeds, target)
+    // 收敛度 = 1 - after/before，要求 ≥ 0.98（即 after ≤ 0.02·before），且绝对值很低
+    expect(after).toBeLessThan(before * 0.02)
+    expect(after).toBeLessThan(0.01)
 
-    tf.dispose([seeds])
+    tf.dispose([seeds, target])
     gOpt.dispose()
     dOpt.dispose()
     model.dispose()

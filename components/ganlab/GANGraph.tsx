@@ -39,9 +39,11 @@ const Arrow = () => <div className="self-start mt-7 px-1 text-xl text-stone-300"
 export function GANGraph({
   stateRef,
   vizVersion,
+  targetIndex,
 }: {
   stateRef: React.MutableRefObject<VizState>
   vizVersion: number
+  targetIndex: number
 }) {
   const sample = stateRef.current.bestImage
   return (
@@ -62,8 +64,8 @@ export function GANGraph({
           </div>
         </Node>
         <Arrow />
-        <Node title="真实图像" sub="目标分布">
-          <PixelImage pixels={TARGET_IMAGES[0].pixels} size={64} />
+        <Node title="真实图像" sub={`目标「${TARGET_IMAGES[targetIndex].name}」`}>
+          <PixelImage pixels={TARGET_IMAGES[targetIndex].pixels} size={64} />
         </Node>
       </div>
     </div>

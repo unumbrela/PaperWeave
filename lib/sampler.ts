@@ -122,24 +122,17 @@ export const TARGET_IMAGES: TargetImage[] = [
   { name: '爱心', pixels: heart() },
 ]
 
-let targetTensor: Tensor2D | null = null
-/** 目标图堆叠成 [K, IMG_DIM]（缓存）。 */
-export function targetsTensor(tf: TF): Tensor2D {
-  if (!targetTensor || targetTensor.isDisposed) {
-    const flat: number[] = []
-    for (const t of TARGET_IMAGES) flat.push(...Array.from(t.pixels))
-    // tf.keep：缓存张量不被外层 tf.tidy 释放
-    targetTensor = tf.keep(tf.tensor2d(flat, [TARGET_IMAGES.length, IMG_DIM]))
-  }
-  return targetTensor
+/** 选定目标图的张量 [1, IMG_DIM]（不缓存，由调用方负责 keep/dispose）。 */
+export function targetTensor(targetIndex: number, tf: TF): Tensor2D {
+  const t = TARGET_IMAGES[targetIndex].pixels
+  return tf.tensor2d(Array.from(t), [1, IMG_DIM])
 }
 
-/** 真实样本批 [n, IMG_DIM]：随机取目标图并加轻微像素噪声做增强。 */
-export function sampleReal(n: number, tf: TF): Tensor2D {
-  const K = TARGET_IMAGES.length
+/** 真实样本批 [n, IMG_DIM]：复制选定的目标图并加轻微像素噪声做增强。 */
+export function sampleReal(n: number, targetIndex: number, tf: TF): Tensor2D {
+  const t = TARGET_IMAGES[targetIndex].pixels
   const flat = new Float32Array(n * IMG_DIM)
   for (let i = 0; i < n; i++) {
-    const t = TARGET_IMAGES[Math.floor(Math.random() * K)].pixels
     const off = i * IMG_DIM
     for (let p = 0; p < IMG_DIM; p++) {
       flat[off + p] = Math.min(1, Math.max(0, t[p] + (Math.random() - 0.5) * 0.04))
