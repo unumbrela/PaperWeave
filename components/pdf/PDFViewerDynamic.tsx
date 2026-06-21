@@ -246,6 +246,10 @@ export default function PDFViewerDynamic({
 
           .pdf-reading-page .react-pdf__Page__textContent ::selection {
             background: rgba(246, 194, 90, 0.4);
+            /* 关键：选中时让文字层字形保持隐形，只留高亮底色叠在 canvas 真实文字上。
+               否则全局 ::selection 的 color: var(--ink) 会点亮文字层字形，与 canvas
+               字形错位形成「重影」。 */
+            color: transparent;
           }
 
           .pdf-reading-page .react-pdf__Page__annotationLayer {
