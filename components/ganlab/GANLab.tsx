@@ -2,7 +2,7 @@
 import React, { useState } from 'react'
 import { TopControls } from './TopControls'
 import { GANGraph } from './GANGraph'
-import { GeneratedGrid } from './GeneratedGrid'
+import { GeneratedResult } from './GeneratedResult'
 import { TargetGrid } from './TargetGrid'
 import { MetricsPanel } from './MetricsPanel'
 import { Article } from './Article'
@@ -10,7 +10,7 @@ import { useGANTraining } from '@/hooks/useGANTraining'
 import type { LossType } from '@/lib/ganModel'
 
 export default function GANLab() {
-  const [lr, setLrState] = useState(0.002)
+  const [lr, setLrState] = useState(0.001)
   const [lossType, setLossTypeState] = useState<LossType>('log')
   const [slowMo, setSlowMoState] = useState(false)
 
@@ -39,7 +39,18 @@ export default function GANLab() {
       <TopControls
         running={running}
         ready={ready}
-        onToggle={() => (running ? stop() : start())}
+        reached={reached}
+        onToggle={() => {
+          if (reached) {
+            // 已收敛：再次点击则重置并从头训练
+            reset()
+            requestAnimationFrame(() => start())
+          } else if (running) {
+            stop()
+          } else {
+            start()
+          }
+        }}
         onStep={() => step()}
         onReset={reset}
         steps={steps}
@@ -68,7 +79,7 @@ export default function GANLab() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="lg:col-span-7">
-          <GeneratedGrid stateRef={stateRef} vizVersion={vizVersion} />
+          <GeneratedResult stateRef={stateRef} vizVersion={vizVersion} reached={reached} />
         </div>
         <div className="space-y-4 lg:col-span-5">
           <MetricsPanel

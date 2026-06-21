@@ -5,6 +5,7 @@ import type { LossType } from '@/lib/ganModel'
 export function TopControls({
   running,
   ready,
+  reached,
   onToggle,
   onStep,
   onReset,
@@ -18,6 +19,7 @@ export function TopControls({
 }: {
   running: boolean
   ready: boolean
+  reached: boolean
   onToggle: () => void
   onStep: () => void
   onReset: () => void
@@ -39,11 +41,11 @@ export function TopControls({
           disabled={!ready}
           className="rounded-md bg-violet-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-40"
         >
-          {running ? '⏸ 暂停' : '▶ 开始训练'}
+          {reached ? '↻ 重新训练' : running ? '⏸ 暂停' : '▶ 开始训练'}
         </button>
         <button
           onClick={onStep}
-          disabled={!ready || running}
+          disabled={!ready || running || reached}
           className="rounded-md border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-50 disabled:opacity-40"
         >
           单步
@@ -68,7 +70,7 @@ export function TopControls({
           onChange={(e) => setLr(Number(e.target.value))}
           className="rounded border border-stone-300 p-1"
         >
-          {[0.0005, 0.001, 0.002, 0.005].map((v) => (
+          {[0.0005, 0.001, 0.002].map((v) => (
             <option key={v} value={v}>
               {v}
             </option>

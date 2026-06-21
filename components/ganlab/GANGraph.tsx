@@ -43,7 +43,7 @@ export function GANGraph({
   stateRef: React.MutableRefObject<VizState>
   vizVersion: number
 }) {
-  const sample = stateRef.current.displayImages[0]
+  const sample = stateRef.current.bestImage
   return (
     <div className="rounded-lg border border-stone-200 bg-white p-4">
       <h3 className="mb-3 text-center text-sm font-semibold text-stone-700">模型总览</h3>

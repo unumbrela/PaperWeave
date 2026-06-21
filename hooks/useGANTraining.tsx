@@ -2,21 +2,34 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type * as tfType from '@tensorflow/tfjs'
 import { GANLabModel, LossType } from '@/lib/ganModel'
-import { IMG_DIM, LATENT_DIM, sampleNoise, sampleReal, targetsTensor } from '@/lib/sampler'
+import {
+  IMG_DIM,
+  LATENT_DIM,
+  TARGET_IMAGES,
+  sampleNoise,
+  sampleReal,
+  targetsTensor,
+} from '@/lib/sampler'
 
 type TF = typeof tfType
 
-const NUM_DISPLAY = 16 // 4×4 展示网格
+const NUM_CANDIDATES = 24 // 内部生成的候选图数量（只展示其中最好的一张）
 const REFRESH_EVERY = 3
 const MAX_LOSS_POINTS = 200
-const REACHED_THRESHOLD = 0.82 // 收敛度达到即判定"达到目标"
-const NOISE_DECAY_STEPS = 600 // 实例噪声在此步数内衰减到 0
-const RECON_WEIGHT = 5 // 重建引导项权重
+const REACHED_THRESHOLD = 0.85 // 收敛度达到即判定"达到目标"并自动停止
+const NOISE_DECAY_STEPS = 600 // 实例噪声在此步数内衰减
+const NOISE_MAX = 0.1 // 实例噪声初始强度
+const NOISE_FLOOR = 0.03 // 实例噪声下限（不降到 0，避免判别器过强）
+const ADV_WEIGHT = 0.3 // 对抗项权重（调低，让重建项主导以稳定收敛）
+const RECON_WEIGHT = 15 // 重建引导项权重
+const HIDDEN = 160 // 生成器/判别器隐藏层宽度
+const MAX_AUTO_STEPS = 800 // 训练步数硬上限，保证一定会停下来
 
 export interface VizState {
   tf: TF | null
   model: GANLabModel | null
-  displayImages: number[][] // 固定种子生成的图像，每张长度 IMG_DIM
+  bestImage: number[] // 当前最佳生成图（最接近某个目标），长度 IMG_DIM
+  bestTargetName: string // 该最佳图匹配到的目标名
 }
 
 export interface GANTrainingOptions {
@@ -27,15 +40,16 @@ export interface GANTrainingOptions {
 
 export function useGANTraining(initial: GANTrainingOptions = {}) {
   const tfRef = useRef<TF | null>(null)
-  const stateRef = useRef<VizState>({ tf: null, model: null, displayImages: [] })
+  const stateRef = useRef<VizState>({ tf: null, model: null, bestImage: [], bestTargetName: '' })
   const seedsRef = useRef<tfType.Tensor2D | null>(null)
   const baselineRef = useRef<number | null>(null)
   const optsRef = useRef<{ g: tfType.Optimizer; d: tfType.Optimizer } | null>(null)
   const runningRef = useRef(false)
+  const reachedRef = useRef(false) // 供训练循环判断是否自动停止
   const stepCountRef = useRef(0) // 用于实例噪声衰减计划
 
   const cfgRef = useRef({
-    lr: initial.lr ?? 0.002,
+    lr: initial.lr ?? 0.001,
     batch: initial.batch ?? 64,
     lossType: initial.lossType ?? ('log' as LossType),
     slowMo: false,
@@ -59,7 +73,7 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
 
   const newSeeds = useCallback((tf: TF) => {
     seedsRef.current?.dispose()
-    seedsRef.current = tf.randomNormal([NUM_DISPLAY, LATENT_DIM]) as tfType.Tensor2D
+    seedsRef.current = tf.randomNormal([NUM_CANDIDATES, LATENT_DIM]) as tfType.Tensor2D
   }, [])
 
   const refreshViz = useCallback(() => {
@@ -71,22 +85,41 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
     const out = tf.tidy(() => {
       const gen = model.generator(seeds) // [N, IMG_DIM]
       const targets = targetsTensor(tf) // [K, IMG_DIM]
-      // 每张生成图到最近目标图的均方距离
-      const g3 = gen.reshape([NUM_DISPLAY, 1, IMG_DIM])
+      // 每张生成图到每个目标图的均方距离
+      const g3 = gen.reshape([NUM_CANDIDATES, 1, IMG_DIM])
       const t3 = targets.reshape([1, targets.shape[0], IMG_DIM])
       const dist = g3.sub(t3).square().mean(2) // [N, K]
-      const nearest = dist.min(1).mean() // 标量
       return {
         images: gen.arraySync() as number[][],
-        mse: nearest.dataSync()[0],
+        dist: dist.arraySync() as number[][],
       }
     })
 
-    stateRef.current.displayImages = out.images
-    if (baselineRef.current == null) baselineRef.current = Math.max(out.mse, 1e-4)
-    const conv = Math.min(1, Math.max(0, 1 - out.mse / baselineRef.current))
+    // 在 JS 里挑出"最接近某个目标"的那一张候选图
+    const K = TARGET_IMAGES.length
+    let best = 0
+    let bestMse = Infinity
+    let bestK = 0
+    for (let i = 0; i < out.dist.length; i++) {
+      let kMin = 0
+      for (let k = 1; k < K; k++) if (out.dist[i][k] < out.dist[i][kMin]) kMin = k
+      if (out.dist[i][kMin] < bestMse) {
+        bestMse = out.dist[i][kMin]
+        best = i
+        bestK = kMin
+      }
+    }
+
+    stateRef.current.bestImage = out.images[best]
+    stateRef.current.bestTargetName = TARGET_IMAGES[bestK].name
+
+    if (baselineRef.current == null) baselineRef.current = Math.max(bestMse, 1e-4)
+    const conv = Math.min(1, Math.max(0, 1 - bestMse / baselineRef.current))
     setConvergence(conv)
-    if (conv >= REACHED_THRESHOLD) setReached(true)
+    if (conv >= REACHED_THRESHOLD) {
+      reachedRef.current = true
+      setReached(true)
+    }
     setVizVersion((v) => v + 1)
   }, [])
 
@@ -102,7 +135,7 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
       await tf.ready()
       if (!mounted) return
       tfRef.current = tf
-      const model = new GANLabModel(tf, { lossType: cfgRef.current.lossType })
+      const model = new GANLabModel(tf, { hidden: HIDDEN, lossType: cfgRef.current.lossType })
       stateRef.current.tf = tf
       stateRef.current.model = model
       newSeeds(tf)
@@ -128,9 +161,9 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
     if (!tf || !model || !opt) return
     const batch = cfgRef.current.batch
 
-    // 实例噪声随训练衰减，缓解判别器过强；重建引导项保证可靠收敛到目标
+    // 实例噪声随训练衰减（保留下限），缓解判别器过强；重建引导项保证可靠收敛
     const n = stepCountRef.current
-    const sd = 0.3 * Math.max(0, 1 - n / NOISE_DECAY_STEPS)
+    const sd = Math.max(NOISE_FLOOR, NOISE_MAX * (1 - n / NOISE_DECAY_STEPS))
     stepCountRef.current = n + 1
 
     const dCost = opt.d.minimize(
@@ -151,7 +184,7 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
         tf.tidy(() => {
           const fake = model.generator(sampleNoise(batch, tf))
           const fakeN = fake.add(tf.randomNormal(fake.shape, 0, sd)) as tfType.Tensor2D
-          const adv = model.gLoss(model.discriminator(fakeN))
+          const adv = model.gLoss(model.discriminator(fakeN)).mul(ADV_WEIGHT)
           return adv.add(model.reconLoss(fake).mul(RECON_WEIGHT)) as tfType.Scalar
         }),
       true,
@@ -177,13 +210,19 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
     setRunning(true)
     while (runningRef.current) {
       step()
+      // 收敛达标或到达步数上限即自动停止
+      if (reachedRef.current || stepCountRef.current >= MAX_AUTO_STEPS) {
+        runningRef.current = false
+        break
+      }
       await new Promise((r) => setTimeout(r, cfgRef.current.slowMo ? 200 : 0))
     }
     setRunning(false)
   }, [step])
 
   const start = useCallback(() => {
-    if (!runningRef.current) loop()
+    if (reachedRef.current || runningRef.current) return
+    loop()
   }, [loop])
   const stop = useCallback(() => {
     runningRef.current = false
@@ -198,6 +237,7 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
     newSeeds(tf)
     stepCountRef.current = 0
     baselineRef.current = null
+    reachedRef.current = false
     setGenLoss([])
     setDisLoss([])
     setSteps(0)
