@@ -274,6 +274,8 @@ export type CoreStep = {
   /** 目标路由（工具页或 /library 等核心页面） */
   href: string;
   icon: string;
+  /** 该环的主色（首页「织线长卷」逐站染色，暖→冷→暖推进，沿用 tool-card accent）。 */
+  accent: string;
   /** 对应工具 slug（工具页才有）；用于把核心工具从「配套工具」中排除，避免重复露出。 */
   toolSlug?: string;
 };
@@ -284,6 +286,7 @@ export const CORE_FLOW: CoreStep[] = [
     blurb: "多源并发检索最新论文，LLM 查询扩展不重不漏，逐篇定位 + 一句话速览入库。",
     href: "/tools/paper-search",
     icon: "🔎",
+    accent: "#b14bff",
     toolSlug: "paper-search",
   },
   {
@@ -291,12 +294,14 @@ export const CORE_FLOW: CoreStep[] = [
     blurb: "导入论文库，PDF 精读批注，挑出真正值得深读的那一篇。",
     href: "/library",
     icon: "📖",
+    accent: "#4bb3ff",
   },
   {
     title: "提炼",
     blurb: "把精读的论文结构化拆成要点 / 方法 / 实验设置 / 引文，沉淀可复用素材。",
     href: "/tools/markdown-summarize",
     icon: "📚",
+    accent: "#6b8ed6",
     toolSlug: "markdown-summarize",
   },
   {
@@ -304,6 +309,7 @@ export const CORE_FLOW: CoreStep[] = [
     blurb: "拆解选中论文的现有创新点与局限，在其之上立起可验证的差异化新创新点。",
     href: "/tools/idea-generator",
     icon: "💡",
+    accent: "#f59e0b",
     toolSlug: "idea-generator",
   },
   {
@@ -311,6 +317,7 @@ export const CORE_FLOW: CoreStep[] = [
     blurb: "把创新点与素材搭成论文结构、逐节要点与段落脚手架（不代写正文）。",
     href: "/tools/paper-writer",
     icon: "✍️",
+    accent: "#ec4899",
     toolSlug: "paper-writer",
   },
   {
@@ -318,6 +325,7 @@ export const CORE_FLOW: CoreStep[] = [
     blurb: "出版级绘图代码 + 文生图科研示意图提示词，把方法与结果画清楚。",
     href: "/tools/figure-generator",
     icon: "📈",
+    accent: "#10b981",
     toolSlug: "figure-generator",
   },
 ];
