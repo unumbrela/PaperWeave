@@ -3,105 +3,121 @@ import type * as tfType from '@tensorflow/tfjs'
 type TF = typeof tfType
 type Tensor2D = tfType.Tensor2D
 
-export type Distribution = 'gaussians' | 'line' | 'ring' | 'disjoint' | 'drawing'
+// 图像与隐空间尺寸（小尺寸 + 小模型，保证浏览器内可靠快速收敛）
+export const IMG_SIZE = 16
+export const IMG_DIM = IMG_SIZE * IMG_SIZE // 256
+export const LATENT_DIM = 16
 
-export const PRESET_DISTRIBUTIONS: { id: Distribution; label: string }[] = [
-  { id: 'gaussians', label: '双高斯' },
-  { id: 'line', label: '斜线' },
-  { id: 'ring', label: '环形' },
-  { id: 'disjoint', label: '分离三簇' },
+export interface TargetImage {
+  name: string
+  pixels: Float32Array // 长度 IMG_DIM，行优先，灰度 [0,1]
+}
+
+// ---- 程序化绘制一小组固定目标图（白色形状，黑色背景）----
+
+function blank(): Float32Array {
+  return new Float32Array(IMG_DIM)
+}
+const at = (a: Float32Array, x: number, y: number, v: number) => {
+  if (x >= 0 && x < IMG_SIZE && y >= 0 && y < IMG_SIZE) a[y * IMG_SIZE + x] = v
+}
+const C = (IMG_SIZE - 1) / 2 // 中心
+
+function disk(): Float32Array {
+  const a = blank()
+  for (let y = 0; y < IMG_SIZE; y++)
+    for (let x = 0; x < IMG_SIZE; x++) {
+      const d = Math.hypot(x - C, y - C)
+      at(a, x, y, d <= 5 ? 1 : d <= 6 ? 6 - d : 0)
+    }
+  return a
+}
+
+function ring(): Float32Array {
+  const a = blank()
+  for (let y = 0; y < IMG_SIZE; y++)
+    for (let x = 0; x < IMG_SIZE; x++) {
+      const d = Math.hypot(x - C, y - C)
+      at(a, x, y, d >= 3.5 && d <= 6 ? 1 - Math.min(1, Math.abs(d - 4.75) / 1.25) : 0)
+    }
+  return a
+}
+
+function cross(): Float32Array {
+  const a = blank()
+  for (let i = 0; i < IMG_SIZE; i++)
+    for (let j = 0; j < IMG_SIZE; j++) {
+      if (Math.abs(j - C) <= 1.5 || Math.abs(i - C) <= 1.5) at(a, j, i, 1)
+    }
+  return a
+}
+
+function square(): Float32Array {
+  const a = blank()
+  for (let y = 3; y <= IMG_SIZE - 4; y++)
+    for (let x = 3; x <= IMG_SIZE - 4; x++) {
+      const edge = x === 3 || x === IMG_SIZE - 4 || y === 3 || y === IMG_SIZE - 4
+      at(a, x, y, edge ? 1 : 0.0)
+    }
+  // 填充方块（实心更易识别）
+  for (let y = 3; y <= IMG_SIZE - 4; y++) for (let x = 3; x <= IMG_SIZE - 4; x++) at(a, x, y, 1)
+  return a
+}
+
+function triangle(): Float32Array {
+  const a = blank()
+  for (let y = 2; y <= IMG_SIZE - 3; y++) {
+    const half = ((y - 2) / (IMG_SIZE - 5)) * (C + 0.5)
+    for (let x = 0; x < IMG_SIZE; x++) if (Math.abs(x - C) <= half) at(a, x, y, 1)
+  }
+  return a
+}
+
+function exShape(): Float32Array {
+  const a = blank()
+  for (let y = 0; y < IMG_SIZE; y++)
+    for (let x = 0; x < IMG_SIZE; x++) {
+      if (Math.abs(x - y) <= 1.5 || Math.abs(x + y - (IMG_SIZE - 1)) <= 1.5) at(a, x, y, 1)
+    }
+  return a
+}
+
+export const TARGET_IMAGES: TargetImage[] = [
+  { name: '圆', pixels: disk() },
+  { name: '环', pixels: ring() },
+  { name: '十字', pixels: cross() },
+  { name: '方块', pixels: square() },
+  { name: '三角', pixels: triangle() },
+  { name: 'X', pixels: exShape() },
 ]
 
-export type DrawingPositions = Array<[number, number]>
-
-// Box-Muller 标准正态采样
-function randNormal(): number {
-  const u = 1 - Math.random()
-  const v = 1 - Math.random()
-  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v)
-}
-
-/** 从真实分布采一个落在单位方格 [0,1]^2 的点（对齐 GAN Lab 预设）。 */
-export function sampleTruePoint(
-  dist: Distribution,
-  drawing?: DrawingPositions,
-): [number, number] {
-  const r = Math.random()
-  switch (dist) {
-    case 'line':
-      return [0.8 - 0.75 * r + 0.01 * randNormal(), 0.6 + 0.3 * r + 0.01 * randNormal()]
-    case 'gaussians':
-      return r < 0.5
-        ? [0.3 + 0.1 * randNormal(), 0.7 + 0.1 * randNormal()]
-        : [0.7 + 0.05 * randNormal(), 0.4 + 0.2 * randNormal()]
-    case 'ring':
-      return [
-        0.5 + 0.3 * Math.cos(r * Math.PI * 2) + 0.025 * randNormal(),
-        0.45 + 0.25 * Math.sin(r * Math.PI * 2) + 0.025 * randNormal(),
-      ]
-    case 'disjoint': {
-      const s = 0.025
-      if (r < 1 / 3) return [0.35 + s * randNormal(), 0.75 + s * randNormal()]
-      if (r < 2 / 3) return [0.75 + s * randNormal(), 0.6 + s * randNormal()]
-      return [0.45 + s * randNormal(), 0.35 + s * randNormal()]
-    }
-    case 'drawing': {
-      if (!drawing || drawing.length === 0) return [0.5, 0.5]
-      const p = drawing[Math.floor(drawing.length * r)]
-      return [p[0] + 0.02 * randNormal(), p[1] + 0.02 * randNormal()]
-    }
-    default:
-      return [0.5, 0.5]
+let targetTensor: Tensor2D | null = null
+/** 目标图堆叠成 [K, IMG_DIM]（缓存）。 */
+export function targetsTensor(tf: TF): Tensor2D {
+  if (!targetTensor || targetTensor.isDisposed) {
+    const flat: number[] = []
+    for (const t of TARGET_IMAGES) flat.push(...Array.from(t.pixels))
+    // tf.keep：缓存张量不被外层 tf.tidy 释放
+    targetTensor = tf.keep(tf.tensor2d(flat, [TARGET_IMAGES.length, IMG_DIM]))
   }
+  return targetTensor
 }
 
-/** 真实样本张量 [n,2]。 */
-export function sampleReal(
-  n: number,
-  dist: Distribution,
-  tf: TF,
-  drawing?: DrawingPositions,
-): Tensor2D {
-  const arr = new Array<number>(n * 2)
-  for (let i = 0; i < n; ++i) {
-    const [x, y] = sampleTruePoint(dist, drawing)
-    arr[i * 2] = x
-    arr[i * 2 + 1] = y
-  }
-  return tf.tensor2d(arr, [n, 2])
-}
-
-/** 均匀噪声输入 [n, noiseSize]，范围 [0,1]。 */
-export function sampleNoise(n: number, tf: TF, noiseSize = 2): Tensor2D {
-  return tf.randomUniform([n, noiseSize], 0, 1) as Tensor2D
-}
-
-/**
- * 生成器流形的输入网格：噪声空间 [0,1]^2 上的 (cells+1)^2 个顶点，
- * 行优先索引 idx = i*(cells+1)+j。喂给生成器后画成形变网格。
- */
-export function manifoldNoiseGrid(cells: number, tf: TF): Tensor2D {
-  const side = cells + 1
-  const arr = new Array<number>(side * side * 2)
-  let k = 0
-  for (let i = 0; i < side; ++i) {
-    for (let j = 0; j < side; ++j) {
-      arr[k++] = i / cells
-      arr[k++] = j / cells
+/** 真实样本批 [n, IMG_DIM]：随机取目标图并加轻微像素噪声做增强。 */
+export function sampleReal(n: number, tf: TF): Tensor2D {
+  const K = TARGET_IMAGES.length
+  const flat = new Float32Array(n * IMG_DIM)
+  for (let i = 0; i < n; i++) {
+    const t = TARGET_IMAGES[Math.floor(Math.random() * K)].pixels
+    const off = i * IMG_DIM
+    for (let p = 0; p < IMG_DIM; p++) {
+      flat[off + p] = Math.min(1, Math.max(0, t[p] + (Math.random() - 0.5) * 0.04))
     }
   }
-  return tf.tensor2d(arr, [side * side, 2])
+  return tf.tensor2d(flat, [n, IMG_DIM])
 }
 
-/** 判别器热力图的网格坐标 [res*res,2]，像素 (col,row) → (x=col/res, y=row/res)。 */
-export function discriminatorGrid(res: number, tf: TF): Tensor2D {
-  const arr = new Array<number>(res * res * 2)
-  let k = 0
-  for (let row = 0; row < res; ++row) {
-    for (let col = 0; col < res; ++col) {
-      arr[k++] = (col + 0.5) / res
-      arr[k++] = (row + 0.5) / res
-    }
-  }
-  return tf.tensor2d(arr, [res * res, 2])
+/** 隐变量噪声 [n, LATENT_DIM]，标准正态。 */
+export function sampleNoise(n: number, tf: TF): Tensor2D {
+  return tf.randomNormal([n, LATENT_DIM]) as Tensor2D
 }

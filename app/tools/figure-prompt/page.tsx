@@ -10,6 +10,7 @@ import { consumeHandoff } from "@/lib/workflow/handoff";
 import { HandoffBanner, SaveToLibrary } from "@/components/workflow/handoff-controls";
 import { DrawioPreview } from "@/components/figure/DrawioPreview";
 import { extractMxfile } from "@/lib/figure/drawio";
+import { DRAWIO_EXAMPLE } from "@/lib/figure/drawio-example";
 import { cn } from "@/lib/utils";
 
 const TOOL = getTool("figure-prompt")!;
@@ -93,6 +94,15 @@ const EXAMPLE_RECAP: { label: string; value: string }[] = [
   { label: "提示词语言", value: LANGS.find((l) => l.value === EXAMPLE.lang)!.label },
 ];
 
+const DRAWIO_EXAMPLE_RECAP: { label: string; value: string }[] = [
+  { label: "图型", value: DIAGRAM_TYPES.find((t) => t.value === DRAWIO_EXAMPLE.diagramType)!.label },
+  { label: "主题", value: DRAWIO_EXAMPLE.subject },
+  { label: "节点 / 模块与关系", value: DRAWIO_EXAMPLE.description },
+  { label: "布局方向", value: DIRECTIONS.find((d) => d.value === DRAWIO_EXAMPLE.direction)!.label },
+  { label: "配色", value: DRAWIO_EXAMPLE.palette },
+  { label: "标签语言", value: (DRAWIO_EXAMPLE.lang as string) === "zh" ? "中文" : "English" },
+];
+
 const fieldBox = cn(
   "focus-ring w-full rounded-xl bg-paper-2/80 border border-line px-4 py-3",
   "text-[13px] text-ink placeholder:text-ink-4 leading-relaxed",
@@ -172,6 +182,16 @@ export default function Page() {
       palette: dPalette.trim(),
       lang: dLang,
     });
+  };
+
+  const applyDrawioExample = () => {
+    setDiagramType(DRAWIO_EXAMPLE.diagramType);
+    setDSubject(DRAWIO_EXAMPLE.subject);
+    setDDesc(DRAWIO_EXAMPLE.description);
+    setDirection(DRAWIO_EXAMPLE.direction);
+    setDPalette(DRAWIO_EXAMPLE.palette);
+    setDLang(DRAWIO_EXAMPLE.lang);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -441,6 +461,7 @@ export default function Page() {
       )}
 
       {mode === "drawio" && (
+      <>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <div className="surface rounded-[20px] p-6">
             <label className="overline block mb-2">图型</label>
@@ -581,6 +602,72 @@ export default function Page() {
             )}
           </div>
         </div>
+
+        {/* 完整示例：还原输入 → 描述(提示词) → drawio 成图 */}
+        <section className="mt-14">
+          <div className="flex items-baseline justify-between mb-5">
+            <div>
+              <div className="overline mb-1" style={{ color: "#f59e0b" }}>
+                example · 一键填入
+              </div>
+              <h2 className="serif text-[30px] leading-tight text-ink">
+                先看一个完整示例
+                <span className="serif-italic text-ink-3">, 从描述到 drawio.</span>
+              </h2>
+            </div>
+            <div className="hairline hidden sm:block flex-1 mx-8 self-end mb-3" />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-start">
+            {/* ① 还原的输入 */}
+            <div className="surface rounded-[20px] p-6">
+              <div className="flex items-center justify-between mb-4">
+                <span className="overline">① 输入（可一键填入表单）</span>
+                <button
+                  onClick={applyDrawioExample}
+                  className={cn(
+                    "rounded-full border border-ink bg-ink text-paper-2 px-3.5 py-1.5",
+                    "text-[12px] font-medium transition-all hover:opacity-90 focus-ring",
+                  )}
+                >
+                  载入此示例
+                </button>
+              </div>
+              <dl className="space-y-3">
+                {DRAWIO_EXAMPLE_RECAP.map((r) => (
+                  <div key={r.label}>
+                    <dt className="overline mb-1 text-ink-4">{r.label}</dt>
+                    <dd className="text-[12.5px] leading-relaxed text-ink-2">{r.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-4 text-[11px] text-ink-3 serif-italic">
+                参考一张 FWMamba-UNet 论文架构图还原而来 —— 载入后改改描述即可让 AI 重新生成。
+              </p>
+            </div>
+
+            {/* ② 描述(提示词) + ③ drawio 成图 */}
+            <div className="flex flex-col gap-4">
+              <div className="surface rounded-[20px] p-6">
+                <div className="overline mb-3">② 喂给 AI 的描述（提示词）</div>
+                <pre
+                  className={cn(
+                    "rounded-xl bg-paper-2/80 border border-line p-4",
+                    "text-[12px] leading-relaxed text-ink whitespace-pre-wrap break-words font-mono",
+                  )}
+                >
+                  {DRAWIO_EXAMPLE.description}
+                </pre>
+              </div>
+
+              <div>
+                <div className="overline mb-2">③ 对应的 drawio 成图（站内渲染）</div>
+                <DrawioPreview xml={DRAWIO_EXAMPLE.xml} />
+              </div>
+            </div>
+          </div>
+        </section>
+      </>
       )}
     </ToolShell>
   );

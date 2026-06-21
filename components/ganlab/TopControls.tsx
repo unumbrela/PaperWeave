@@ -11,8 +11,6 @@ export function TopControls({
   steps,
   lr,
   setLr,
-  batch,
-  setBatch,
   lossType,
   setLossType,
   slowMo,
@@ -26,16 +24,14 @@ export function TopControls({
   steps: number
   lr: number
   setLr: (v: number) => void
-  batch: number
-  setBatch: (v: number) => void
   lossType: LossType
   setLossType: (t: LossType) => void
   slowMo: boolean
   setSlowMo: (v: boolean) => void
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border border-stone-200 bg-white p-3">
-      <div className="text-lg font-semibold text-stone-800">GAN Lab</div>
+    <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 rounded-lg border border-stone-200 bg-white p-3">
+      <div className="text-lg font-semibold text-stone-800">GAN 图像生成实验室</div>
 
       <div className="flex items-center gap-2">
         <button
@@ -43,7 +39,7 @@ export function TopControls({
           disabled={!ready}
           className="rounded-md bg-violet-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-40"
         >
-          {running ? '⏸ 暂停' : '▶ 开始'}
+          {running ? '⏸ 暂停' : '▶ 开始训练'}
         </button>
         <button
           onClick={onStep}
@@ -72,22 +68,7 @@ export function TopControls({
           onChange={(e) => setLr(Number(e.target.value))}
           className="rounded border border-stone-300 p-1"
         >
-          {[0.001, 0.005, 0.01, 0.02, 0.05, 0.1].map((v) => (
-            <option key={v} value={v}>
-              {v}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex items-center gap-2 text-sm text-stone-600">
-        <span>批大小</span>
-        <select
-          value={batch}
-          onChange={(e) => setBatch(Number(e.target.value))}
-          className="rounded border border-stone-300 p-1"
-        >
-          {[16, 32, 64, 128].map((v) => (
+          {[0.0005, 0.001, 0.002, 0.005].map((v) => (
             <option key={v} value={v}>
               {v}
             </option>
@@ -107,9 +88,9 @@ export function TopControls({
         </select>
       </div>
 
-      <div className="ml-auto flex items-center gap-2 text-sm text-stone-500">
+      <div className="flex items-center gap-2 text-sm text-stone-500">
         <span>迭代</span>
-        <span className="font-mono text-stone-800">{String(steps).padStart(6, '0')}</span>
+        <span className="font-mono text-stone-800">{String(steps).padStart(5, '0')}</span>
       </div>
     </div>
   )

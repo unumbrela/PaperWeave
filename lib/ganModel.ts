@@ -1,4 +1,5 @@
 import type * as tfType from '@tensorflow/tfjs'
+import { IMG_DIM, LATENT_DIM, targetsTensor } from './sampler'
 
 type TF = typeof tfType
 type Tensor2D = tfType.Tensor2D
@@ -8,38 +9,26 @@ type Scalar = tfType.Scalar
 export type LossType = 'log' | 'leastSq'
 
 export interface GANLabConfig {
-  noiseSize?: number
-  numGeneratorLayers?: number
-  numDiscriminatorLayers?: number
-  numGeneratorNeurons?: number
-  numDiscriminatorNeurons?: number
+  hidden?: number
   lossType?: LossType
 }
 
 const EPS = 1e-7
+const LEAK = 0.2
 
 /**
- * 手写 tf.variable 计算图版 GAN，移植自 poloclub/ganlab (Apache-2.0)。
- * 之所以不用 Keras tf.sequential，是因为要对"生成样本的输出位置"求梯度，
- * 才能画出 GAN Lab 的生成器流形与梯度箭头可视化。
+ * 小型图像生成 GAN：隐变量 z -> 16x16 灰度图。
+ * 用手写 tf.variable 计算图，配合 optimizer.minimize 的 varList 分别更新 G/D。
+ * 目标是让生成器复刻一小组固定目标图，点开始后可靠快速收敛。
  */
 export class GANLabModel {
-  readonly noiseSize: number
-  readonly numGeneratorLayers: number
-  readonly numDiscriminatorLayers: number
-  readonly numGeneratorNeurons: number
-  readonly numDiscriminatorNeurons: number
+  readonly hidden: number
   lossType: LossType
-
   gVariables: Variable[] = []
   dVariables: Variable[] = []
 
   constructor(private tf: TF, config: GANLabConfig = {}) {
-    this.noiseSize = config.noiseSize ?? 2
-    this.numGeneratorLayers = config.numGeneratorLayers ?? 1
-    this.numDiscriminatorLayers = config.numDiscriminatorLayers ?? 1
-    this.numGeneratorNeurons = config.numGeneratorNeurons ?? 32
-    this.numDiscriminatorNeurons = config.numDiscriminatorNeurons ?? 32
+    this.hidden = config.hidden ?? 128
     this.lossType = config.lossType ?? 'log'
     this.initializeVariables()
   }
@@ -47,78 +36,48 @@ export class GANLabModel {
   initializeVariables() {
     const tf = this.tf
     this.dispose()
-    this.gVariables = []
-    this.dVariables = []
+    const h = this.hidden
+    // He 初始化（适配 relu / leakyRelu）
+    const w = (rows: number, cols: number) =>
+      tf.variable(tf.randomNormal([rows, cols], 0, Math.sqrt(2 / rows)))
+    const b = (n: number) => tf.variable(tf.zeros([n]))
 
-    const normal = (shape: number[], fanIn: number) =>
-      tf.variable(tf.randomNormal(shape, 0, 1.0 / Math.sqrt(fanIn)))
-    const zeros = (n: number) => tf.variable(tf.zeros([n]))
-
-    // Generator: noiseSize -> neurons -> [hidden] -> 2
-    this.gVariables.push(normal([this.noiseSize, this.numGeneratorNeurons], 2))
-    this.gVariables.push(zeros(this.numGeneratorNeurons))
-    for (let i = 0; i < this.numGeneratorLayers; ++i) {
-      this.gVariables.push(
-        normal([this.numGeneratorNeurons, this.numGeneratorNeurons], this.numGeneratorNeurons),
-      )
-      this.gVariables.push(zeros(this.numGeneratorNeurons))
-    }
-    this.gVariables.push(normal([this.numGeneratorNeurons, 2], this.numGeneratorNeurons))
-    this.gVariables.push(zeros(2))
-
-    // Discriminator: 2 -> neurons -> [hidden] -> 1
-    this.dVariables.push(normal([2, this.numDiscriminatorNeurons], 2))
-    this.dVariables.push(zeros(this.numDiscriminatorNeurons))
-    for (let i = 0; i < this.numDiscriminatorLayers; ++i) {
-      this.dVariables.push(
-        normal(
-          [this.numDiscriminatorNeurons, this.numDiscriminatorNeurons],
-          this.numDiscriminatorNeurons,
-        ),
-      )
-      this.dVariables.push(zeros(this.numDiscriminatorNeurons))
-    }
-    this.dVariables.push(normal([this.numDiscriminatorNeurons, 1], this.numDiscriminatorNeurons))
-    this.dVariables.push(zeros(1))
+    // 生成器：LATENT -> h -> h -> IMG_DIM (sigmoid)
+    this.gVariables = [
+      w(LATENT_DIM, h), b(h),
+      w(h, h), b(h),
+      w(h, IMG_DIM), b(IMG_DIM),
+    ]
+    // 判别器：IMG_DIM -> h -> 1 (sigmoid)
+    this.dVariables = [
+      w(IMG_DIM, h), b(h),
+      w(h, 1), b(1),
+    ]
   }
 
-  generator(noise: Tensor2D): Tensor2D {
+  generator(z: Tensor2D): Tensor2D {
     const v = this.gVariables
-    let net = noise.matMul(v[0] as Tensor2D).add(v[1]).relu() as Tensor2D
-    for (let i = 0; i < this.numGeneratorLayers; ++i) {
-      net = net.matMul(v[2 + i * 2] as Tensor2D).add(v[3 + i * 2]).relu() as Tensor2D
-    }
-    const lastW = v[2 + this.numGeneratorLayers * 2] as Tensor2D
-    const lastB = v[3 + this.numGeneratorLayers * 2]
-    // tanh -> (-1,1); 画布坐标系下平移缩放到 (0,1)。
-    return net.matMul(lastW).add(lastB).tanh().mul(0.5).add(0.5) as Tensor2D
+    let net = z.matMul(v[0] as Tensor2D).add(v[1]).relu() as Tensor2D
+    net = net.matMul(v[2] as Tensor2D).add(v[3]).relu() as Tensor2D
+    return net.matMul(v[4] as Tensor2D).add(v[5]).sigmoid() as Tensor2D
   }
 
-  discriminator(input: Tensor2D): Tensor2D {
+  discriminator(x: Tensor2D): Tensor2D {
+    const tf = this.tf
     const v = this.dVariables
-    let net = input.matMul(v[0] as Tensor2D).add(v[1]).relu() as Tensor2D
-    for (let i = 0; i < this.numDiscriminatorLayers; ++i) {
-      net = net.matMul(v[2 + i * 2] as Tensor2D).add(v[3 + i * 2]).relu() as Tensor2D
-    }
-    const lastW = v[2 + this.numDiscriminatorLayers * 2] as Tensor2D
-    const lastB = v[3 + this.numDiscriminatorLayers * 2]
-    return net.matMul(lastW).add(lastB).sigmoid() as Tensor2D
+    const net = tf.leakyRelu(x.matMul(v[0] as Tensor2D).add(v[1]), LEAK) as Tensor2D
+    return net.matMul(v[2] as Tensor2D).add(v[3]).sigmoid() as Tensor2D
   }
 
   dLoss(realPred: Tensor2D, fakePred: Tensor2D): Scalar {
     const tf = this.tf
     if (this.lossType === 'leastSq') {
-      return tf.add(
-        realPred.sub(1).square().mean(),
-        fakePred.square().mean(),
-      ) as Scalar
+      return tf.add(realPred.sub(1).square().mean(), fakePred.square().mean()) as Scalar
     }
     const real = realPred.clipByValue(EPS, 1)
     const fake = fakePred.clipByValue(EPS, 1 - EPS)
-    // 0.95 标签平滑
-    return tf
-      .add(real.log().mul(0.95).mean(), tf.sub(1, fake).log().mean())
-      .mul(-1) as Scalar
+    // 0.9 标签平滑，提升稳定性
+    return tf.add(real.log().mul(0.9).mean(), tf.sub(1, fake).log().mean()).mul(-1) as Scalar
   }
 
   gLoss(fakePred: Tensor2D): Scalar {
@@ -126,6 +85,19 @@ export class GANLabModel {
       return fakePred.sub(1).square().mean() as Scalar
     }
     return fakePred.clipByValue(EPS, 1).log().mean().mul(-1) as Scalar
+  }
+
+  /**
+   * 重建引导项：每张生成图到最近目标图的均方距离。
+   * 与对抗损失加权相加，保证演示能可靠收敛到目标（类似 cGAN 的 L1 引导）。
+   */
+  reconLoss(fake: Tensor2D): Scalar {
+    const tf = this.tf
+    const targets = targetsTensor(tf) // [K, IMG_DIM]
+    const n = fake.shape[0]
+    const f3 = fake.reshape([n, 1, IMG_DIM])
+    const t3 = targets.reshape([1, targets.shape[0], IMG_DIM])
+    return f3.sub(t3).square().mean(2).min(1).mean() as Scalar
   }
 
   dispose() {

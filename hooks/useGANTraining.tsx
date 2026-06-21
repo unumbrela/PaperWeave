@@ -2,162 +2,94 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type * as tfType from '@tensorflow/tfjs'
 import { GANLabModel, LossType } from '@/lib/ganModel'
-import {
-  Distribution,
-  DrawingPositions,
-  discriminatorGrid,
-  manifoldNoiseGrid,
-  sampleNoise,
-  sampleReal,
-} from '@/lib/sampler'
+import { IMG_DIM, LATENT_DIM, sampleNoise, sampleReal, targetsTensor } from '@/lib/sampler'
 
 type TF = typeof tfType
 
-// 可视化参数
-const NUM_SAMPLES = 300 // 叠加显示的真/假样本数
-const NUM_GRADIENTS = 80 // 梯度箭头数量
-const MANIFOLD_CELLS = 20 // 流形网格分辨率
-const HEATMAP_RES = 40 // 判别器热力图分辨率
-const REFRESH_EVERY = 2 // 每多少步刷新一次可视化
+const NUM_DISPLAY = 16 // 4×4 展示网格
+const REFRESH_EVERY = 3
 const MAX_LOSS_POINTS = 200
+const REACHED_THRESHOLD = 0.82 // 收敛度达到即判定"达到目标"
+const NOISE_DECAY_STEPS = 600 // 实例噪声在此步数内衰减到 0
+const RECON_WEIGHT = 5 // 重建引导项权重
 
 export interface VizState {
   tf: TF | null
   model: GANLabModel | null
-  realSamples: number[][]
-  fakeSamples: number[][]
-  manifoldVertices: number[][]
-  manifoldCells: number
-  gradSamples: number[][]
-  gradVectors: number[][]
-  heatmap: Float32Array | null
-  heatmapRes: number
+  displayImages: number[][] // 固定种子生成的图像，每张长度 IMG_DIM
 }
 
 export interface GANTrainingOptions {
   lr?: number
   batch?: number
-  distribution?: Distribution
   lossType?: LossType
-  drawing?: DrawingPositions
-}
-
-function jsDivergence(real: number[][], fake: number[][], res: number): number {
-  const rh = new Float64Array(res * res)
-  const fh = new Float64Array(res * res)
-  const bin = (p: number[]) => {
-    const xi = Math.min(res - 1, Math.max(0, Math.floor(p[0] * res)))
-    const yi = Math.min(res - 1, Math.max(0, Math.floor(p[1] * res)))
-    return yi * res + xi
-  }
-  real.forEach((p) => (rh[bin(p)] += 1))
-  fake.forEach((p) => (fh[bin(p)] += 1))
-  const norm = (a: Float64Array) => {
-    const s = a.reduce((x, y) => x + y, 0) || 1
-    for (let i = 0; i < a.length; ++i) a[i] /= s
-  }
-  norm(rh)
-  norm(fh)
-  let js = 0
-  for (let i = 0; i < rh.length; ++i) {
-    const m = 0.5 * (rh[i] + fh[i])
-    if (rh[i] > 0) js += 0.5 * rh[i] * Math.log(rh[i] / m)
-    if (fh[i] > 0) js += 0.5 * fh[i] * Math.log(fh[i] / m)
-  }
-  return js
 }
 
 export function useGANTraining(initial: GANTrainingOptions = {}) {
   const tfRef = useRef<TF | null>(null)
-  const stateRef = useRef<VizState>({
-    tf: null,
-    model: null,
-    realSamples: [],
-    fakeSamples: [],
-    manifoldVertices: [],
-    manifoldCells: MANIFOLD_CELLS,
-    gradSamples: [],
-    gradVectors: [],
-    heatmap: null,
-    heatmapRes: HEATMAP_RES,
-  })
-
-  // 训练配置放进 ref，避免闭包过期
-  const cfgRef = useRef({
-    lr: initial.lr ?? 0.02,
-    batch: initial.batch ?? 64,
-    distribution: initial.distribution ?? ('gaussians' as Distribution),
-    lossType: initial.lossType ?? ('log' as LossType),
-    drawing: initial.drawing ?? ([] as DrawingPositions),
-    slowMo: false,
-  })
+  const stateRef = useRef<VizState>({ tf: null, model: null, displayImages: [] })
+  const seedsRef = useRef<tfType.Tensor2D | null>(null)
+  const baselineRef = useRef<number | null>(null)
   const optsRef = useRef<{ g: tfType.Optimizer; d: tfType.Optimizer } | null>(null)
   const runningRef = useRef(false)
+  const stepCountRef = useRef(0) // 用于实例噪声衰减计划
+
+  const cfgRef = useRef({
+    lr: initial.lr ?? 0.002,
+    batch: initial.batch ?? 64,
+    lossType: initial.lossType ?? ('log' as LossType),
+    slowMo: false,
+  })
 
   const [ready, setReady] = useState(false)
   const [running, setRunning] = useState(false)
   const [genLoss, setGenLoss] = useState<number[]>([])
   const [disLoss, setDisLoss] = useState<number[]>([])
   const [steps, setSteps] = useState(0)
-  const [divergence, setDivergence] = useState(0)
+  const [convergence, setConvergence] = useState(0)
+  const [reached, setReached] = useState(false)
   const [vizVersion, setVizVersion] = useState(0)
 
   const makeOptimizers = useCallback((tf: TF, lr: number) => {
     optsRef.current?.g.dispose()
     optsRef.current?.d.dispose()
-    optsRef.current = { g: tf.train.adam(lr, 0.9, 0.999), d: tf.train.adam(lr, 0.9, 0.999) }
+    // beta1=0.5 是 GAN 训练的常用稳定设置
+    optsRef.current = { g: tf.train.adam(lr, 0.5, 0.999), d: tf.train.adam(lr, 0.5, 0.999) }
+  }, [])
+
+  const newSeeds = useCallback((tf: TF) => {
+    seedsRef.current?.dispose()
+    seedsRef.current = tf.randomNormal([NUM_DISPLAY, LATENT_DIM]) as tfType.Tensor2D
   }, [])
 
   const refreshViz = useCallback(() => {
     const tf = tfRef.current
     const model = stateRef.current.model
-    if (!tf || !model) return
-    const cfg = cfgRef.current
+    const seeds = seedsRef.current
+    if (!tf || !model || !seeds) return
 
     const out = tf.tidy(() => {
-      const real = sampleReal(NUM_SAMPLES, cfg.distribution, tf, cfg.drawing)
-      const z = sampleNoise(NUM_SAMPLES, tf, model.noiseSize)
-      const fake = model.generator(z)
-
-      // 流形顶点
-      const mGrid = manifoldNoiseGrid(MANIFOLD_CELLS, tf)
-      const mOut = model.generator(mGrid)
-
-      // 判别器热力图
-      const hGrid = discriminatorGrid(HEATMAP_RES, tf)
-      const hOut = model.discriminator(hGrid).reshape([HEATMAP_RES * HEATMAP_RES])
-
-      // 梯度场：对生成样本位置求 gLoss 的下降方向
-      const gradPts = (fake.slice([0, 0], [NUM_GRADIENTS, 2]) as tfType.Tensor2D)
-      const gradFn = tf.grads((pts) =>
-        model.gLoss(model.discriminator(pts as tfType.Tensor2D)),
-      )
-      const [grad] = gradFn([gradPts]) as tfType.Tensor2D[]
-
+      const gen = model.generator(seeds) // [N, IMG_DIM]
+      const targets = targetsTensor(tf) // [K, IMG_DIM]
+      // 每张生成图到最近目标图的均方距离
+      const g3 = gen.reshape([NUM_DISPLAY, 1, IMG_DIM])
+      const t3 = targets.reshape([1, targets.shape[0], IMG_DIM])
+      const dist = g3.sub(t3).square().mean(2) // [N, K]
+      const nearest = dist.min(1).mean() // 标量
       return {
-        real: real.arraySync() as number[][],
-        fake: fake.arraySync() as number[][],
-        manifold: mOut.arraySync() as number[][],
-        heatmap: hOut.dataSync() as Float32Array,
-        gradPts: gradPts.arraySync() as number[][],
-        // 下降方向 = -grad
-        gradVec: (grad.mul(-1).arraySync() as number[][]),
+        images: gen.arraySync() as number[][],
+        mse: nearest.dataSync()[0],
       }
     })
 
-    const s = stateRef.current
-    s.realSamples = out.real
-    s.fakeSamples = out.fake
-    s.manifoldVertices = out.manifold
-    s.gradSamples = out.gradPts
-    s.gradVectors = out.gradVec
-    s.heatmap = Float32Array.from(out.heatmap)
-
-    setDivergence(jsDivergence(out.real, out.fake, 20))
+    stateRef.current.displayImages = out.images
+    if (baselineRef.current == null) baselineRef.current = Math.max(out.mse, 1e-4)
+    const conv = Math.min(1, Math.max(0, 1 - out.mse / baselineRef.current))
+    setConvergence(conv)
+    if (conv >= REACHED_THRESHOLD) setReached(true)
     setVizVersion((v) => v + 1)
   }, [])
 
-  // 初始化 tf + 模型
   useEffect(() => {
     let mounted = true
     ;(async () => {
@@ -173,6 +105,7 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
       const model = new GANLabModel(tf, { lossType: cfgRef.current.lossType })
       stateRef.current.tf = tf
       stateRef.current.model = model
+      newSeeds(tf)
       makeOptimizers(tf, cfgRef.current.lr)
       setReady(true)
       refreshViz()
@@ -181,6 +114,7 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
       mounted = false
       runningRef.current = false
       stateRef.current.model?.dispose()
+      seedsRef.current?.dispose()
       optsRef.current?.g.dispose()
       optsRef.current?.d.dispose()
     }
@@ -192,28 +126,33 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
     const model = stateRef.current.model
     const opt = optsRef.current
     if (!tf || !model || !opt) return
-    const cfg = cfgRef.current
-    const batch = cfg.batch
+    const batch = cfgRef.current.batch
 
-    // 判别器一步
+    // 实例噪声随训练衰减，缓解判别器过强；重建引导项保证可靠收敛到目标
+    const n = stepCountRef.current
+    const sd = 0.3 * Math.max(0, 1 - n / NOISE_DECAY_STEPS)
+    stepCountRef.current = n + 1
+
     const dCost = opt.d.minimize(
       () =>
         tf.tidy(() => {
-          const real = sampleReal(batch, cfg.distribution, tf, cfg.drawing)
-          const z = sampleNoise(batch, tf, model.noiseSize)
+          const real = sampleReal(batch, tf)
+          const z = sampleNoise(batch, tf)
           const fake = model.generator(z)
-          return model.dLoss(model.discriminator(real), model.discriminator(fake))
+          const realN = real.add(tf.randomNormal(real.shape, 0, sd)) as tfType.Tensor2D
+          const fakeN = fake.add(tf.randomNormal(fake.shape, 0, sd)) as tfType.Tensor2D
+          return model.dLoss(model.discriminator(realN), model.discriminator(fakeN))
         }),
       true,
       model.dVariables,
     )
-    // 生成器一步
     const gCost = opt.g.minimize(
       () =>
         tf.tidy(() => {
-          const z = sampleNoise(batch, tf, model.noiseSize)
-          const fake = model.generator(z)
-          return model.gLoss(model.discriminator(fake))
+          const fake = model.generator(sampleNoise(batch, tf))
+          const fakeN = fake.add(tf.randomNormal(fake.shape, 0, sd)) as tfType.Tensor2D
+          const adv = model.gLoss(model.discriminator(fakeN))
+          return adv.add(model.reconLoss(fake).mul(RECON_WEIGHT)) as tfType.Scalar
         }),
       true,
       model.gVariables,
@@ -238,8 +177,7 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
     setRunning(true)
     while (runningRef.current) {
       step()
-      const delay = cfgRef.current.slowMo ? 250 : 0
-      await new Promise((r) => setTimeout(r, delay))
+      await new Promise((r) => setTimeout(r, cfgRef.current.slowMo ? 200 : 0))
     }
     setRunning(false)
   }, [step])
@@ -257,11 +195,16 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
     if (!tf || !model) return
     model.initializeVariables()
     makeOptimizers(tf, cfgRef.current.lr)
+    newSeeds(tf)
+    stepCountRef.current = 0
+    baselineRef.current = null
     setGenLoss([])
     setDisLoss([])
     setSteps(0)
+    setConvergence(0)
+    setReached(false)
     refreshViz()
-  }, [makeOptimizers, refreshViz])
+  }, [makeOptimizers, newSeeds, refreshViz])
 
   const setLr = useCallback(
     (lr: number) => {
@@ -274,20 +217,6 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
   const setBatch = useCallback((b: number) => {
     cfgRef.current.batch = b
   }, [])
-  const setDistribution = useCallback(
-    (d: Distribution) => {
-      cfgRef.current.distribution = d
-      refreshViz()
-    },
-    [refreshViz],
-  )
-  const setDrawing = useCallback(
-    (positions: DrawingPositions) => {
-      cfgRef.current.drawing = positions
-      if (cfgRef.current.distribution === 'drawing') refreshViz()
-    },
-    [refreshViz],
-  )
   const setLossType = useCallback((t: LossType) => {
     cfgRef.current.lossType = t
     if (stateRef.current.model) stateRef.current.model.lossType = t
@@ -303,7 +232,8 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
     genLoss,
     disLoss,
     steps,
-    divergence,
+    convergence,
+    reached,
     vizVersion,
     start,
     stop,
@@ -311,8 +241,6 @@ export function useGANTraining(initial: GANTrainingOptions = {}) {
     reset,
     setLr,
     setBatch,
-    setDistribution,
-    setDrawing,
     setLossType,
     setSlowMo,
   }
