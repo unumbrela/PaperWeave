@@ -89,6 +89,25 @@
 - 内存滑动窗口限流、PDF 代理 SSRF 防护、上游超时、RLS 行级隔离、METRICS_TOKEN 门禁（📁 `lib/api/http.ts`、`app/api/pdf-proxy/route.ts`）。
 - 结构化日志 + `/api/metrics` 聚合指标（📁 `lib/api/log.ts`）。
 
+### 4.8 医学分割可视化的资源加载优化（数据结构升级 + LQIP）
+
+> 一个「现象 → 根因 → 方案 → 收益」的完整性能优化案例，是报告里少有的「可量化前后对比」的工程点。
+
+- **现象**：模型可视化里的医学图像分割模块 `/tools/med-seg-explainer`（📁 `components/med-seg/`）首屏图片加载明显偏慢，切换样本时有空白闪烁。
+- **根因定位**（用 `du -sh` / `identify` / DevTools Network 实测）：
+  1. **照片用了错误的数据结构**——9 个样本的 `input.png`（481×478 **RGBA 无损 PNG**，约 270 KB/张）与 `overlay.png`（约 210 KB/张）共 ~4.3 MB；照片用无损 RGBA PNG 存储极度浪费。
+  2. **缩略图拉满图**——样本选择器 `SampleGallery` 只显示 48px 格子，却 eager 加载 9 张完整 `input.png`。
+  3. **首帧无占位**——所有 `next/image` 既无 `priority` 也无 `placeholder="blur"`。
+  4. **dev 下按需重编码**——`next.config.ts` 为空（无 formats / 缓存 TTL），开发态每张大 PNG 都临时用 sharp 重编码。
+  5. **死重量**——`public/med-seg/legacy/` 4.9 MB 资源已无任何代码引用，仍被一并部署。
+- **方案**：
+  1. **离线数据结构升级**：新增 sharp 脚本 `scripts/optimize-med-seg.mjs`（`pnpm optimize:med-seg`），把照片类 PNG 批量转 **WebP**（最长边 ≤512，q80），并为每个样本生成 96² 缩略图 `thumb.webp` 与 16px 的 **LQIP** base64 模糊占位；重的源图移出 `public/`（迁入 `med-seg-src/`，保证可重生成又不进部署）。产物汇总成生成式清单 📁 `lib/med-seg/manifest.generated.ts`（单一真相源：路径 / 原始尺寸 / blur）。
+  2. **加载策略**：`SampleGallery` 与流水线 `StageBox` 的 canvas 预览改用 96² 缩略图；首屏首图（输入原图）加 `priority`，输入/叠加图加 `placeholder="blur"` 用 LQIP 秒出占位；`MedSegExplainer` 用 `requestIdleCallback` 预取相邻样本，切换更顺。
+  3. **平台级配置**：`next.config.ts` 启用 `images.formats=['image/webp']`、`minimumCacheTTL=1 年`、按实际展示尺寸收敛 `imageSizes/deviceSizes`。
+  4. 删除死资源目录 `public/med-seg/legacy/`。
+- **量化收益**：单张照片 `input.png` **270 KB → `input.webp` 11 KB（≈24×）**、`overlay` 210 KB → 7 KB；样本目录 `public/med-seg/samples` **5.1 MB → 0.88 MB**；整个 `public/med-seg` **9.9 MB → 0.89 MB（≈11×）**；首屏借 LQIP 模糊占位即时呈现、再渐进清晰。
+- 📷 优化前后 DevTools Network 传输量 / LCP 对比截图。📁 `scripts/optimize-med-seg.mjs`、`lib/med-seg/manifest.generated.ts`、`next.config.ts`。
+
 ## 5. 系统测试
 
 ### 5.1 测试方案
@@ -118,6 +137,7 @@
 
 ### 7.2 遇到的问题与解决（挑 3-5 个写成「问题 → 分析 → 方案」）
 - 候选素材：三套持久化并存收敛为 Dexie 单一真相源；Vercel 只读文件系统导致 PDF 落盘失败 → 同源代理 + Blob；流式中途断流体验 → 前置守卫 + 可中断；IndexedDB 未建索引字段 orderBy 抛 SchemaError → 内存排序；巨型组件拆分。
+- **医学分割模块首屏慢**：照片以 481px RGBA PNG 存储（单图 ~270 KB）+ 缩略图拉满图 + 无占位 → 离线 sharp 转 WebP + 96² 缩略图 + LQIP 模糊占位 + manifest 单一真相源，`public/med-seg` 9.9 MB→0.89 MB（≈11×）、首屏秒出（详见 §4.8）。
 
 ### 7.3 不足与展望
 - 国际化缺失、限流/指标为单实例内存态、PDF Blob 不入云需重新缓存、移动端适配、更多检索源（IEEE / PubMed）。

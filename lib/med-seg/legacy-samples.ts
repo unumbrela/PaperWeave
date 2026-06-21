@@ -1,5 +1,8 @@
 import type { LegacySample } from "./types";
+import { MED_SEG_ASSETS } from "./manifest.generated";
 
+// dice/iou are the human-curated source of truth; asset paths / dimensions /
+// blur placeholders come from the generated manifest (see scripts/optimize-med-seg.mjs).
 const metrics: Record<string, { dice: number; iou: number }> = {
   s0: { dice: 0.816, iou: 0.6892 },
   s100: { dice: 0.8751, iou: 0.778 },
@@ -12,14 +15,20 @@ const metrics: Record<string, { dice: number; iou: number }> = {
   s800: { dice: 0.8974, iou: 0.8138 },
 };
 
-export const legacySamples: LegacySample[] = Object.keys(metrics).map((id) => ({
-  id,
-  input: `/med-seg/samples/${id}/input.png`,
-  gt: `/med-seg/samples/${id}/gt.png`,
-  pred: `/med-seg/samples/${id}/pred.png`,
-  overlay: `/med-seg/samples/${id}/overlay.png`,
-  dice: metrics[id].dice,
-  iou: metrics[id].iou,
+export const legacySamples: LegacySample[] = MED_SEG_ASSETS.map((a) => ({
+  id: a.id,
+  w: a.w,
+  h: a.h,
+  input: a.input,
+  gt: a.gt,
+  pred: a.pred,
+  overlay: a.overlay,
+  edgeAttn: a.edgeAttn,
+  thumb: a.thumb,
+  dwt: a.dwt,
+  blur: a.blur,
+  dice: metrics[a.id]?.dice ?? 0,
+  iou: metrics[a.id]?.iou ?? 0,
 }));
 
 import type { StageId } from "./types";

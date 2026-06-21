@@ -101,7 +101,10 @@ function InputDetail({ sample }: { sample: LegacySample }) {
             src={sample.input}
             alt="input"
             fill
+            priority
             sizes="(min-width: 1280px) 320px, 45vw"
+            placeholder="blur"
+            blurDataURL={sample.blur.input}
             className="object-cover"
           />
         </div>
@@ -145,6 +148,8 @@ function PatchifyDetail({ sample }: { sample: LegacySample }) {
           alt="input"
           fill
           sizes="(min-width: 1024px) 640px, 90vw"
+          placeholder="blur"
+          blurDataURL={sample.blur.input}
           className="object-cover"
         />
         {/* 叠一层 16×8 的 patch 栅格（示意） */}
@@ -243,12 +248,12 @@ function FWBlockDetail({ sample }: { sample: LegacySample }) {
           <strong className="text-ink-2">下图 ↓</strong> 是对当前样本做一次 Haar DWT 的真实四个子带——这就是频率分支最内层看到的东西。
         </div>
         <div className="grid grid-cols-4 gap-2">
-          {[
+          {([
             { k: "ll", label: "LL", hint: "低频近似" },
             { k: "lh", label: "LH", hint: "水平高频" },
             { k: "hl", label: "HL", hint: "垂直高频" },
             { k: "hh", label: "HH", hint: "对角细节" },
-          ].map((b) => (
+          ] as const).map((b) => (
             <figure
               key={b.k}
               className={cn(
@@ -261,7 +266,7 @@ function FWBlockDetail({ sample }: { sample: LegacySample }) {
                 style={{ background: b.k === "ll" ? "#efe8dd" : "#17120d" }}
               >
                 <Image
-                  src={`/med-seg/samples/${sample.id}/dwt/${b.k}.png`}
+                  src={sample.dwt[b.k]}
                   alt={b.label}
                   fill
                   sizes="120px"
@@ -347,7 +352,7 @@ function EAFFDetail({
                 className="object-cover opacity-35"
               />
               <Image
-                src={`/med-seg/samples/${sample.id}/edge_attn_preview.png`}
+                src={sample.edgeAttn}
                 alt="edge attn"
                 fill
                 sizes="(min-width: 1280px) 240px, 40vw"
@@ -365,6 +370,8 @@ function EAFFDetail({
               alt="fused"
               fill
               sizes="(min-width: 1280px) 240px, 40vw"
+              placeholder="blur"
+              blurDataURL={sample.blur.overlay}
               className="object-cover"
             />
           }
@@ -390,6 +397,8 @@ function FinalSigmoidDetail({ sample }: { sample: LegacySample }) {
               alt="logits"
               fill
               sizes="(min-width: 1280px) 240px, 40vw"
+              placeholder="blur"
+              blurDataURL={sample.blur.overlay}
               className="object-cover"
             />
           }

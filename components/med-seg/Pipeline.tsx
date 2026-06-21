@@ -232,7 +232,7 @@ export function Pipeline({ sample, activeIndex, onActiveChange }: Props) {
               <StageBox
                 step={s}
                 index={i}
-                inputSrc={sample.input}
+                inputSrc={sample.thumb}
                 predSrc={sample.pred}
                 overlaySrc={sample.overlay}
                 active={i === activeIndex}

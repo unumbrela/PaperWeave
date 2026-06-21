@@ -29,10 +29,12 @@ export function SampleGallery({ samples, selectedId, onSelect }: Props) {
             )}
           >
             <Image
-              src={s.input}
+              src={s.thumb}
               alt={s.id}
               fill
               sizes="48px"
+              placeholder="blur"
+              blurDataURL={s.blur.input}
               className={cn(
                 "object-cover transition-opacity",
                 active ? "opacity-100" : "opacity-65",

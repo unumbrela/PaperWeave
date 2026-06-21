@@ -73,10 +73,19 @@ export interface Manifest {
 
 export interface LegacySample {
   id: string;
+  /** intrinsic size of the source photo */
+  w: number;
+  h: number;
   input: string;
   gt: string;
   pred: string;
   overlay: string;
+  edgeAttn: string;
+  /** 96² gallery + canvas thumbnail */
+  thumb: string;
+  dwt: DWTBands;
+  /** base64 LQIP data URLs for placeholder="blur" */
+  blur: { input: string; overlay: string };
   dice: number;
   iou: number;
 }

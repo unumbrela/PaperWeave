@@ -12,7 +12,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "optimize:med-seg": "node scripts/optimize-med-seg.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -67,6 +68,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "fake-indexeddb": "^6",
+    "sharp": "0.34.5",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4"

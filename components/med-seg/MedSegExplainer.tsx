@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { legacySamples } from "@/lib/med-seg/legacy-samples";
 import { FLOW_STEPS } from "@/lib/med-seg/flow-stages";
 import { Hero } from "./Hero";
@@ -19,6 +19,33 @@ export function MedSegExplainer() {
   );
 
   const step = FLOW_STEPS[activeIndex];
+
+  // 空闲时预取相邻样本的图，切换样本更顺滑
+  useEffect(() => {
+    const idx = legacySamples.findIndex((s) => s.id === selectedId);
+    const neighbors = [legacySamples[idx - 1], legacySamples[idx + 1]].filter(
+      Boolean,
+    );
+    const preload = () => {
+      for (const s of neighbors) {
+        for (const src of [s.input, s.overlay, s.thumb]) {
+          const img = new window.Image();
+          img.src = src;
+        }
+      }
+    };
+    const ric =
+      typeof window.requestIdleCallback === "function"
+        ? window.requestIdleCallback(preload)
+        : window.setTimeout(preload, 200);
+    return () => {
+      if (typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(ric as number);
+      } else {
+        clearTimeout(ric as number);
+      }
+    };
+  }, [selectedId]);
 
   return (
     <div className="mx-auto w-full max-w-[1280px] px-6 pt-10 pb-20">
