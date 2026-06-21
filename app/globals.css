@@ -731,6 +731,61 @@ kbd {
   100% { background-position: -200% 0; }
 }
 
+/* ================= HERO PHOTOGRAPHIC BACKDROP ================= */
+/* A real aged-parchment photo (public/hero-paper.jpg, public domain) bound to
+   the hero, under a paper-white scrim so the headline stays crisp and the
+   bottom edge dissolves into the global paper. Ken-burns breath + scroll
+   parallax give the still image life. Swap the photo by replacing the file. */
+.hero-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.hero-photo {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -12%;
+  height: 128%;
+  transform: translate3d(0, var(--parallax, 0px), 0);
+  will-change: transform;
+}
+.hero-photo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("/hero-paper.jpg") center 30% / cover no-repeat;
+  filter: saturate(0.9) contrast(1.02);
+  transform-origin: 60% 40%;
+  animation: hero-kenburns 36s ease-in-out infinite alternate;
+}
+@keyframes hero-kenburns {
+  from { transform: scale(1.03) translate3d(0, 0, 0); }
+  to   { transform: scale(1.11) translate3d(-1.6%, -1.2%, 0); }
+}
+/* Paper-white scrim ("蒙版"): radial lift around the headline + vertical fade
+   to the page's paper colour so the hero melts into the loom below. */
+.hero-scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      130% 95% at 28% 6%,
+      rgba(250, 246, 236, 0.34) 0%,
+      rgba(244, 239, 230, 0.6) 42%,
+      rgba(244, 239, 230, 0.82) 70%,
+      var(--paper) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(244, 239, 230, 0.28) 0%,
+      rgba(244, 239, 230, 0.5) 52%,
+      var(--paper) 100%
+    );
+}
+
 /* ================= WEAVE JOURNEY (homepage core flow) ================= */
 /* Vertical "warp" thread running through the core-flow stations, with a slow
    luminous shimmer travelling down it. Mirrors the .loom weaving metaphor. */
@@ -749,6 +804,20 @@ kbd {
 @keyframes weave-shimmer {
   0% { background-position: 0 -120%; }
   100% { background-position: 0 120%; }
+}
+
+/* Progress thread: a coloured strand that "weaves in" as you scroll the
+   journey, overlaid on the static warp. scaleY driven by --progress (JS). */
+.weave-thread-progress {
+  transform-origin: top center;
+  transform: scaleY(var(--progress, 0));
+  background: linear-gradient(
+    180deg,
+    rgba(177, 75, 255, 0.55) 0%,
+    rgba(75, 179, 255, 0.5) 45%,
+    rgba(236, 72, 153, 0.5) 100%
+  );
+  will-change: transform;
 }
 
 /* Node bead sitting on the thread; lit in the station's own accent. */
@@ -790,6 +859,39 @@ kbd {
     0 18px 38px -20px rgba(26, 23, 19, 0.22);
 }
 
+/* Hover sheen — a soft light bar sweeps across the surface once on hover.
+   Reused by weave stations and gallery cards for a cohesive micro-interaction. */
+.sheen {
+  position: relative;
+  overflow: hidden;
+}
+.sheen::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -60%;
+  width: 45%;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 100%
+  );
+  transform: skewX(-18deg);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 3;
+}
+.sheen:hover::after {
+  animation: sheen-sweep 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes sheen-sweep {
+  0% { left: -60%; opacity: 0.9; }
+  100% { left: 130%; opacity: 0; }
+}
+
 /* ================= TERMINAL CARD (The Lab) ================= */
 /* Command-line identity: warm-dark glass + mono, distinct from glass tool cards. */
 .terminal-card {
@@ -816,6 +918,10 @@ kbd {
   .weave-thread { animation: none; }
   .weave-station:hover,
   .terminal-card:hover { transform: none; }
+  .hero-photo::before { animation: none; }
+  .hero-photo { transform: none; }
+  .weave-thread-progress { transform: scaleY(1); }
+  .sheen:hover::after { animation: none; opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

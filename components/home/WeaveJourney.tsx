@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { ArrowUpRight, CornerDownLeft } from "lucide-react";
 import { Reveal } from "@/components/reveal";
@@ -17,12 +18,53 @@ import { cn } from "@/lib/utils";
  * 响应式：lg 下站点沿中线左右交错；sm/md 下退化为单列、织线移到最左。
  */
 export function WeaveJourney() {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const progressRef = useRef<HTMLSpanElement | null>(null);
+
+  // 滚动进度：随旅程被滚过，彩色织线从顶端「织」到底端（scaleY，仅 transform）。
+  // reduced-motion 下不挂监听，CSS 直接把 progress 视为 1（整条已织好）。
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const root = rootRef.current;
+    const bar = progressRef.current;
+    if (!root || !bar) return;
+
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const rect = root.getBoundingClientRect();
+      const vh = window.innerHeight;
+      // 0 → 旅程顶端刚到视口中线；1 → 底端越过中线。
+      const p = (vh * 0.5 - rect.top) / Math.max(rect.height, 1);
+      bar.style.setProperty("--progress", String(Math.min(1, Math.max(0, p))));
+    };
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
   return (
-    <div className="relative">
-      {/* 经线：一条贯穿全程的织线。mobile 靠左，lg 居中。 */}
+    <div ref={rootRef} className="relative">
+      {/* 经线：一条贯穿全程的织线（静态轨）。mobile 靠左，lg 居中。 */}
       <span
         aria-hidden
         className="weave-thread pointer-events-none absolute top-2 bottom-10 left-[19px] w-px lg:left-1/2 lg:-translate-x-1/2"
+      />
+      {/* 彩色进度织线：随滚动 scaleY 增长，叠在静态轨上。 */}
+      <span
+        ref={progressRef}
+        aria-hidden
+        className="weave-thread-progress pointer-events-none absolute top-2 bottom-10 left-[19px] w-px lg:left-1/2 lg:-translate-x-1/2"
       />
 
       <ol className="relative space-y-7 lg:space-y-2">
@@ -53,7 +95,7 @@ export function WeaveJourney() {
                 <Link
                   href={step.href}
                   className={cn(
-                    "weave-station group focus-ring relative block rounded-[22px] p-6 sm:p-7",
+                    "weave-station sheen group focus-ring relative block rounded-[22px] p-6 sm:p-7",
                     left ? "lg:text-right" : "lg:text-left",
                   )}
                   style={{ ["--accent" as string]: step.accent }}

@@ -6,6 +6,7 @@ import { Search, ArrowUpRight, ArrowRight, Terminal } from "lucide-react";
 import { ToolCard } from "@/components/tool-card";
 import { Reveal } from "@/components/reveal";
 import { WeaveJourney } from "@/components/home/WeaveJourney";
+import { HeroBackdrop } from "@/components/home/HeroBackdrop";
 import {
   getSupportingTools,
   getGalleryTools,
@@ -77,8 +78,9 @@ export default function Home() {
   return (
     <>
       {/* HERO */}
-      <section className="relative">
-        <div className="mx-auto max-w-6xl px-6 pt-20 sm:pt-28 pb-14">
+      <section className="relative overflow-hidden">
+        <HeroBackdrop />
+        <div className="relative z-10 mx-auto max-w-6xl px-6 pt-20 sm:pt-28 pb-14">
           {/* Top meta row */}
           <Reveal className="flex items-center justify-between">
             <div className="overline flex items-center gap-2">
@@ -147,7 +149,7 @@ export default function Home() {
           </Reveal>
         </div>
 
-        <div className="mx-auto max-w-6xl px-6">
+        <div className="relative z-10 mx-auto max-w-6xl px-6">
           <div className="hairline" />
         </div>
       </section>
@@ -284,7 +286,7 @@ export default function Home() {
               <Reveal key={tool.slug} delay={i * 70}>
                 <Link
                   href={tool.href}
-                  className="card-glass focus-ring group block overflow-hidden rounded-[22px]"
+                  className="card-glass sheen focus-ring group block overflow-hidden rounded-[22px]"
                 >
                   {/* 渐变 banner：用工具自带 gradient 做视觉招贴 */}
                   <div
