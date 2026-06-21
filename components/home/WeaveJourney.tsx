@@ -272,10 +272,10 @@ export function WeaveJourney() {
         })}
 
         {/* 终点 cap：把「检索→…→制图→回存」闭环显性化（与上一行拉开间距防重叠）。 */}
-        <li className="relative pt-24 lg:pt-28">
+        <li className="relative pt-40 lg:pt-48">
           <span
             aria-hidden
-            className="weave-node weave-node-end absolute top-[112px] left-[14px] z-10 lg:left-1/2 lg:-translate-x-1/2 lg:top-[124px]"
+            className="weave-node weave-node-end absolute top-[180px] left-[14px] z-10 lg:left-1/2 lg:-translate-x-1/2 lg:top-[204px]"
           />
           <Reveal
             delay={CORE_FLOW.length * 90}
@@ -287,7 +287,7 @@ export function WeaveJourney() {
             >
               <CornerDownLeft className="h-4 w-4 text-ink-3 transition-colors group-hover:text-coral" />
               <span className="text-[13px] text-ink-2 group-hover:text-ink">
-                产出<span className="serif-italic text-ink">回存</span>论文库，闭合检索—生成—回存回环
+                产出<span className="font-medium text-ink">回存</span>论文库，闭合检索—生成—回存回环
               </span>
             </Link>
           </Reveal>

@@ -1,23 +1,26 @@
-// 以论文为核心的工作流主线 5 环：检索 → 精读 → 立论 → 撰写 → 制图。
-// 阶段标签统一为二字动词，与首页主线动词链（检索·精读·提炼·立论·撰写·制图）同源；
+// 以论文为核心的工作流主线 6 环：检索 → 精读 → 梳理 → 立论 → 撰写 → 制图。
+// 阶段标签统一为二字动词，与首页主线动词链（检索·精读·梳理·立论·撰写·制图）同源。
+// 「梳理」= 整理研究方向、梳理整个方向的发展历程（research-genealogy）；
 // 「提炼」是精读环内的结构化要点工序，故并入「精读」阶段。命令行/自动化工具迁入 lab。
 export type Phase =
   | "检索"
   | "精读"
+  | "梳理"
   | "立论"
   | "撰写"
   | "制图";
 
-// workflow：挂在 5 环主线、参与一键流转闭环的工具。
+// workflow：挂在 6 环主线、参与一键流转闭环的工具（核心步骤 + 围绕主干的配套）。
+// utility：与主干松耦合的外围工具（网页速览 / 文库问答 / 格式转译），首页下放到 Utilities 区，phases 为空。
 // gallery：交互式教学演示（模型可视化 / 科研叙事），独立于工作流，不参与阶段过滤与 handoff。
 // lab：命令行 / 自动化扩展（任务规划器 / 自动化封装器），独立于论文主线，phases 为空。
-export type Track = "workflow" | "gallery" | "lab";
+export type Track = "workflow" | "utility" | "gallery" | "lab";
 
 export type Tool = {
   slug: string;
   name: string;
   description: string;
-  /** workflow 工具挂在 5 环主线；gallery 工具不属于任何工作流阶段（phases 为空）。 */
+  /** workflow 工具挂在 6 环主线；utility / gallery / lab 工具不属于任何工作流阶段（phases 为空）。 */
   phases: Phase[];
   track: Track;
   icon: string;
