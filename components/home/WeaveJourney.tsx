@@ -279,7 +279,7 @@ export function WeaveJourney() {
           />
           <Reveal
             delay={CORE_FLOW.length * 90}
-            className="pl-12 lg:pl-0 lg:flex lg:justify-center"
+            className="relative z-20 pl-12 lg:pl-0 lg:flex lg:justify-center"
           >
             <Link
               href="/library"

@@ -121,7 +121,7 @@ export default function Home() {
               <p className="text-[13px] leading-relaxed text-ink-2 max-w-xs">
                 这里是 <span className="serif-italic text-ink">PaperWeave</span>
                 ，一个以论文为核心、本地优先的研究工作台。从检索最新论文，到精读、梳理、{" "}
-                <span className="serif-italic text-ink">立论</span>
+                <span className="text-ink">立论</span>
                 、撰写、制图——一条线走完。只搭骨架不代写正文，让每一步都顺起来。
               </p>
             </Reveal>
@@ -164,7 +164,7 @@ export default function Home() {
       <section className="mx-auto w-full max-w-6xl px-6 pt-16">
         <Reveal className="flex items-baseline justify-between mb-3">
           <h2 className="serif text-[28px] sm:text-[34px] tracking-tight text-ink">
-            <span className="serif-italic text-ink-2">The</span> Paper Workflow
+            <span className="text-ink-2">The</span> Paper Workflow
           </h2>
           <span className="overline text-ink-3">核心论文流程 · 一条线走完</span>
         </Reveal>
@@ -203,7 +203,7 @@ export default function Home() {
       <section className="mx-auto w-full max-w-6xl px-6 pt-10 pb-24">
         <Reveal className="flex items-baseline justify-between mb-3">
           <h2 className="serif text-[28px] sm:text-[34px] tracking-tight text-ink">
-            <span className="serif-italic text-ink-2">Supporting</span> Tools
+            <span className="text-ink-2">Supporting</span> Tools
           </h2>
           <span className="overline">配套工具 · 围绕主干</span>
         </Reveal>
@@ -233,7 +233,7 @@ export default function Home() {
           <div className="hairline mb-12" />
           <Reveal className="flex items-baseline justify-between mb-3">
             <h2 className="serif text-[28px] sm:text-[34px] tracking-tight text-ink">
-              <span className="serif-italic text-ink-2">More</span> Utilities
+              <span className="text-ink-2">More</span> Utilities
             </h2>
             <span className="overline">更多工具 · 松耦合</span>
           </Reveal>
@@ -256,7 +256,7 @@ export default function Home() {
           <div className="hairline mb-12" />
           <Reveal className="flex items-baseline justify-between mb-3">
             <h2 className="serif text-[28px] sm:text-[34px] tracking-tight text-ink">
-              <span className="serif-italic text-ink-2">The</span> Lab
+              <span className="text-ink-2">The</span> Lab
             </h2>
             <span className="overline">命令行 / 自动化扩展</span>
           </Reveal>
@@ -300,7 +300,7 @@ export default function Home() {
           <div className="hairline mb-12" />
           <Reveal className="flex items-baseline justify-between mb-3">
             <h2 className="serif text-[28px] sm:text-[34px] tracking-tight text-ink">
-              <span className="serif-italic text-ink-2">The</span> Gallery
+              <span className="text-ink-2">The</span> Gallery
             </h2>
             <span className="overline">可视化展厅</span>
           </Reveal>
@@ -317,20 +317,15 @@ export default function Home() {
                   href={tool.href}
                   className="card-glass sheen focus-ring group block overflow-hidden rounded-[22px]"
                 >
-                  {/* 渐变 banner：用工具自带 gradient 做视觉招贴 */}
-                  <div
-                    className={cn(
-                      "relative flex h-28 items-end bg-gradient-to-br p-5",
-                      tool.gradient,
-                    )}
-                  >
+                  {/* 统一中性 banner（不用彩色背板）：emoji 招贴 + 浅底角标 */}
+                  <div className="relative flex h-28 items-end border-b border-line bg-paper-3 p-5">
                     <span
                       aria-hidden
                       className="absolute right-4 top-3 text-[44px] leading-none opacity-90 transition-transform duration-500 group-hover:scale-110"
                     >
                       {tool.icon}
                     </span>
-                    <span className="overline rounded-full bg-[rgba(26,23,19,0.28)] px-2.5 py-1 text-white/90 backdrop-blur-sm">
+                    <span className="overline rounded-full border border-line bg-paper/80 px-2.5 py-1 text-ink-3 backdrop-blur-sm">
                       展厅
                     </span>
                   </div>
