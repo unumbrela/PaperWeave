@@ -1,8 +1,8 @@
 "use client"
 import React, { useEffect, useRef } from 'react'
-import { IMG_SIZE } from '@/lib/sampler'
+import { IMG_DIM, IMG_SIZE } from '@/lib/sampler'
 
-/** 把一张 IMG_SIZE×IMG_SIZE 灰度图（[0,1]）放大渲染到 canvas。 */
+/** 把一张 IMG_SIZE×IMG_SIZE RGB 图（[0,1]，行优先 RGB）放大渲染到 canvas。 */
 export function PixelImage({
   pixels,
   size = 64,
@@ -20,7 +20,7 @@ export function PixelImage({
     if (!c) return
     const ctx = c.getContext('2d')!
     ctx.clearRect(0, 0, size, size)
-    if (!pixels || pixels.length < IMG_SIZE * IMG_SIZE) {
+    if (!pixels || pixels.length < IMG_DIM) {
       ctx.fillStyle = '#000'
       ctx.fillRect(0, 0, size, size)
       return
@@ -30,11 +30,11 @@ export function PixelImage({
     off.height = IMG_SIZE
     const octx = off.getContext('2d')!
     const img = octx.createImageData(IMG_SIZE, IMG_SIZE)
+    const clamp = (x: number) => Math.round(Math.min(1, Math.max(0, x)) * 255)
     for (let i = 0; i < IMG_SIZE * IMG_SIZE; i++) {
-      const v = Math.round(Math.min(1, Math.max(0, pixels[i])) * 255)
-      img.data[i * 4] = v
-      img.data[i * 4 + 1] = v
-      img.data[i * 4 + 2] = v
+      img.data[i * 4] = clamp(pixels[i * 3])
+      img.data[i * 4 + 1] = clamp(pixels[i * 3 + 1])
+      img.data[i * 4 + 2] = clamp(pixels[i * 3 + 2])
       img.data[i * 4 + 3] = 255
     }
     octx.putImageData(img, 0, 0)

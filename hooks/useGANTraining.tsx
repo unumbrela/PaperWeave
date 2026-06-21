@@ -13,7 +13,7 @@ import {
 
 type TF = typeof tfType
 
-const NUM_CANDIDATES = 24 // 内部生成的候选图数量（只展示其中最好的一张）
+const NUM_CANDIDATES = 8 // 内部生成的候选图数量（只展示其中最好的一张）
 const REFRESH_EVERY = 3
 const MAX_LOSS_POINTS = 200
 const REACHED_THRESHOLD = 0.98 // 收敛度达到即判定"达到目标"并自动停止（越高越像）
@@ -22,7 +22,7 @@ const NOISE_MAX = 0.1 // 实例噪声初始强度
 const NOISE_FLOOR = 0.03 // 实例噪声下限（不降到 0，避免判别器过强）
 const ADV_WEIGHT = 0.3 // 对抗项权重（调低，让重建项主导以稳定收敛）
 const RECON_WEIGHT = 15 // 重建引导项权重
-const HIDDEN = 160 // 生成器/判别器隐藏层宽度
+const HIDDEN = 256 // 生成器/判别器隐藏层宽度（彩色高维输出需更大容量）
 const MAX_AUTO_STEPS = 1500 // 训练步数硬上限，保证一定会停下来
 
 export interface VizState {
