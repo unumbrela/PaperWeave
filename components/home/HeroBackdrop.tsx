@@ -3,12 +3,12 @@
 import { useEffect, useRef } from "react";
 
 /**
- * Hero 签名底图层 —— 一张真实的羊皮纸 / 旧纸照片（public/hero-paper.jpg，
- * 公有领域），压在 hero 之后，叠一层纸白径向 + 垂直渐变「蒙版」保证标题清晰，
- * 底缘融进全站 paper 底色。两处动效：
- *   1. 缓慢 ken-burns 漂移（CSS，scale 1→1.06 往复）——让静态照片有呼吸感；
+ * Hero 签名底图层 —— 一张手工设计的「织线」插画（public/hero-art.webp：散落论文页
+ * → 彩色丝线编织 → 装订书稿 → 折线图），作 hero 主视觉，叠一层轻量纸白蒙版：仅在
+ * 左上标题区轻提亮、底缘渐隐进全站 paper，让插画清晰露出。两处动效：
+ *   1. 轻微 ken-burns 漂移（CSS，scale 1→1.05 往复）——让静态插画有呼吸感；
  *   2. 滚动视差（JS，rAF 节流，仅 transform）——底图比内容慢半拍。
- * 用户要换自己的图：替换 public/hero-paper.jpg 即可（无需改代码）。
+ * 换图：替换 public/hero-art.webp 即可（无需改代码；构图见 globals.css 的 .hero-* 注释）。
  * reduced-motion 下禁用视差与 ken-burns，仅保留静态底图 + 蒙版。
  */
 export function HeroBackdrop() {
