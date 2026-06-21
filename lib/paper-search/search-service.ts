@@ -247,18 +247,11 @@ export async function searchArXiv(query: SearchQuery): Promise<PaperResult[]> {
         authorIndex = authorEnd + '</author>'.length;
       }
       
-      let pdfUrl: string | undefined;
-      const linkStart = entry.indexOf('link title="pdf"', 0);
-      if (linkStart !== -1) {
-        const hrefStart = entry.indexOf('href="', linkStart);
-        if (hrefStart !== -1) {
-          const hrefEnd = entry.indexOf('"', hrefStart + 6);
-          if (hrefEnd !== -1) {
-            pdfUrl = entry.substring(hrefStart + 6, hrefEnd);
-          }
-        }
-      }
-      
+      // PDF 链接直接由 arXiv id 构造，而非解析 <link>：arXiv 的 pdf link 是
+      // `<link href="..." ... title="pdf"/>`（title 在末尾），旧解析假设 `link title="pdf"`
+      // 紧挨着出现 → 永远匹配不到 → arXiv 论文全都没有 pdfUrl（搜索结果没有「阅读」入口）。
+      const pdfUrl = id ? `https://arxiv.org/pdf/${id}.pdf` : undefined;
+
       results.push({
         id,
         title,

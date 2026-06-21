@@ -210,12 +210,12 @@ export function ResultCard({
 
           {/* 动作行 */}
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            {paper.pdfUrl && onRead && (
+            {onRead && (
               <button
                 onClick={onRead}
                 disabled={importing}
                 className={cn(actionBtn, "bg-coral/10 font-medium text-[#a53425] hover:bg-coral/18")}
-                title="自动入库并打开 PDF 阅读器"
+                title="自动入库并打开精读（无直链 PDF 时可在阅读器内打开原文或上传 PDF）"
               >
                 {importing ? <Loader2 className="h-3 w-3 animate-spin" /> : <BookOpen className="h-3 w-3" />}
                 阅读
