@@ -158,9 +158,9 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "figure-prompt",
-    name: "科研示意图提示词",
+    name: "科研绘图",
     description:
-      "把主题与要展示的内容，组织成可直接粘贴给文生图模型（DALL·E / Midjourney / 即梦等）的科研图形摘要 / 示意图提示词：横向流程、矢量插画质感、配色语义、克制约束一应俱全。",
+      "两类图一站搞定：① 科研示意图——把主题与内容组织成可粘贴给文生图模型（DALL·E / Midjourney / 即梦）的图形摘要提示词；② 架构流程图——AI 直接产出 draw.io 图（架构/流程/时序/ER 等），站内预览并可下载 .drawio。",
     phases: ["制图"],
     track: "workflow",
     icon: "🎨",

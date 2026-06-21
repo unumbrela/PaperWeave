@@ -8,6 +8,8 @@ import { StreamOutput } from "@/components/stream-output";
 import { useStream } from "@/components/use-stream";
 import { consumeHandoff } from "@/lib/workflow/handoff";
 import { HandoffBanner, SaveToLibrary } from "@/components/workflow/handoff-controls";
+import { DrawioPreview } from "@/components/figure/DrawioPreview";
+import { extractMxfile } from "@/lib/figure/drawio";
 import { cn } from "@/lib/utils";
 
 const TOOL = getTool("figure-prompt")!;
@@ -43,9 +45,27 @@ const LANGS = [
   { value: "both", label: "中 + 英" },
 ] as const;
 
+// drawio 模式：图型与方向。
+const DIAGRAM_TYPES = [
+  { value: "architecture", label: "架构图", sub: "模块/数据流" },
+  { value: "flowchart", label: "流程图", sub: "步骤/判断" },
+  { value: "sequence", label: "时序图", sub: "参与者/消息" },
+  { value: "er", label: "ER 图", sub: "实体/关系" },
+  { value: "mindmap", label: "思维导图", sub: "中心放射" },
+  { value: "class", label: "类图", sub: "UML 类" },
+] as const;
+
+const DIRECTIONS = [
+  { value: "LR", label: "横向 →" },
+  { value: "TB", label: "纵向 ↓" },
+] as const;
+
 type FigureType = (typeof FIGURE_TYPES)[number]["value"];
 type ModelTarget = (typeof MODELS)[number]["value"];
 type Lang = (typeof LANGS)[number]["value"];
+type DiagramType = (typeof DIAGRAM_TYPES)[number]["value"];
+type Direction = (typeof DIRECTIONS)[number]["value"];
+type Mode = "prompt" | "drawio";
 
 // 一个端到端示例：输入还原 → 生成的提示词 → GPT-image 成图。
 const EXAMPLE = {
@@ -92,6 +112,18 @@ export default function Page() {
   const [sourcePaperId, setSourcePaperId] = useState<string | null>(null);
   const { text, loading, error, run, stop } = useStream();
 
+  // 模式：科研示意图(提示词) / 架构流程图(drawio)
+  const [mode, setMode] = useState<Mode>("prompt");
+  // drawio 模式独立表单与流
+  const [dSubject, setDSubject] = useState("");
+  const [dDesc, setDDesc] = useState("");
+  const [diagramType, setDiagramType] = useState<DiagramType>("flowchart");
+  const [direction, setDirection] = useState<Direction>("LR");
+  const [dPalette, setDPalette] = useState("");
+  const [dLang, setDLang] = useState<"zh" | "en">("zh");
+  const drawio = useStream();
+  const drawioXml = extractMxfile(drawio.text);
+
   useEffect(() => {
     // 挂载时一次性消费上游 handoff 并水合输入，非级联渲染
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -130,8 +162,45 @@ export default function Page() {
     });
   };
 
+  const submitDrawio = () => {
+    if (dSubject.trim().length < 2 || dDesc.trim().length < 5) return;
+    drawio.run("/api/figure-drawio", {
+      subject: dSubject.trim(),
+      description: dDesc.trim(),
+      diagramType,
+      direction,
+      palette: dPalette.trim(),
+      lang: dLang,
+    });
+  };
+
   return (
     <ToolShell tool={TOOL}>
+      {/* 模式切换：提示词 / drawio */}
+      <div className="mb-6 flex gap-2">
+        {(
+          [
+            ["prompt", "科研示意图 · 提示词"],
+            ["drawio", "架构流程图 · drawio"],
+          ] as const
+        ).map(([v, label]) => (
+          <button
+            key={v}
+            onClick={() => setMode(v)}
+            className={cn(
+              "rounded-full border px-4 py-2 text-[13px] transition-all",
+              mode === v
+                ? "border-ink bg-ink text-paper-2"
+                : "border-line bg-paper-2/60 text-ink-2 hover:border-line-strong hover:text-ink",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mode === "prompt" && (
+      <>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <div className="surface rounded-[20px] p-6">
           {handoffFrom && (
@@ -368,6 +437,151 @@ export default function Page() {
           </div>
         </div>
       </section>
+      </>
+      )}
+
+      {mode === "drawio" && (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+          <div className="surface rounded-[20px] p-6">
+            <label className="overline block mb-2">图型</label>
+            <div className="grid grid-cols-3 gap-2">
+              {DIAGRAM_TYPES.map((t) => (
+                <button
+                  key={t.value}
+                  onClick={() => setDiagramType(t.value)}
+                  className={cn(
+                    "rounded-xl border px-2 py-2.5 text-center transition-all",
+                    diagramType === t.value
+                      ? "border-ink bg-ink text-paper-2"
+                      : "border-line bg-paper-2/60 text-ink-2 hover:border-line-strong hover:text-ink",
+                  )}
+                >
+                  <div className="serif text-[13.5px] leading-none">{t.label}</div>
+                  <div className="mt-1 text-[10px] opacity-70">{t.sub}</div>
+                </button>
+              ))}
+            </div>
+
+            <label className="overline block mt-5 mb-2">主题 *</label>
+            <input
+              value={dSubject}
+              onChange={(e) => setDSubject(e.target.value)}
+              placeholder="例：用户登录系统的后端架构"
+              className={fieldBox}
+            />
+
+            <label className="overline block mt-5 mb-2">要画的节点 / 模块与关系 *</label>
+            <textarea
+              value={dDesc}
+              onChange={(e) => setDDesc(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submitDrawio();
+              }}
+              placeholder="例：客户端 → API 网关 → 鉴权服务（校验 JWT）；网关 → 用户服务 → 数据库；鉴权失败回 401。标出每条调用的方向。"
+              rows={6}
+              className={cn(fieldBox, "resize-y")}
+            />
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div>
+                <label className="overline block mb-2">布局方向</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {DIRECTIONS.map((d) => (
+                    <button
+                      key={d.value}
+                      onClick={() => setDirection(d.value)}
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-[12px] transition-all",
+                        direction === d.value
+                          ? "border-ink bg-ink text-paper-2"
+                          : "border-line bg-paper-2/60 text-ink-2 hover:border-line-strong hover:text-ink",
+                      )}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="overline block mb-2">标签语言</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      ["zh", "中文"],
+                      ["en", "English"],
+                    ] as const
+                  ).map(([v, label]) => (
+                    <button
+                      key={v}
+                      onClick={() => setDLang(v)}
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-[12px] transition-all",
+                        dLang === v
+                          ? "border-ink bg-ink text-paper-2"
+                          : "border-line bg-paper-2/60 text-ink-2 hover:border-line-strong hover:text-ink",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <label className="overline block mt-5 mb-2">
+              配色 <span className="normal-case text-ink-4">（可选）</span>
+            </label>
+            <input
+              value={dPalette}
+              onChange={(e) => setDPalette(e.target.value)}
+              placeholder="留空 = 蓝/浅紫为主色，橙色强调关键节点"
+              className={fieldBox}
+            />
+
+            <button
+              onClick={submitDrawio}
+              disabled={drawio.loading || dSubject.trim().length < 2 || dDesc.trim().length < 5}
+              className={cn(
+                "cta-gradient mt-8 w-full rounded-full px-5 py-3 text-[14px] font-medium",
+                "transition-all focus-ring disabled:opacity-50 disabled:pointer-events-none",
+              )}
+            >
+              {drawio.loading ? "正在生成 drawio…" : "生成 drawio 图"}
+            </button>
+
+            <p className="mt-3 text-[11px] text-ink-3 text-center serif-italic">
+              AI 直接产出 draw.io 图，站内预览，可下载 .drawio 或在 draw.io 中打开继续编辑
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            {drawio.error ? (
+              <div className="surface rounded-[20px] p-6 text-sm text-[#a53425]">
+                <p className="font-medium">生成失败</p>
+                <p className="mt-1 text-[12px] opacity-80">{drawio.error}</p>
+                <button
+                  onClick={submitDrawio}
+                  className="mt-3 inline-flex items-center gap-1 rounded-full border border-line px-3 py-1 text-[12px] text-ink-2 transition-colors hover:text-ink"
+                >
+                  重试
+                </button>
+              </div>
+            ) : drawio.loading && !drawioXml ? (
+              <div className="surface rounded-[20px] min-h-[320px] flex items-center justify-center">
+                <p className="serif-italic text-[18px] text-ink-3">正在生成 drawio 图…</p>
+              </div>
+            ) : drawioXml ? (
+              <DrawioPreview xml={drawioXml} />
+            ) : (
+              <div className="surface rounded-[20px] min-h-[320px] flex items-center justify-center text-center px-6">
+                <p className="serif-italic text-[22px] text-ink-3 max-w-xs leading-snug">
+                  描述要画的模块与关系，AI 直接画成可编辑的 draw.io 图。
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </ToolShell>
   );
 }
