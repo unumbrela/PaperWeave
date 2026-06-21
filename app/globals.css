@@ -892,27 +892,77 @@ kbd {
   100% { transform: scale(2.6); opacity: 0; }
 }
 
-/* 工序卡: input → output panel filling the station's opposite half. */
+/* 工序卡: input → output panel filling the station's opposite half. A faint
+   accent-tinted glass card with a top accent rail, glyph watermark, and a
+   small input→output pipeline (node dots). */
 .flow-panel {
-  background: var(--glass-2);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
-  backdrop-filter: blur(12px) saturate(1.05);
+  background:
+    linear-gradient(
+      155deg,
+      color-mix(in srgb, var(--accent, #8854d0) 9%, var(--glass-2)) 0%,
+      var(--glass-2) 60%
+    );
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  backdrop-filter: blur(14px) saturate(1.1);
   border: 1px solid var(--line);
-  transition: border-color 0.4s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 10px 30px -18px rgba(26, 23, 19, 0.28);
+  transition:
+    border-color 0.4s ease,
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .flow-panel:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   border-color: var(--accent, var(--line-strong));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 18px 40px -20px rgba(26, 23, 19, 0.34);
+}
+/* Top accent rail that grows across the card on hover. */
+.flow-rail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  transform: scaleX(0.18);
+  transform-origin: left;
+  background: linear-gradient(
+    90deg,
+    var(--accent, #8854d0),
+    color-mix(in srgb, var(--accent, #8854d0) 30%, transparent)
+  );
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.flow-panel:hover .flow-rail {
+  transform: scaleX(1);
 }
 .flow-glyph {
   position: absolute;
-  right: -6px;
-  bottom: -14px;
-  font-size: 92px;
+  right: -8px;
+  bottom: -18px;
+  font-size: 104px;
   line-height: 1;
-  opacity: 0.07;
+  opacity: 0.08;
   pointer-events: none;
   user-select: none;
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease;
+}
+.flow-panel:hover .flow-glyph {
+  transform: scale(1.08) rotate(-4deg);
+  opacity: 0.12;
+}
+/* Output node dot — a gentle glowing pulse to mark the produced artifact. */
+.flow-dot {
+  box-shadow: 0 0 0 0 var(--accent, var(--plum));
+  animation: flow-dot-pulse 2.8s ease-out infinite;
+}
+@keyframes flow-dot-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, #8854d0) 55%, transparent); }
+  70% { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
 .weave-node-end {
   background: var(--ink-4);
@@ -1008,6 +1058,7 @@ kbd {
   .weave-flow { display: none; }
   .weave-node::after { animation: none; display: none; }
   .flow-panel:hover { transform: none; }
+  .flow-dot { animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

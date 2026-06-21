@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { ArrowUpRight, ArrowDown, CornerDownLeft } from "lucide-react";
+import { ArrowUpRight, CornerDownLeft } from "lucide-react";
 import { Reveal } from "@/components/reveal";
 import { CORE_FLOW, getTool } from "@/lib/tools-registry";
 import { cn } from "@/lib/utils";
@@ -200,33 +200,67 @@ export function WeaveJourney() {
               >
                 <div
                   className={cn(
-                    "flow-panel relative overflow-hidden rounded-[20px] p-5 sm:p-6",
+                    "flow-panel group/panel relative overflow-hidden rounded-[20px] p-6 sm:p-7",
+                    "max-w-sm",
                     left ? "" : "lg:ml-auto",
                   )}
                   style={{ ["--accent" as string]: step.accent }}
                 >
+                  {/* 顶部 accent 细条 + 大字水印 */}
+                  <span aria-hidden className="flow-rail" />
                   <span aria-hidden className="flow-glyph">
                     {step.icon}
                   </span>
-                  <div className="relative max-w-[15rem] space-y-2.5">
-                    <div>
+
+                  {/* 工序标识 */}
+                  <div className="relative flex items-center justify-between">
+                    <span className="overline text-ink-4">工序 / Pipeline</span>
+                    <span
+                      className="numeral text-[20px] leading-none opacity-70"
+                      style={{ color: step.accent }}
+                    >
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                  </div>
+
+                  {/* 输入 → 产出 管线（节点圆 + 竖线） */}
+                  <div className="relative mt-5 pl-6">
+                    {/* 竖线 */}
+                    <span
+                      aria-hidden
+                      className="absolute left-[5px] top-2 bottom-2 w-px"
+                      style={{
+                        background: `linear-gradient(180deg, var(--line-strong), ${step.accent})`,
+                      }}
+                    />
+                    {/* 输入节点 */}
+                    <div className="relative">
+                      <span
+                        aria-hidden
+                        className="absolute -left-6 top-1 h-[11px] w-[11px] rounded-full border-2 bg-paper"
+                        style={{ borderColor: "var(--line-strong)" }}
+                      />
                       <div className="overline text-ink-4">输入</div>
                       <div className="mt-0.5 text-[14px] text-ink-2">
                         {step.input}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 text-ink-4">
+                    {/* 产出节点 */}
+                    <div className="relative mt-4">
                       <span
-                        className="h-px w-7"
-                        style={{ background: step.accent, opacity: 0.6 }}
+                        aria-hidden
+                        className="flow-dot absolute -left-6 top-1 h-[11px] w-[11px] rounded-full"
+                        style={{ background: step.accent }}
                       />
-                      <ArrowDown className="h-3.5 w-3.5" />
-                    </div>
-                    <div>
                       <div className="overline" style={{ color: step.accent }}>
                         产出
                       </div>
-                      <div className="mt-0.5 text-[14px] font-medium text-ink">
+                      <div
+                        className="mt-1 inline-flex items-center rounded-lg px-2.5 py-1 text-[14px] font-medium text-ink"
+                        style={{
+                          background: `color-mix(in srgb, ${step.accent} 12%, transparent)`,
+                        }}
+                      >
                         {step.output}
                       </div>
                     </div>
@@ -237,11 +271,11 @@ export function WeaveJourney() {
           );
         })}
 
-        {/* 终点 cap：把「检索→…→制图→回存」闭环显性化。 */}
-        <li className="relative pt-12 lg:pt-10">
+        {/* 终点 cap：把「检索→…→制图→回存」闭环显性化（与上一行拉开间距防重叠）。 */}
+        <li className="relative pt-24 lg:pt-28">
           <span
             aria-hidden
-            className="weave-node weave-node-end absolute top-[60px] left-[14px] z-10 lg:left-1/2 lg:-translate-x-1/2 lg:top-[52px]"
+            className="weave-node weave-node-end absolute top-[112px] left-[14px] z-10 lg:left-1/2 lg:-translate-x-1/2 lg:top-[124px]"
           />
           <Reveal
             delay={CORE_FLOW.length * 90}
