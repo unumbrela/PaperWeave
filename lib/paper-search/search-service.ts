@@ -117,7 +117,14 @@ export async function searchOpenAlex(query: SearchQuery): Promise<PaperResult[]>
           // OpenAlex 的刊名在 primary_location.source.display_name（旧 host_venue 已废弃；work.venue 不存在）
           venue: work.primary_location?.source?.display_name,
           url: work.id,
-          pdfUrl: work.open_access?.oa_url,
+          // 只取「真·直链 PDF」：open_access.oa_url 常是 DOI 落地页（HTML），
+          // 包进 pdf-proxy 抓回来不是 PDF → 415/502，精读打不开。OpenAlex 已内含
+          // Unpaywall 数据，直链在 *.pdf_url；没有就留空，交给前端兜底（打开原文/上传）。
+          pdfUrl:
+            work.best_oa_location?.pdf_url ||
+            work.primary_location?.pdf_url ||
+            work.locations?.find((l: { pdf_url?: string }) => l?.pdf_url)?.pdf_url ||
+            undefined,
           abstract: work.abstract || restoreOpenAlexAbstract(work.abstract_inverted_index),
           citations: work.cited_by_count,
           doi: normalizeDoi(work.doi),

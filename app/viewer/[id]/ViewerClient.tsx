@@ -14,6 +14,21 @@ import { useAnnotations, useResearchNotes, useStickyNotes, useAIExplanation } fr
 import { CenteredLoading } from '@/components/states';
 import { stageHandoff } from '@/lib/workflow/handoff';
 
+// pdfPath 形如 `/api/pdf-proxy?url=<encoded>`。若代理目标是 doi.org 等 DOI 落地页，
+// 它返回的是 HTML 而非 PDF（抓回来必 415/502），视为「无可内联 PDF」。
+function proxiedTargetIsLanding(pdfPath: string): boolean {
+  try {
+    const query = pdfPath.split('?')[1];
+    if (!query) return false;
+    const target = new URLSearchParams(query).get('url');
+    if (!target) return false;
+    const host = new URL(target).hostname.toLowerCase();
+    return host === 'doi.org' || host === 'dx.doi.org' || host.endsWith('.doi.org');
+  } catch {
+    return false;
+  }
+}
+
 export default function ViewerClient() {
   const params = useParams();
   const router = useRouter();
@@ -304,6 +319,8 @@ export default function ViewerClient() {
   const [pdfFilePath, setPdfFilePath] = useState<string | null>(null);
   // 当前展示的 PDF 是否来自本地离线缓存（Blob）。用于决定是否需要自动「暖缓存」。
   const [pdfFromCache, setPdfFromCache] = useState(false);
+  // 没有可内联阅读的 PDF（无 pdfPath，或 pdfPath 指向 DOI 落地页）→ 直接走兜底面板
+  const [pdfUnavailable, setPdfUnavailable] = useState(false);
 
   useEffect(() => {
     if (!paper) return;
@@ -311,14 +328,8 @@ export default function ViewerClient() {
     let objectUrl: string | null = null;
     let cancelled = false;
 
-    const localCandidate = `/papers/${paperId}.pdf`;
-
-    const resolvePath = (remotePath?: string) => {
-      if (remotePath) {
-        return remotePath.startsWith('http') ? remotePath : (remotePath.startsWith('/') ? remotePath : `/${remotePath}`);
-      }
-      return localCandidate;
-    };
+    const resolvePath = (remotePath: string) =>
+      remotePath.startsWith('http') ? remotePath : (remotePath.startsWith('/') ? remotePath : `/${remotePath}`);
 
     const resolve = async () => {
       // 1) 优先用本地离线缓存的 Blob —— 断网也能读
@@ -328,6 +339,7 @@ export default function ViewerClient() {
           objectUrl = URL.createObjectURL(blob);
           setPdfFilePath(objectUrl);
           setPdfFromCache(true);
+          setPdfUnavailable(false);
           return;
         }
       } catch {
@@ -336,8 +348,16 @@ export default function ViewerClient() {
       if (cancelled) return;
       setPdfFromCache(false);
 
-      // 2) 无本地缓存：直接用 pdfPath（arXiv 走同源 /api/pdf-proxy，或远端链接）。
-      //    PDF 已不再落盘到 public/papers（serverless 只读 FS），故无需再探测本地静态路径。
+      // 2) 无 pdfPath，或 pdfPath 包进代理的目标是 DOI/落地页（注定不是 PDF，抓回来必 502/415）：
+      //    不发起注定失败的请求，直接显示兜底（打开原文 / 上传 PDF）。
+      if (!paper.pdfPath || proxiedTargetIsLanding(paper.pdfPath)) {
+        setPdfFilePath(null);
+        setPdfUnavailable(true);
+        return;
+      }
+
+      // 3) 有可用的 pdfPath（arXiv 走同源 /api/pdf-proxy，或远端直链）。
+      setPdfUnavailable(false);
       setPdfFilePath(resolvePath(paper.pdfPath));
     };
 
@@ -347,6 +367,19 @@ export default function ViewerClient() {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
+  }, [paper]);
+
+  // 用户手动上传一份 PDF：缓存为本地 Blob 后立即内联渲染（并实现离线复读）。
+  const handlePickPdf = useCallback(async (file: File) => {
+    if (!paper) return;
+    try {
+      await repository.cachePdfBlob(paper.id, file);
+      setPdfFilePath(URL.createObjectURL(file));
+      setPdfFromCache(true);
+      setPdfUnavailable(false);
+    } catch (e) {
+      console.error('上传 PDF 失败:', e);
+    }
   }, [paper]);
 
   // 暖缓存：首次从网络/服务端成功拿到 PDF 后，后台静默存为本地 Blob，
@@ -444,9 +477,9 @@ export default function ViewerClient() {
           )}
 
           <div ref={pdfContainerRef} className="flex-1 overflow-auto bg-paper-3">
-            {pdfFilePath ? (
+            {pdfFilePath || pdfUnavailable ? (
               <PDFViewerDynamic
-                file={pdfFilePath}
+                file={pdfFilePath ?? ''}
                 currentPage={currentPage}
                 scale={scale}
                 annotations={annotations}
@@ -457,6 +490,9 @@ export default function ViewerClient() {
                 onDeleteStickyNote={deleteStickyNote}
                 onLoadSuccess={handleDocumentLoadSuccess}
                 onLoadError={handleDocumentLoadError}
+                sourceUrl={paper.sourceUrl}
+                onPickPdf={handlePickPdf}
+                unavailable={pdfUnavailable}
               />
             ) : (
               <CenteredLoading label="正在定位 PDF 文件…" />

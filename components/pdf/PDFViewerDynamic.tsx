@@ -25,6 +25,12 @@ interface PDFViewerDynamicProps {
   onLoadSuccess: (numPages: number) => void;
   onLoadError?: (error: Error) => void;
   containerRef?: React.RefObject<HTMLDivElement | null>;
+  /** 原文链接（DOI / 出版商页）——无法内联阅读时供「打开原文」兜底 */
+  sourceUrl?: string;
+  /** 用户手动选了一个本地 PDF：缓存为 Blob 后即可离线内联阅读 */
+  onPickPdf?: (file: File) => void;
+  /** 已知没有可内联的 PDF（如 pdfPath 指向 DOI 落地页）：直接显示兜底，不发起注定失败的请求 */
+  unavailable?: boolean;
 }
 
 export default function PDFViewerDynamic({
@@ -39,6 +45,9 @@ export default function PDFViewerDynamic({
   onDeleteStickyNote,
   onLoadSuccess,
   onLoadError,
+  sourceUrl,
+  onPickPdf,
+  unavailable = false,
 }: PDFViewerDynamicProps) {
   const [mounted, setMounted] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -112,36 +121,56 @@ export default function PDFViewerDynamic({
     );
   }
 
-  if (loadError) {
+  // 无法内联阅读时的友好兜底：要么这篇没有开放获取 PDF（unavailable），
+  // 要么远端抓取失败（loadError，如出版商 403 → 代理 502）。给「打开原文」
+  // 和「上传本地 PDF」两条出路，而不是抛一堆技术错误。
+  if (unavailable || loadError) {
+    const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const f = e.target.files?.[0];
+      if (f && onPickPdf) onPickPdf(f);
+      e.target.value = ''; // 允许重复选择同一文件
+    };
+
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[600px] text-ink-3 p-8">
-        <div className="max-w-lg text-center">
+        <div className="max-w-md text-center">
           <div className="w-16 h-16 bg-coral/12 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-coral" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-ink-2 mb-2">PDF 加载失败</h3>
-          <p className="text-sm mb-4">文件可能不存在、已损坏或无法解析</p>
-          <div className="bg-paper-2/60 rounded-lg p-4 text-left text-xs mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-ink-4">文件路径:</span>
-              <code className="text-ocean break-all">{file}</code>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-ink-4">错误信息:</span>
-              <code className="text-coral">{loadError}</code>
-            </div>
+          <h3 className="text-lg font-medium text-ink-2 mb-2">暂无可直接阅读的 PDF</h3>
+          <p className="text-sm mb-6">
+            这篇论文没有可内联阅读的开放获取 PDF（可能是订阅期刊或出版商不允许直接抓取）。
+            你可以打开原文页面，或手动上传一份 PDF 后离线阅读与批注。
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            {sourceUrl && (
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-line px-5 py-2 text-sm text-ink-2 hover:bg-paper-3 transition-colors focus-ring"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                打开原文
+              </a>
+            )}
+            {onPickPdf && (
+              <label className="inline-flex items-center gap-2 rounded-full cta-gradient px-5 py-2 text-sm font-medium cursor-pointer focus-ring">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                上传 PDF
+                <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={handleFilePick} />
+              </label>
+            )}
           </div>
-          <div className="text-xs text-ink-4">
-            <p className="mb-1">常见原因:</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>PDF 文件格式不受支持</li>
-              <li>文件已损坏或加密</li>
-              <li>网络请求超时</li>
-              <li>浏览器缓存问题</li>
-            </ul>
-          </div>
+          {loadError && (
+            <p className="mt-5 text-xs text-ink-4">加载失败：{loadError}</p>
+          )}
         </div>
       </div>
     );
