@@ -1,149 +1,139 @@
-import * as d3 from "d3";
-import { DiffusionNode, DrawContext } from "./types";
-import { NOISE_COLOR, DENOISE_COLOR, OUTPUT_COLOR } from "./config";
+import type { Vec2 } from "./types";
+import { DOMAIN_MAX, DOMAIN_MIN } from "./config";
 
-export function getNodeColor(type: string, noiseLevel?: number): string {
-  if (type === "noise") {
-    return NOISE_COLOR;
-  } else if (type === "output") {
-    return OUTPUT_COLOR;
-  } else {
-    const t = noiseLevel || 0;
-    return d3.interpolateRgb(NOISE_COLOR, DENOISE_COLOR)(1 - t);
+const SPAN = DOMAIN_MAX - DOMAIN_MIN;
+
+/** 数据坐标 → 画布像素（y 轴朝上）。 */
+export function dataToPx(p: Vec2, w: number, h: number): Vec2 {
+  return [((p[0] - DOMAIN_MIN) / SPAN) * w, (1 - (p[1] - DOMAIN_MIN) / SPAN) * h];
+}
+
+/** 画布像素 → 数据坐标。 */
+export function pxToData(px: Vec2, w: number, h: number): Vec2 {
+  return [(px[0] / w) * SPAN + DOMAIN_MIN, (1 - px[1] / h) * SPAN + DOMAIN_MIN];
+}
+
+export function clearCanvas(ctx: CanvasRenderingContext2D, w: number, h: number, bg = "#fafaf9") {
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+}
+
+/** 浅网格 + 过原点的坐标轴。 */
+export function drawAxes(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(120,113,108,0.10)";
+  for (let v = Math.ceil(DOMAIN_MIN); v <= DOMAIN_MAX; v++) {
+    const [gx] = dataToPx([v, 0], w, h);
+    const [, gy] = dataToPx([0, v], w, h);
+    ctx.beginPath();
+    ctx.moveTo(gx, 0);
+    ctx.lineTo(gx, h);
+    ctx.moveTo(0, gy);
+    ctx.lineTo(w, gy);
+    ctx.stroke();
+  }
+  // 原点轴线略深
+  ctx.strokeStyle = "rgba(120,113,108,0.22)";
+  const o = dataToPx([0, 0], w, h);
+  ctx.beginPath();
+  ctx.moveTo(o[0], 0);
+  ctx.lineTo(o[0], h);
+  ctx.moveTo(0, o[1]);
+  ctx.lineTo(w, o[1]);
+  ctx.stroke();
+}
+
+export function drawPoints(
+  ctx: CanvasRenderingContext2D,
+  pts: Vec2[],
+  w: number,
+  h: number,
+  color: string,
+  radius = 2,
+) {
+  ctx.fillStyle = color;
+  for (const p of pts) {
+    const [px, py] = dataToPx(p, w, h);
+    ctx.beginPath();
+    ctx.arc(px, py, radius, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
-export function getNodeOpacity(type: string, noiseLevel?: number): number {
-  if (type === "noise") {
-    return 0.9;
-  } else if (type === "output") {
-    return 1;
-  } else {
-    return 0.6 + (1 - (noiseLevel || 0)) * 0.4;
+/** 画一条折线轨迹（数据坐标）。 */
+export function drawPath(
+  ctx: CanvasRenderingContext2D,
+  pts: Vec2[],
+  w: number,
+  h: number,
+  color: string,
+  alpha = 0.5,
+  width = 1,
+) {
+  if (pts.length < 2) return;
+  ctx.strokeStyle = withAlpha(color, alpha);
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  const p0 = dataToPx(pts[0], w, h);
+  ctx.moveTo(p0[0], p0[1]);
+  for (let i = 1; i < pts.length; i++) {
+    const p = dataToPx(pts[i], w, h);
+    ctx.lineTo(p[0], p[1]);
   }
+  ctx.stroke();
 }
 
-export function drawNodeContent(
-  ctx: DrawContext,
-  node: DiffusionNode,
-  x: number,
-  y: number,
-  size: number
-): string {
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const c = canvas.getContext("2d");
-  
-  if (!c) return "";
-  
-  const noise = node.noiseLevel || 0;
-  const quality = 1 - noise;
-  
-  c.fillStyle = "#ffffff";
-  c.fillRect(0, 0, size, size);
-  
-  const imageData = c.createImageData(size, size);
-  const pixels = imageData.data;
-  
-  for (let i = 0; i < pixels.length; i += 4) {
-    const r = Math.random();
-    const g = Math.random();
-    const b = Math.random();
-    
-    const noiseFactor = noise;
-    const contentFactor = quality;
-    
-    if (noise > 0) {
-      pixels[i] = Math.floor((r * noiseFactor + 128 * contentFactor) * 255);
-      pixels[i + 1] = Math.floor((g * noiseFactor + 128 * contentFactor) * 255);
-      pixels[i + 2] = Math.floor((b * noiseFactor + 128 * contentFactor) * 255);
-    } else {
-      const centerX = (i / 4) % size;
-      const centerY = Math.floor((i / 4) / size);
-      
-      const dx = centerX - size / 2;
-      const dy = centerY - size / 2;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      
-      if (dist < size * 0.35) {
-        pixels[i] = 255;
-        pixels[i + 1] = 200;
-        pixels[i + 2] = 150;
-      } else if (dist < size * 0.4) {
-        pixels[i] = 200;
-        pixels[i + 1] = 150;
-        pixels[i + 2] = 100;
-      } else {
-        pixels[i] = 240;
-        pixels[i + 1] = 240;
-        pixels[i + 2] = 240;
-      }
-    }
-    pixels[i + 3] = 255;
-  }
-  
-  c.putImageData(imageData, 0, 0);
-  
-  if (noise > 0 && noise < 1) {
-    for (let i = 0; i < size * size * noise * 0.3; i++) {
-      const nx = Math.random() * size;
-      const ny = Math.random() * size;
-      const bright = Math.random() * 0.8 + 0.2;
-      c.fillStyle = `rgba(255, 255, 255, ${bright * noise})`;
-      c.fillRect(nx, ny, 1, 1);
-    }
-  }
-  
-  return canvas.toDataURL();
+/** 在数据坐标里画一段带箭头的向量（用于速度场）。 */
+export function drawArrow(
+  ctx: CanvasRenderingContext2D,
+  from: Vec2,
+  to: Vec2,
+  w: number,
+  h: number,
+  color: string,
+  alpha = 0.9,
+) {
+  const a = dataToPx(from, w, h);
+  const b = dataToPx(to, w, h);
+  ctx.strokeStyle = withAlpha(color, alpha);
+  ctx.fillStyle = withAlpha(color, alpha);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(a[0], a[1]);
+  ctx.lineTo(b[0], b[1]);
+  ctx.stroke();
+  const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+  const s = 4;
+  ctx.beginPath();
+  ctx.moveTo(b[0], b[1]);
+  ctx.lineTo(b[0] - s * Math.cos(ang - 0.4), b[1] - s * Math.sin(ang - 0.4));
+  ctx.lineTo(b[0] - s * Math.cos(ang + 0.4), b[1] - s * Math.sin(ang + 0.4));
+  ctx.closePath();
+  ctx.fill();
 }
 
-export function getLinkColor(weight?: number): string {
-  const opacity = weight ? Math.min(0.3 + weight * 0.5, 0.8) : 0.3;
-  return `rgba(139, 92, 246, ${opacity})`;
+/** 把 #rrggbb 配上 alpha 通道。 */
+export function withAlpha(hex: string, alpha: number): string {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!m) return hex;
+  const r = parseInt(m[1], 16);
+  const g = parseInt(m[2], 16);
+  const b = parseInt(m[3], 16);
+  return `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
 }
 
-export function computeLayerRanges(
-  layers: DiffusionNode[][],
-  rangeType: "local" | "module" | "global"
-): Map<string, [number, number]> {
-  const ranges = new Map<string, [number, number]>();
-  
-  if (rangeType === "global") {
-    let min = Infinity;
-    let max = -Infinity;
-    layers.flat().forEach((node) => {
-      const output = Array.isArray(node.output) ? node.output.flat() : [node.output];
-      output.forEach((v) => {
-        if (typeof v === "number") {
-          if (v < min) min = v;
-          if (v > max) max = v;
-        }
-      });
-    });
-    layers.forEach((layer, li) => {
-      layer.forEach((_, ni) => {
-        ranges.set(`node-${li}-${ni}`, [min, max]);
-      });
-    });
-  } else {
-    layers.forEach((layer, li) => {
-      let min = Infinity;
-      let max = -Infinity;
-      layer.forEach((node) => {
-        const output = Array.isArray(node.output) ? node.output.flat() : [node.output];
-        output.forEach((v) => {
-          if (typeof v === "number") {
-            if (v < min) min = v;
-            if (v > max) max = v;
-          }
-        });
-      });
-      layer.forEach((_, ni) => {
-        ranges.set(`node-${li}-${ni}`, [min, max]);
-      });
-    });
-  }
-  
-  return ranges;
+/** 按 devicePixelRatio 设置画布物理像素，返回 CSS 逻辑尺寸 (w,h)。 */
+export function setupHiDPICanvas(
+  canvas: HTMLCanvasElement,
+  cssSize: number,
+): { ctx: CanvasRenderingContext2D; w: number; h: number } {
+  const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+  canvas.width = cssSize * dpr;
+  canvas.height = cssSize * dpr;
+  canvas.style.width = `${cssSize}px`;
+  canvas.style.height = `${cssSize}px`;
+  const ctx = canvas.getContext("2d")!;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: cssSize, h: cssSize };
 }

@@ -1,33 +1,19 @@
-"use client";
-
 export function Hero() {
   return (
-    <div className="text-center mb-8">
-      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-sm mb-4">
-        <span className="serif-italic">可视化展厅</span>
-        <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+    <div className="text-center">
+      <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 mb-6 bg-purple-100 text-purple-700 text-sm">
+        <span className="w-2 h-2 rounded-full bg-purple-500" />
+        可视化展厅 · 复刻自 A Visual Introduction to Rectified Flows
       </div>
-      <h1 className="serif text-3xl md:text-4xl font-medium text-ink tracking-tight">
-        经典模型 · 扩散模型
+      <h1 className="serif text-3xl sm:text-4xl lg:text-5xl leading-tight tracking-tight text-ink">
+        扩散模型 · 流匹配与 Rectified Flow
       </h1>
-      <p className="mt-4 text-ink-2 max-w-2xl mx-auto">
-        观察从随机噪声到清晰图像的逐步演变：t=100（纯噪声）→ t=0（清晰图像），理解扩散模型的逆向去噪过程。
+      <p className="mt-4 max-w-2xl mx-auto text-ink-2 text-sm sm:text-base leading-relaxed">
+        生成模型把随机噪声「流」成数据。Flow Matching 学到的路径却是
+        <span className="text-[#8b5cf6] font-medium">弯曲</span>的 —— 弯曲就意味着采样要跑很多步。
+        <span className="text-[#22c55e] font-medium">Rectified Flow</span> 用「重流」把轨迹
+        <strong>拉直</strong>，于是几步甚至一步就能采样。下面每一张图都是用闭式速度场跑出来的<strong>真实</strong>流，不是动画。
       </p>
-      
-      <div className="mt-6 flex items-center justify-center gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-[#667eea]" />
-          <span className="text-sm text-ink-3">t=100 (高噪声)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-[#f4c25a]" />
-          <span className="text-sm text-ink-3">t=50 (中等)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-[#22c55e]" />
-          <span className="text-sm text-ink-3">t=0 (清晰)</span>
-        </div>
-      </div>
     </div>
   );
 }

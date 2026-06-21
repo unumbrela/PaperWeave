@@ -217,7 +217,7 @@ export const TOOLS: Tool[] = [
     slug: "diffusion-explainer",
     name: "经典模型 · 扩散模型",
     description:
-      "直观理解扩散模型的去噪过程：从随机噪声开始，逐步观察每一步去噪后图像的变化，理解时间步的作用。",
+      "像玩 GAN Lab 一样玩扩散模型：选或自绘二维目标分布，看前向加噪与反向去噪的真实采样轨迹，调节噪声调度与采样器。",
     phases: [],
     track: "gallery",
     icon: "🌀",
