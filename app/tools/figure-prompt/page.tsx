@@ -401,9 +401,9 @@ export default function Page() {
           <div className="hairline hidden sm:block flex-1 mx-8 self-end mb-3" />
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-start">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-stretch">
           {/* ① 输入还原 */}
-          <div className="surface rounded-[20px] p-6">
+          <div className="surface rounded-[20px] p-6 h-full">
             <div className="flex items-center justify-between mb-4">
               <span className="overline">① 输入（可一键填入表单）</span>
               <button
@@ -427,7 +427,7 @@ export default function Page() {
           </div>
 
           {/* ② 提示词 + ③ 成图 */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 h-full">
             <div className="surface rounded-[20px] p-6">
               <div className="overline mb-3">② 生成的科研绘图提示词</div>
               <pre

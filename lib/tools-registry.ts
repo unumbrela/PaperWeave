@@ -146,17 +146,6 @@ export const TOOLS: Tool[] = [
 
   // ── 制图 ────────────────────────────────────────────────
   {
-    slug: "figure-generator",
-    name: "图表制图",
-    description:
-      "描述想画的图（可附数据），生成可直接运行的出版级绘图代码：matplotlib / seaborn / plotly / TikZ，内置色盲友好配色、期刊单双栏尺寸与投稿自查清单。",
-    phases: ["制图"],
-    track: "workflow",
-    icon: "📈",
-    gradient: "from-[#10b981] to-[#4bb3ff]",
-    href: "/tools/figure-generator",
-  },
-  {
     slug: "figure-prompt",
     name: "科研绘图",
     description:
@@ -322,11 +311,11 @@ export const CORE_FLOW: CoreStep[] = [
   },
   {
     title: "制图",
-    blurb: "出版级绘图代码 + 文生图科研示意图提示词，把方法与结果画清楚。",
-    href: "/tools/figure-generator",
-    icon: "📈",
+    blurb: "两类图一站搞定：文生图科研示意图提示词 + AI 直出 draw.io 架构/流程图，把方法与结果画清楚。",
+    href: "/tools/figure-prompt",
+    icon: "🎨",
     accent: "#10b981",
-    toolSlug: "figure-generator",
+    toolSlug: "figure-prompt",
   },
 ];
 

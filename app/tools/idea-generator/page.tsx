@@ -133,15 +133,15 @@ export default function Page() {
                 label="发往「研究任务分解」"
               />
               <SendToTool
-                targetSlug="figure-generator"
+                targetSlug="figure-prompt"
                 payload={{
                   from: TOOL.name,
                   sourcePaperId: sourcePaperId ?? undefined,
                   fields: {
-                    description: `为下面这个研究 idea 的最小验证实验设计结果图（先想清楚要传达的结论，再选图型）：\n\n${text}`,
+                    content: `为下面这个研究 idea 的最小验证实验设计配图（先想清楚要传达的结论，再选图型）：\n\n${text}`,
                   },
                 }}
-                label="为验证实验设计图表"
+                label="为验证实验设计配图"
               />
             </div>
           )}

@@ -125,12 +125,12 @@ export default function Page() {
                 />
               )}
               <SendToTool
-                targetSlug="figure-generator"
+                targetSlug="figure-prompt"
                 payload={{
                   from: TOOL.name,
                   sourcePaperId: sourcePaperId ?? undefined,
                   fields: {
-                    description: `为下面这篇论文的实验/方法部分设计配图（先想清楚每张图要传达的结论，再选图型）：\n\n${text}`,
+                    content: `为下面这篇论文的方法/实验部分设计配图（先想清楚每张图要传达的结论，再选图型）：\n\n${text}`,
                   },
                 }}
                 label="为论文设计配图"

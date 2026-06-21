@@ -3,7 +3,7 @@ name: paper-figure
 description: Use this skill when the user wants to create or improve a figure/chart for an academic paper or presentation (图表制图/论文绘图/画对比图/结果图/出版级图表), including writing matplotlib/seaborn/TikZ code for experiment results.
 ---
 
-> 站内对应工具：「**图表制图**」（`/tools/figure-generator`）——同一套出版级绘图规范的命令行形态。
+> 出版级数据图表（matplotlib / seaborn / TikZ 代码）的命令行形态。站内「**科研绘图**」（`/tools/figure-prompt`）走的是另一条路：文生图科研示意图提示词 + draw.io 架构/流程图。
 
 ## When to use
 

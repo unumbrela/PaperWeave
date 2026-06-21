@@ -7,9 +7,9 @@
 | [`paper-search`](./paper-search/SKILL.md) | 「查一下 X 方向的论文」「有哪些高被引工作」 | curl，免 API key |
 | [`research-genealogy`](./research-genealogy/SKILL.md) | 「梳理 X 方向的发展历程」——产出引文核验的**发展族谱**（树 + 叙事报告），不止论文列表（站内对应「**研究脉络族谱**」） | python3（stdlib），免 API key |
 | [`cite-paper`](./cite-paper/SKILL.md) | 「给我这篇的 BibTeX / GB-T 7714」 | curl，免 API key |
-| [`paper-figure`](./paper-figure/SKILL.md) | 「画一张投稿用的结果对比图」（站内对应「**图表制图**」） | python3 + matplotlib（可选） |
+| [`paper-figure`](./paper-figure/SKILL.md) | 「画一张投稿用的结果对比图」（出版级数据图表代码；站内「制图」环为「**科研绘图**」） | python3 + matplotlib（可选） |
 
-四个 skill 正好覆盖主线「**检索**」环的纵深递进：**搜列表**（paper-search）→ **懂脉络**（research-genealogy，站内「研究脉络族谱」）→ **出引文**（cite-paper）；paper-figure 服务「**制图**」环（站内「图表制图」）。
+四个 skill 正好覆盖主线「**检索**」环的纵深递进：**搜列表**（paper-search）→ **懂脉络**（research-genealogy，站内「研究脉络族谱」）→ **出引文**（cite-paper）；paper-figure 服务「**制图**」环（站内「科研绘图」）。
 
 ## 安装
 
@@ -30,7 +30,7 @@ skill 不是另一套实现，而是同一套领域知识的命令行形态：
 - `paper-search` 的检索源与查询方式 = `lib/paper-search/search-service.ts`（OpenAlex + arXiv，免 key）；
 - `research-genealogy` 是「上游输出即下游输入」跨越终端的实例：skill 在终端产出 `lineage.json`，站内「**研究脉络族谱**」（`/tools/research-genealogy`）把它渲染成可点击的族谱树（解析逻辑在 `lib/genealogy/lineage.ts`，schema 见本目录 README）。它自带 4 个 stdlib-only Python 脚本（检索 / 谱系推导 / 引文核验 / 渲染），上游独立仓库为 `unumbrela/research-genealogy`，此处为内置拷贝，两边改动需互相同步；
 - `cite-paper` 的引文规则 = `lib/export/citations.ts`（BibTeX 条目类型 / GB-T 7714 体例与 Web 端一致）;
-- `paper-figure` 的出版规范 = 站内「**图表制图**」（`app/api/figure-generator/route.ts` 的系统提示：Okabe-Ito 配色 / 单双栏尺寸 / 矢量导出 / 自查清单）。
+- `paper-figure` 的出版规范自含于 `paper-figure/SKILL.md`（Okabe-Ito 配色 / 单双栏尺寸 / 矢量导出 / 自查清单）。
 
 Web 端改了规则，请同步这里，反之亦然。
 
