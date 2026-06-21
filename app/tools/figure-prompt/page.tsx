@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
 import { StreamOutput } from "@/components/stream-output";
@@ -46,6 +47,32 @@ type FigureType = (typeof FIGURE_TYPES)[number]["value"];
 type ModelTarget = (typeof MODELS)[number]["value"];
 type Lang = (typeof LANGS)[number]["value"];
 
+// 一个端到端示例：输入还原 → 生成的提示词 → GPT-image 成图。
+const EXAMPLE = {
+  figureType: "workflow",
+  subject: `"真实生成模型本机推理 → 逐帧数据 → 手机端回放" 的数据来源管线`,
+  content: `左段「真实模型本机 GPU 推理」：一块 GPU/服务器图标连出三条平行支线——文本=Qwen3-1.7B（逐 token 概率分布小直方图）、分子=EDM E(3) 等变扩散（de novo 3D 分子）、蛋白=Genie2 SE(3) 扩散（de novo 螺旋骨架）；中段「逐帧轨迹导出」：三条支线汇入一叠轻量 JSON 数据卡片，表示生成过程的每一帧被记录导出；右段「手机端 AR 回放」：一只手机/AR 视图图标读取数据后逐帧插值播放三维演示。中段下方加一个橙色高亮徽标标注"诚实性说明：无条件生成、真实 de novo 输出"。`,
+  layout: "horizontal",
+  palette: `蓝色与浅紫色为主色，橙色用于强调"真实模型"标识与诚实性说明徽标，白色背景`,
+  style: `扁平简洁矢量图标、细线箭头串联、三段层级分明且对齐整齐；仅保留极少量中英混合短标签（Qwen3-1.7B、EDM、Genie2、逐帧数据、AR 回放、真实模型），避免过度装饰与大段文字`,
+  model: "dalle",
+  lang: "zh",
+  prompt: `请生成一张适合论文发表的科研流程图，主题是"真实生成模型本机推理 → 逐帧数据 → 手机端回放"的数据来源管线，强调科学严谨性。 采用从左到右的横向流程布局，分三段并用细线箭头串联：左段「真实模型本机 GPU 推理」——一块 GPU/服务器图标，连出三条平行支线，每条支线一个简洁模型图标并配极简标签：文本=Qwen3-1.7B（逐 token 概率分布小直方图）、分子=EDM E(3) 等变扩散（de novo 3D 分子）、蛋白=Genie2 SE(3) 扩散（de novo 螺旋骨架）；中段「逐帧轨迹导出」——三条支线汇入一叠轻量 JSON 数据卡片图标，表示生成过程的每一帧被记录导出；右段「手机端 AR 回放」——一只手机/AR 视图图标，读取数据后逐帧插值播放出三维演示。 在中段下方用一个橙色高亮的小标注徽标表达"诚实性说明：无条件生成、真实 de novo 输出"，与蓝紫主色形成对比强调。 整体风格专业、清晰、矢量化科研插图质感，画面干净、三段层级分明、对齐整齐。使用白色背景，以蓝色和浅紫色为主色，橙色用于强调"真实模型"标识与诚实性说明徽标。扁平简洁图标，细线箭头串联流程。避免过度装饰，不要出现大段文字说明，仅保留极少量简短中文/英文混合标签（Qwen3-1.7B、EDM、Genie2、逐帧数据、AR 回放、真实模型）。`,
+  image: "/figure-prompt/genmodel-pipeline.png",
+} as const;
+
+// 把示例字段映射成中文展示标签，复用页面已有的选项定义。
+const EXAMPLE_RECAP: { label: string; value: string }[] = [
+  { label: "图类型", value: FIGURE_TYPES.find((t) => t.value === EXAMPLE.figureType)!.label },
+  { label: "主题", value: EXAMPLE.subject },
+  { label: "关键内容 / 步骤", value: EXAMPLE.content },
+  { label: "布局", value: LAYOUTS.find((l) => l.value === EXAMPLE.layout)!.label },
+  { label: "配色", value: EXAMPLE.palette },
+  { label: "额外风格", value: EXAMPLE.style },
+  { label: "目标模型", value: MODELS.find((m) => m.value === EXAMPLE.model)!.label },
+  { label: "提示词语言", value: LANGS.find((l) => l.value === EXAMPLE.lang)!.label },
+];
+
 const fieldBox = cn(
   "focus-ring w-full rounded-xl bg-paper-2/80 border border-line px-4 py-3",
   "text-[13px] text-ink placeholder:text-ink-4 leading-relaxed",
@@ -76,6 +103,18 @@ export default function Page() {
     setHandoffFrom(h.from);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
+
+  const applyExample = () => {
+    setFigureType(EXAMPLE.figureType);
+    setSubject(EXAMPLE.subject);
+    setContent(EXAMPLE.content);
+    setLayout(EXAMPLE.layout);
+    setPalette(EXAMPLE.palette);
+    setStyle(EXAMPLE.style);
+    setModel(EXAMPLE.model);
+    setLang(EXAMPLE.lang);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const submit = () => {
     if (subject.trim().length < 2 || content.trim().length < 5) return;
@@ -255,6 +294,80 @@ export default function Page() {
           )}
         </div>
       </div>
+
+      {/* 端到端示例：输入还原 → 提示词 → 成图 */}
+      <section className="mt-14">
+        <div className="flex items-baseline justify-between mb-5">
+          <div>
+            <div className="overline mb-1" style={{ color: "#f59e0b" }}>
+              example · 一键填入
+            </div>
+            <h2 className="serif text-[30px] leading-tight text-ink">
+              先看一个完整示例
+              <span className="serif-italic text-ink-3">, 从输入到成图.</span>
+            </h2>
+          </div>
+          <div className="hairline hidden sm:block flex-1 mx-8 self-end mb-3" />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-start">
+          {/* ① 输入还原 */}
+          <div className="surface rounded-[20px] p-6">
+            <div className="flex items-center justify-between mb-4">
+              <span className="overline">① 输入（可一键填入表单）</span>
+              <button
+                onClick={applyExample}
+                className={cn(
+                  "rounded-full border border-ink bg-ink text-paper-2 px-3.5 py-1.5",
+                  "text-[12px] font-medium transition-all hover:opacity-90 focus-ring",
+                )}
+              >
+                载入此示例
+              </button>
+            </div>
+            <dl className="space-y-3">
+              {EXAMPLE_RECAP.map((r) => (
+                <div key={r.label}>
+                  <dt className="overline mb-1 text-ink-4">{r.label}</dt>
+                  <dd className="text-[12.5px] leading-relaxed text-ink-2">{r.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          {/* ② 提示词 + ③ 成图 */}
+          <div className="flex flex-col gap-4">
+            <div className="surface rounded-[20px] p-6">
+              <div className="overline mb-3">② 生成的科研绘图提示词</div>
+              <pre
+                className={cn(
+                  "rounded-xl bg-paper-2/80 border border-line p-4",
+                  "text-[12px] leading-relaxed text-ink whitespace-pre-wrap break-words",
+                  "font-mono",
+                )}
+              >
+                {EXAMPLE.prompt}
+              </pre>
+            </div>
+
+            <div className="surface rounded-[20px] p-6">
+              <div className="overline mb-3">③ GPT-image 据此提示词生成的成图</div>
+              <div className="relative w-full aspect-[16/9] overflow-hidden rounded-xl border border-line bg-white">
+                <Image
+                  src={EXAMPLE.image}
+                  alt="GPT-image 根据示例提示词生成的科研流程图"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 58vw"
+                  className="object-contain"
+                />
+              </div>
+              <p className="mt-3 text-[11px] text-ink-3 serif-italic">
+                成图由 GPT-image 按上方提示词生成，非本工具产出 —— 本工具只负责写提示词。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
     </ToolShell>
   );
 }
