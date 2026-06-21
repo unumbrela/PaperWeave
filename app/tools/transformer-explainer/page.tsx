@@ -4,7 +4,7 @@ import { TransformerExplainer } from "@/components/transformer-explainer/Transfo
 export const metadata: Metadata = {
   title: "Transformer 可视化 · Toolbox",
   description:
-    "交互式理解 Transformer 架构：从输入嵌入、多头注意力机制、残差连接到输出。",
+    "端到端流水线：看一句话如何被 Transformer 算成「下一个词」——分词、嵌入、自注意力、多头、前馈、堆叠到输出概率，每步可交互。",
 };
 
 export default function Page() {

@@ -1,82 +1,72 @@
-import { interpolateGreys, interpolateRdBu, interpolateBrBG, interpolateOranges, interpolateViridis } from "d3";
+// 玩具 Transformer 的配置：尺寸、词表、例句、颜色、bigram 偏置。
+// 一切为「示意性合成数据」服务——数字由确定性玩具模型真实算出（自洽），
+// 仅用 bigram 偏置把预设例句的 Top-1 下一个词「掰」得通顺。
 
-export const layerColorScales = {
-  input: interpolateGreys,
-  embedding: interpolateRdBu,
-  attention: interpolateBrBG,
-  layerNorm: interpolateGreys,
-  feedForward: interpolateViridis,
-  output: interpolateOranges,
-  weight: interpolateBrBG,
-};
-
-const nodeLength = 36;
-
-export const overviewConfig = {
-  nodeLength,
-  plusSymbolRadius: nodeLength / 5,
-  numLayers: 11,
-  edgeOpacity: 0.3,
-  edgeInitColor: "rgba(26, 23, 19, 0.15)",
-  edgeHoverColor: "rgba(26, 23, 19, 0.7)",
-  residualEdgeColor: "#22c55e",
-  residualEdgeWidth: 2,
-  edgeHoverOuting: false,
-  edgeStrokeWidth: 0.5,
-  intermediateColor: "rgba(26, 23, 19, 0.3)",
-  layerColorScales,
-  svgPaddings: { top: 40, bottom: 50, left: 80, right: 80 },
-  gapRatio: 2.5,
-  overlayRectOffset: 10,
-  numHeads: 4,
-  sequenceLength: 8,
+export const DIMS = {
+  D_MODEL: 24,
+  N_HEADS: 3,
+  D_HEAD: 8, // N_HEADS * D_HEAD = D_MODEL
+  N_BLOCKS: 2,
+  D_FF: 48,
 } as const;
 
-export const layerIndexDict: Record<string, number> = {
-  input: 0,
-  embedding: 1,
-  encoder_1_mha: 2,
-  encoder_1_norm1: 3,
-  encoder_1_ffn: 4,
-  encoder_1_norm2: 5,
-  encoder_2_mha: 6,
-  encoder_2_norm1: 7,
-  encoder_2_ffn: 8,
-  encoder_2_norm2: 9,
-  output: 10,
+export const SEED = 20240611;
+
+// 主色（沿用展厅暖色系中的海蓝），与各阶段标识色。
+export const ACCENT = "#3b6ef6";
+export const STAGE_COLORS = {
+  token: "#7a736a",
+  embedding: "#8854d0",
+  attention: "#3b6ef6",
+  multihead: "#ff5d4d",
+  ffn: "#6b9b6f",
+  output: "#f4c25a",
+} as const;
+// 多头各头的区分色。
+export const HEAD_COLORS = ["#3b6ef6", "#ff5d4d", "#8854d0"] as const;
+
+// 玩具词表（小写英文 + 标点）。索引即 token id。
+export const VOCAB = [
+  "the", "cat", "sat", "on", "mat",
+  "attention", "is", "all", "you", "need",
+  "machine", "learning", "so", "fun", "i",
+  "love", "deep", "quick", "brown", "fox",
+  "jumps", "dog", "runs", "over", "lazy",
+  "a", "of", "to", "and", "model",
+  "data", "neural", "network", "language", "transformer",
+  "are", "great", "good", "smart", "powerful",
+  "hard", "easy", "math", "code", "world",
+  "hello", "then", "now", "here", "very",
+] as const;
+
+export const VOCAB_INDEX: Record<string, number> = Object.fromEntries(
+  VOCAB.map((w, i) => [w, i]),
+);
+
+export interface Sentence {
+  id: string;
+  label: string;
+  words: string[];
+}
+
+// 例句的每个词都在词表内；末词经 bigram 偏置后会给出合理的下一个词。
+export const SENTENCES: Sentence[] = [
+  { id: "cat", label: "the cat sat on the", words: ["the", "cat", "sat", "on", "the"] },
+  { id: "attn", label: "attention is all you", words: ["attention", "is", "all", "you"] },
+  { id: "ml", label: "machine learning is so", words: ["machine", "learning", "is", "so"] },
+  { id: "deep", label: "i love deep", words: ["i", "love", "deep"] },
+  { id: "fox", label: "the quick brown fox", words: ["the", "quick", "brown", "fox"] },
+];
+
+// bigram 偏置：当最后一个词为 key 时，给目标词的 logit 加 BIGRAM_BONUS。
+export const BIGRAM_BONUS = 11;
+export const BIGRAM: Record<string, string> = {
+  the: "mat",
+  you: "need",
+  so: "fun",
+  deep: "learning",
+  fox: "jumps",
 };
 
-export const layerLabelsShort = [
-  "Input",
-  "Embedding",
-  "MHA_1",
-  "Norm_1",
-  "FFN_1",
-  "Norm_2",
-  "MHA_2",
-  "Norm_3",
-  "FFN_2",
-  "Norm_4",
-  "Output",
-];
-
-export const layerLabelsDetailed = [
-  "Input(8, 512)",
-  "Embedding(8, 512)",
-  "MHA_1(8, 512)",
-  "Norm_1(8, 512)",
-  "FFN_1(8, 512)",
-  "Norm_2(8, 512)",
-  "MHA_2(8, 512)",
-  "Norm_3(8, 512)",
-  "FFN_2(8, 512)",
-  "Norm_4(8, 512)",
-  "Output(8, 512)",
-];
-
-export const exampleSentences = [
-  { text: "The quick brown fox", label: "示例句子 1" },
-  { text: "Machine learning is fun", label: "示例句子 2" },
-  { text: "Transformers are powerful", label: "示例句子 3" },
-  { text: "Attention is all you need", label: "示例句子 4" },
-] as const;
+export const TEMPERATURE = { min: 0.1, max: 2, default: 0.9, step: 0.05 } as const;
+export const TOP_K = 6;

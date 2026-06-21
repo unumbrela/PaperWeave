@@ -190,7 +190,7 @@ export const TOOLS: Tool[] = [
     slug: "transformer-explainer",
     name: "经典模型 · Transformer 可视化",
     description:
-      "交互式理解 Transformer 架构：从输入嵌入、多头注意力机制、残差连接到输出，逐层解析注意力权重的变化。",
+      "端到端流水线：看一句话如何被算成「下一个词」。分词→嵌入→自注意力→多头→前馈→堆叠→输出概率，每步配可交互的图。",
     phases: [],
     track: "gallery",
     icon: "🔗",
