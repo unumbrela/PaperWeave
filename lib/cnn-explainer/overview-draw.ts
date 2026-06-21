@@ -646,6 +646,13 @@ export function updateCNN(ctx: DrawContext) {
     const layerGroup = svg.select<SVGGElement>(`g#cnn-layer-group-${l}`);
     const nodeGroups = layerGroup.selectAll<SVGGElement, CNNNode>("g.node-group").data(cnn[l]);
 
+    // Re-bind the fresh activations down to each group's <image> child.
+    // selectAll does NOT propagate data, so without this the images keep the
+    // datum they inherited at creation (the very first image) and every
+    // redraw — here and in updateColorScaleLevel — would re-render that stale
+    // activation (the symptom: switching/uploading images all show espresso).
+    nodeGroups.select<SVGImageElement>("image.node-image");
+
     if (l < cnn.length - 1) {
       nodeGroups
         .transition("disappear")
