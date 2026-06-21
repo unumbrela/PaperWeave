@@ -2,27 +2,33 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { ArrowUpRight, CornerDownLeft } from "lucide-react";
+import { ArrowUpRight, ArrowDown, CornerDownLeft } from "lucide-react";
 import { Reveal } from "@/components/reveal";
 import { CORE_FLOW, getTool } from "@/lib/tools-registry";
 import { cn } from "@/lib/utils";
 
+/** 沿织线下落的「数据包」——少量彩色光点持续从上游流向下游，呼应一键流转。 */
+const PARTICLES = [
+  { p: "#b14bff", delay: "0s", dur: "6.5s" },
+  { p: "#4bb3ff", delay: "1.6s", dur: "7.5s" },
+  { p: "#f59e0b", delay: "3.1s", dur: "6s" },
+  { p: "#ec4899", delay: "4.4s", dur: "8s" },
+];
+
 /**
  * 织线·旅程长卷 —— 首页核心论文流程的叙事呈现。
  *
- * 一条贯穿的「织线」（.weave-thread）串起 6 个左右交错的大站点：巨号斜体编号
- * + 二字动词 + 角色句 + 上下游流向 + 目标工具 chip。各站点用 <Reveal> 逐个
- * 点亮（stagger），造成织线随滚动向下延伸的观感。数据唯一来源是
- * lib/tools-registry 的 CORE_FLOW —— 不在此硬编码步骤。
- *
- * 响应式：lg 下站点沿中线左右交错；sm/md 下退化为单列、织线移到最左。
+ * 一条贯穿的「织线」（.weave-thread）串起 6 步：一侧是大站点（巨号 + 动词 +
+ * 角色句 + 工具 chip），另一侧是「工序卡」（输入 → 产出，显性化"上游产出即下游
+ * 输入"），两侧由节点 + 横向纬线（weft）织在中线上。动效：彩色数据包沿织线下落、
+ * 节点涟漪、滚动织成进度线、站点逐个揭示。数据唯一来源是 lib/tools-registry 的
+ * CORE_FLOW —— 不在此硬编码步骤。reduced-motion 下落点/涟漪/进度全部静止。
  */
 export function WeaveJourney() {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const progressRef = useRef<HTMLSpanElement | null>(null);
 
   // 滚动进度：随旅程被滚过，彩色织线从顶端「织」到底端（scaleY，仅 transform）。
-  // reduced-motion 下不挂监听，CSS 直接把 progress 视为 1（整条已织好）。
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
@@ -35,7 +41,6 @@ export function WeaveJourney() {
       raf = 0;
       const rect = root.getBoundingClientRect();
       const vh = window.innerHeight;
-      // 0 → 旅程顶端刚到视口中线；1 → 底端越过中线。
       const p = (vh * 0.5 - rect.top) / Math.max(rect.height, 1);
       bar.style.setProperty("--progress", String(Math.min(1, Math.max(0, p))));
     };
@@ -55,41 +60,67 @@ export function WeaveJourney() {
 
   return (
     <div ref={rootRef} className="relative">
-      {/* 经线：一条贯穿全程的织线（静态轨）。mobile 靠左，lg 居中。 */}
+      {/* 经线：静态轨。mobile 靠左，lg 居中。 */}
       <span
         aria-hidden
         className="weave-thread pointer-events-none absolute top-2 bottom-10 left-[19px] w-px lg:left-1/2 lg:-translate-x-1/2"
       />
-      {/* 彩色进度织线：随滚动 scaleY 增长，叠在静态轨上。 */}
+      {/* 彩色进度织线：随滚动 scaleY 增长。 */}
       <span
         ref={progressRef}
         aria-hidden
         className="weave-thread-progress pointer-events-none absolute top-2 bottom-10 left-[19px] w-px lg:left-1/2 lg:-translate-x-1/2"
       />
+      {/* 数据包：沿织线持续下落。 */}
+      <div
+        aria-hidden
+        className="weave-flow pointer-events-none absolute top-2 bottom-10 left-[19px] w-px lg:left-1/2 lg:-translate-x-1/2"
+      >
+        {PARTICLES.map((p, i) => (
+          <span
+            key={i}
+            className="weave-particle"
+            style={{
+              ["--p" as string]: p.p,
+              ["--delay" as string]: p.delay,
+              ["--dur" as string]: p.dur,
+            }}
+          />
+        ))}
+      </div>
 
-      <ol className="relative space-y-7 lg:space-y-2">
+      <ol className="relative space-y-12 lg:space-y-0">
         {CORE_FLOW.map((step, i) => {
           const tool = step.toolSlug ? getTool(step.toolSlug) : undefined;
           const target = tool?.name ?? "论文库";
-          const left = i % 2 === 0; // 偶数索引（01/03/05）落在左侧
+          const left = i % 2 === 0; // 偶数索引（01/03/05）站点落在左侧
           const upstream = CORE_FLOW[i - 1]?.title;
           const downstream = CORE_FLOW[i + 1]?.title;
 
           return (
-            <li key={step.title} className="relative">
-              {/* 节点圆：坐落在织线上，与站点顶部对齐。 */}
+            <li
+              key={step.title}
+              className="relative lg:grid lg:grid-cols-2 lg:items-center lg:gap-x-16 lg:py-7"
+            >
+              {/* 节点圆（含涟漪）坐落在织线上。 */}
               <span
                 aria-hidden
-                className="weave-node absolute top-7 left-[14px] z-10 lg:left-1/2 lg:-translate-x-1/2"
+                className="weave-node absolute top-7 left-[14px] z-10 lg:top-1/2 lg:left-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2"
                 style={{ ["--node" as string]: step.accent }}
               />
+              {/* 纬线：横穿节点的一道细线，与经线织成十字。 */}
+              <span
+                aria-hidden
+                className="weave-weft pointer-events-none absolute top-1/2 left-1/2 hidden h-px w-28 -translate-x-1/2 -translate-y-1/2 lg:block"
+                style={{ ["--accent" as string]: step.accent }}
+              />
 
+              {/* 站点（一侧） */}
               <Reveal
                 delay={i * 90}
                 className={cn(
-                  "pl-12 lg:pl-0",
-                  "lg:w-[calc(50%-2.75rem)]",
-                  left ? "lg:mr-auto" : "lg:ml-auto",
+                  "pl-12 lg:pl-0 lg:row-start-1",
+                  left ? "lg:col-start-1" : "lg:col-start-2",
                 )}
               >
                 <Link
@@ -100,7 +131,6 @@ export function WeaveJourney() {
                   )}
                   style={{ ["--accent" as string]: step.accent }}
                 >
-                  {/* 上游流向注脚 */}
                   <span
                     className={cn(
                       "overline flex items-center gap-1.5 text-ink-4",
@@ -110,7 +140,6 @@ export function WeaveJourney() {
                     {upstream ? `上游 · ${upstream}` : "链路起点"}
                   </span>
 
-                  {/* 巨号 + 动词 */}
                   <div
                     className={cn(
                       "mt-3 flex items-baseline gap-4",
@@ -131,11 +160,15 @@ export function WeaveJourney() {
                     </span>
                   </div>
 
-                  <p className="mt-4 max-w-md text-[13.5px] leading-relaxed text-ink-2 lg:ml-auto">
+                  <p
+                    className={cn(
+                      "mt-4 max-w-md text-[13.5px] leading-relaxed text-ink-2",
+                      left ? "lg:ml-auto" : "",
+                    )}
+                  >
                     {step.blurb}
                   </p>
 
-                  {/* 目标工具 chip + 下游流向 */}
                   <div
                     className={cn(
                       "mt-6 flex items-center gap-4",
@@ -156,15 +189,59 @@ export function WeaveJourney() {
                   </div>
                 </Link>
               </Reveal>
+
+              {/* 工序卡：输入 → 产出（另一侧，填补留白 + 显性化流水线） */}
+              <Reveal
+                delay={i * 90 + 70}
+                className={cn(
+                  "mt-4 pl-12 lg:mt-0 lg:pl-0 lg:row-start-1",
+                  left ? "lg:col-start-2" : "lg:col-start-1",
+                )}
+              >
+                <div
+                  className={cn(
+                    "flow-panel relative overflow-hidden rounded-[20px] p-5 sm:p-6",
+                    left ? "" : "lg:ml-auto",
+                  )}
+                  style={{ ["--accent" as string]: step.accent }}
+                >
+                  <span aria-hidden className="flow-glyph">
+                    {step.icon}
+                  </span>
+                  <div className="relative max-w-[15rem] space-y-2.5">
+                    <div>
+                      <div className="overline text-ink-4">输入</div>
+                      <div className="mt-0.5 text-[14px] text-ink-2">
+                        {step.input}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-ink-4">
+                      <span
+                        className="h-px w-7"
+                        style={{ background: step.accent, opacity: 0.6 }}
+                      />
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </div>
+                    <div>
+                      <div className="overline" style={{ color: step.accent }}>
+                        产出
+                      </div>
+                      <div className="mt-0.5 text-[14px] font-medium text-ink">
+                        {step.output}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Reveal>
             </li>
           );
         })}
 
         {/* 终点 cap：把「检索→…→制图→回存」闭环显性化。 */}
-        <li className="relative">
+        <li className="relative pt-12 lg:pt-10">
           <span
             aria-hidden
-            className="weave-node weave-node-end absolute top-7 left-[14px] z-10 lg:left-1/2 lg:-translate-x-1/2"
+            className="weave-node weave-node-end absolute top-[60px] left-[14px] z-10 lg:left-1/2 lg:-translate-x-1/2 lg:top-[52px]"
           />
           <Reveal
             delay={CORE_FLOW.length * 90}

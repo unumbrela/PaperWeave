@@ -832,6 +832,39 @@ kbd {
   will-change: transform;
 }
 
+/* Data packets streaming down the thread (upstream → downstream). */
+.weave-flow > .weave-particle {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  margin-left: -3px;
+  height: 6px;
+  width: 6px;
+  border-radius: 9999px;
+  background: var(--p, var(--plum));
+  box-shadow: 0 0 8px 1px var(--p, var(--plum));
+  opacity: 0;
+  animation: weave-flow-down var(--dur, 6.5s) linear infinite;
+  animation-delay: var(--delay, 0s);
+}
+@keyframes weave-flow-down {
+  0% { top: 0%; opacity: 0; }
+  6% { opacity: 0.95; }
+  90% { opacity: 0.95; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* Weft: a faint horizontal strand crossing each node → warp×weft weave. */
+.weave-weft {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent, var(--line-strong)) 50%,
+    transparent 100%
+  );
+  opacity: 0.22;
+}
+
 /* Node bead sitting on the thread; lit in the station's own accent. */
 .weave-node {
   height: 11px;
@@ -842,6 +875,44 @@ kbd {
     0 0 0 4px var(--paper),
     0 0 0 5px rgba(26, 23, 19, 0.08),
     0 0 14px -2px var(--node, transparent);
+}
+/* Slow ripple ring pulsing out of each node. */
+.weave-node::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--node, var(--ink-3));
+  opacity: 0;
+  animation: weave-ripple 3.4s ease-out infinite;
+}
+@keyframes weave-ripple {
+  0% { transform: scale(0.7); opacity: 0.55; }
+  70% { opacity: 0; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* 工序卡: input → output panel filling the station's opposite half. */
+.flow-panel {
+  background: var(--glass-2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  backdrop-filter: blur(12px) saturate(1.05);
+  border: 1px solid var(--line);
+  transition: border-color 0.4s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.flow-panel:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent, var(--line-strong));
+}
+.flow-glyph {
+  position: absolute;
+  right: -6px;
+  bottom: -14px;
+  font-size: 92px;
+  line-height: 1;
+  opacity: 0.07;
+  pointer-events: none;
+  user-select: none;
 }
 .weave-node-end {
   background: var(--ink-4);
@@ -934,6 +1005,9 @@ kbd {
   .hero-photo { transform: none; }
   .weave-thread-progress { transform: scaleY(1); }
   .sheen:hover::after { animation: none; opacity: 0; }
+  .weave-flow { display: none; }
+  .weave-node::after { animation: none; display: none; }
+  .flow-panel:hover { transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

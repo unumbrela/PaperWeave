@@ -265,6 +265,10 @@ export type CoreStep = {
   icon: string;
   /** 该环的主色（首页「织线长卷」逐站染色，暖→冷→暖推进，沿用 tool-card accent）。 */
   accent: string;
+  /** 这一步「吃进」什么（首页工序卡左项，极简短语）。 */
+  input: string;
+  /** 这一步「产出」什么（首页工序卡右项）——即下一步的输入，显性化流水线。 */
+  output: string;
   /** 对应工具 slug（工具页才有）；用于把核心工具从「配套工具」中排除，避免重复露出。 */
   toolSlug?: string;
 };
@@ -276,6 +280,8 @@ export const CORE_FLOW: CoreStep[] = [
     href: "/tools/paper-search",
     icon: "🔎",
     accent: "#b14bff",
+    input: "关键词 · 领域",
+    output: "论文库条目",
     toolSlug: "paper-search",
   },
   {
@@ -284,6 +290,8 @@ export const CORE_FLOW: CoreStep[] = [
     href: "/library",
     icon: "📖",
     accent: "#4bb3ff",
+    input: "论文库 · PDF",
+    output: "批注 · 精读笔记",
   },
   {
     title: "提炼",
@@ -291,6 +299,8 @@ export const CORE_FLOW: CoreStep[] = [
     href: "/tools/markdown-summarize",
     icon: "📚",
     accent: "#6b8ed6",
+    input: "论文 Markdown",
+    output: "结构化要点",
     toolSlug: "markdown-summarize",
   },
   {
@@ -299,6 +309,8 @@ export const CORE_FLOW: CoreStep[] = [
     href: "/tools/idea-generator",
     icon: "💡",
     accent: "#f59e0b",
+    input: "参考创新点",
+    output: "假设 · 验证实验",
     toolSlug: "idea-generator",
   },
   {
@@ -307,6 +319,8 @@ export const CORE_FLOW: CoreStep[] = [
     href: "/tools/paper-writer",
     icon: "✍️",
     accent: "#ec4899",
+    input: "创新点 · 素材",
+    output: "结构 · 段落脚手架",
     toolSlug: "paper-writer",
   },
   {
@@ -315,6 +329,8 @@ export const CORE_FLOW: CoreStep[] = [
     href: "/tools/figure-prompt",
     icon: "🎨",
     accent: "#10b981",
+    input: "方法 · 数据",
+    output: "出版级图表",
     toolSlug: "figure-prompt",
   },
 ];
