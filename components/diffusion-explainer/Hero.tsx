@@ -1,12 +1,8 @@
 export function Hero() {
   return (
     <div className="text-center">
-      <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 mb-6 bg-purple-100 text-purple-700 text-sm">
-        <span className="w-2 h-2 rounded-full bg-purple-500" />
-        可视化展厅 · 复刻自 A Visual Introduction to Rectified Flows
-      </div>
       <h1 className="serif text-3xl sm:text-4xl lg:text-5xl leading-tight tracking-tight text-ink">
-        扩散模型 · 流匹配与 Rectified Flow
+        Flow Matching 与 Rectified Flow
       </h1>
       <p className="mt-4 max-w-2xl mx-auto text-ink-2 text-sm sm:text-base leading-relaxed">
         生成一张图，本质上是把<strong>一把随机撒开的点</strong>，顺着一张「风的地图」移动，最后聚成想要的图案。

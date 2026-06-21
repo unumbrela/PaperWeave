@@ -215,9 +215,9 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "diffusion-explainer",
-    name: "经典模型 · 扩散模型",
+    name: "经典模型 · Flow Matching",
     description:
-      "像玩 GAN Lab 一样玩扩散模型：选或自绘二维目标分布，看前向加噪与反向去噪的真实采样轨迹，调节噪声调度与采样器。",
+      "像玩 GAN Lab 一样玩 Flow Matching：选或自绘二维目标分布，看噪声如何顺着速度场流成数据，并理解 Rectified Flow 如何把轨迹拉直、实现少步生成。",
     phases: [],
     track: "gallery",
     icon: "🌀",
