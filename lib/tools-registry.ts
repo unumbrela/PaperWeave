@@ -219,17 +219,16 @@ export const TOOLS: Tool[] = [
     gradient: "from-[#8b5cf6] to-[#f4c25a]",
     href: "/tools/diffusion-explainer",
   },
-
   {
-    slug: "hpi-potsdam",
-    name: "科研项目交互叙事 · iGEM",
+    slug: "stable-diffusion-explainer",
+    name: "生成模型 · Stable Diffusion",
     description:
-      "HPI Potsdam 2025 iGEM BioComplete 主页：Three.js 3D 星图 + 三段式滚动叙事。附中文解读与迁移思路（物理位场 / 单细胞 embedding 等）。",
+      "交互式理解文生图：从一句 prompt 出发，看 CLIP 文本编码 → UNet 逐步去噪 → 图像浮现，可调时间步 / 引导强度 / 随机种子。复刻 Polo Club「Diffusion Explainer」(MIT)。",
     phases: [],
     track: "gallery",
-    icon: "🧬",
-    gradient: "from-[#4cc9f0] to-[#7c3aed]",
-    href: "/tools/hpi-potsdam",
+    icon: "🎨",
+    gradient: "from-[#ec4899] to-[#f4c25a]",
+    href: "/tools/stable-diffusion-explainer",
   },
 
   // ── 命令行 / 自动化扩展（lab）：独立于论文主线的研究自动化工具 ──────

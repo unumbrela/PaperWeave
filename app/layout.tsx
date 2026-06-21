@@ -4,8 +4,6 @@ import { MeshBackground } from "@/components/mesh-background";
 import { AuthProvider } from "@/lib/auth/auth-context";
 import { SiteNav, SiteFooter } from "@/components/site-chrome";
 import "./globals.css";
-import "./tools/hpi-potsdam/landing.css";
-import "./tools/hpi-potsdam/overrides.css";
 
 const inter = Inter({
   variable: "--font-inter",

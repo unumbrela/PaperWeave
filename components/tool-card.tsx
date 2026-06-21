@@ -18,7 +18,7 @@ const ACCENTS: Record<string, string> = {
   "skill-maker": "#d24b7f",
   "cnn-explainer": "#f4c25a",
   "med-seg-explainer": "#6b8ed6",
-  "hpi-potsdam": "#4cc9f0",
+  "stable-diffusion-explainer": "#ec4899",
   "beautiful-aurora": "#00c2ff",
   "web-beautifier": "#ff3d7f",
   "toolbox-background": "#ff8aa0",
