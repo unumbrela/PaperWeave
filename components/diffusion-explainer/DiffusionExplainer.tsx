@@ -72,89 +72,142 @@ export default function DiffusionExplainer() {
       <div className="mt-14 space-y-16">
         <Section
           n="①"
-          title="流：把噪声搬成数据"
-          body={`生成模型要把一个简单的**源分布** $X_0\\sim\\mathcal N(0,I)$ 连续地搬成复杂的**数据分布** $X_1$。我们沿一条概率路径在两者间插值：
+          title="先想清楚：生成到底在干什么"
+          body={`我们的**目标**是生成新数据 —— 比如让一堆点排成一张「笑脸」。
+**起点**则是纯随机：一团毫无规律、四散开来的点（数学上叫高斯噪声）。
+所谓**生成**，就是让每个点动起来，从「随机散开」慢慢走到「排成图案」。
 
-$$X_t=(1-t)\\,X_0+t\\,X_1,\\qquad t\\in[0,1].$$
+那点怎么知道往哪走？办法是：给空间里**每个位置**都标一个箭头，告诉站在这里的点「此刻该朝哪个方向、走多快」。这张铺满整个画面的「箭头地图」就叫**速度场**。一个点只要每一小步都顺着脚下的箭头走，时间从 0 走到 1，就能从噪声走到数据。这整个过程就叫**流（flow）**。
 
-「流」$\\psi_t$ 由一个**速度场** $v_t(x)$ 通过常微分方程生成，采样就是从噪声出发数值积分（如 Euler 法）：
+用公式写出来其实很简单 —— 当前位置加上「一小步 × 当前箭头」，就是下一刻的位置：
 
-$$\\frac{d}{dt}\\psi_t(x)=v_t(\\psi_t(x)),\\quad \\psi_0(x)=x;\\qquad x_{t+\\Delta}=x_t+\\Delta\\,v_t(x_t).$$
+$$x_{t+\\Delta}=x_t+\\Delta\\cdot v_t(x_t),\\qquad t:0\\to1.$$
 
-点「播放」，看一团高斯怎样顺着速度场流成数据：`}
+点下面的「播放」，看一团随机的点怎样顺着风聚成你选的图案：`}
         >
           {enoughData && <FlowFigure data={data} source={srcTraj} mode="curved" />}
         </Section>
 
         <Section
           n="②"
-          title="Flow Matching：怎么学这个速度场"
-          body={`真正的边缘速度场拿不到，但可以**条件化**在目标点 $x_1$ 上：沿直线插值时，条件速度有闭式
+          title="Flow Matching：怎么把这张「风的地图」画出来"
+          body={`问题来了：这张完整的风图，一开始我们并不知道，得让神经网络去**学**。可没有标准答案，怎么学？
 
-$$v_t(x_t\\mid x_1)=\\frac{x_1-x_t}{1-t}.$$
+诀窍是训练时「开卷」。我们随手取一个噪声点当起点、一个真实数据点当终点，把它俩配成一对。这一对之间最省事的走法就是**走直线**，方向正好是「终点 − 起点」。把海量这样的「起点→终点」直线例子喂给网络，它就能在每个位置、每个时刻学会回答一个问题：**平均而言，该往哪个方向走？**
 
-于是训练目标变成可回归的 Conditional Flow Matching：
+写成训练目标，就是让网络的预测 $v^\\theta$ 尽量贴近这条直线方向：
 
-$$\\mathcal L_{\\mathrm{CFM}}(\\theta)=\\mathbb E_{t,X_0,X_1}\\big\\|(X_1-X_0)-v^\\theta_t(X_t)\\big\\|^2.$$
+$$\\min_\\theta\\ \\mathbb E\\,\\big\\|\\,(X_1-X_0)-v^\\theta_t(X_t)\\,\\big\\|^2.$$
 
-关键点：我们用**知道目标** $x_1$ 的条件速度，去监督一个**只看得到当前 $x_t$** 的网络 $v^\\theta_t$。拖动下图的 $t$，看插值边缘 $p_t$ 如何从源演化到数据，粉色箭头就是网络要拟合的边缘速度场：`}
+拖动下图的时间 $t$，看这团点如何从噪声渐变到数据；**粉色箭头**就是网络要学的那张风图：`}
         >
           {enoughData && <ProbabilityPathFigure data={data} source={srcPath} />}
         </Section>
 
         <Section
           n="③"
-          title="问题：曲率是速度的敌人"
-          body={`即便每条训练样本的条件速度都是**直线**，学到的流却是**弯**的。为什么？因为网络在某点只能给出一个速度，它只好把所有经过该点的速度做平均：
+          title="麻烦来了：学出来的路是弯的，而弯就意味着慢"
+          body={`这里有个反直觉的现象：**每个训练例子明明都是直线，合起来学出的真实路线却是弯的**。
 
-$$v_t(x)=\\mathbb E[\\,X_1-X_0\\mid X_t=x\\,].$$
+原因不难懂：同一个位置，会有很多条方向不同的直线穿过它。但网络在一个位置只能给出**一个**箭头，于是它只好取这些方向的**平均**。平均方向在不同地点各不相同，把它们连起来，路线就拐弯了。
 
-平均后的速度随位置变化 → 轨迹弯曲。而弯曲是采样速度的敌人：Euler 法的直线近似在高曲率处严重失真，必须用很多步才能跟住路径。下图把 Euler 步数 $k$ 调小，左边曲线流的终点立刻跑偏：`}
+弯为什么是问题？因为采样时我们是「沿当前箭头直直地走一步」。路越弯，这种直线近似偏得越多，就得把整段路切成很多小步才能走准 —— 而**每一小步都要跑一次神经网络，步数越多就越慢**。
+
+拖动下图的步数 $k$，把它调小：左边这条弯路的终点立刻**跑偏**。（右边那条已经「理直」的路线我们第 ⑤ 节再讲，这里先看左边。）`}
         >
           {enoughData && <FewStepFigure data={data} source={srcFewStep} />}
         </Section>
 
         <Section
           n="④"
-          title="耦合与交叉"
-          body={`弯曲的根源是**耦合** $\\pi(x_0,x_1)$ —— 源点和目标点怎么配对。
+          title="为什么会弯：起点和终点「乱配对」"
+          body={`既然弯来自「同一地点方向打架」，能不能从源头避免打架？关键在于训练时**怎么把起点和终点配成一对** —— 这件事叫**耦合**。
 
-- **独立耦合** $\\pi(x_0,x_1)=p(x_0)q(x_1)$：随机配对，简单但连线**大量交叉**；
-- **最优传输耦合**：让总搬运代价最小，交叉更少、轨迹更直，但高维下昂贵。
+- **随便配**（独立耦合）：噪声点和数据点随机牵线。简单，但连线**横七竖八、大量交叉**。每个交叉点就是一处「同一地点、却要两个方向」的矛盾现场，逼着网络取平均 → 路线变弯。
+- **配得好**：如果让连线尽量**不交叉**，矛盾就少，路线自然更直。
 
-两条训练路径在 $(x,t)$ 处交叉，就给出两个互相矛盾的速度，网络只能取平均 —— 这正是曲率的来源。切换下图的耦合方式，看交叉数的变化：`}
+切换下图的两种配对方式，注意右上角的**交叉对数**怎么变：`}
         >
           {enoughData && <CouplingFigure data={data} source={srcCoupling} />}
         </Section>
 
         <Section
           n="⑤"
-          title="Rectified Flow：用「重流」把轨迹拉直"
-          body={`解决办法：别用独立耦合，改用**模型自己诱导的耦合**。这就是 **reflow**：
+          title="Rectified Flow：让模型自己把线理直（重流）"
+          body={`怎么得到「不交叉」的配对？有个巧妙的循环办法，叫**重流（reflow）**：
 
-1. 用独立耦合 $\\pi_0=p\\times q$ 采样配对，训练速度场 $v^\\theta_1$；
-2. 用学到的流把源点流过去，得到新配对 $(X_0,\\;\\psi_1(X_0))$；
-3. 在这个**确定性**新耦合上重新训练，得到 $v^\\theta_2$；必要时再重复。
+1. 先用「随便配」的方式训练出第一版模型；
+2. 用这版模型，把每个噪声点**真的流一遍**，记下它实际走到的终点；
+3. 用这批新的「起点 → 实际终点」重新配对，再训练一版。
 
-为什么有效？确定性流的轨迹**不会相交**（相交就会处处重合，矛盾）。所以在新耦合上重训，等于删掉了交叉点处的矛盾速度，曲率随之消失。下图叠加对比：紫色是原曲线流，绿色是拉直后的 rectified flow —— 同样的起点和终点，路径却变直了：`}
+为什么有效？模型流出来的路线**天生不会交叉**（两条确定的轨迹一旦相交，就会从此重合，自相矛盾）。所以拿这种新配对重训，交叉点的矛盾被消除，路线随之**被理直**。理直之后，一步、两步就能从噪声走到数据，采样飞快。
+
+下图把两条路叠在一起：**紫色**是原来的弯路，**绿色**是理直后的路 —— 起点终点都一样，路线却直了：`}
         >
           {enoughData && <FlowFigure data={data} source={srcTraj} mode="both" />}
         </Section>
+
+        <Section
+          n="⑥"
+          title="拓展：它还能用在哪"
+          body={`把这张二维实验台「放大」，就是真实世界的生成模型：维度从二维换成一整张图像（或其压缩后的潜空间），把这里的「闭式风图」换成训练好的神经网络，其余机器一模一样。**Rectified Flow / Flow Matching 正是 Stable Diffusion 3、FLUX 这类模型能做到「少步、近实时」生成的核心思想之一**。
+
+同样的思路 —— *把一个简单分布平滑地搬成复杂分布* —— 远不止用于图像，也被用在分子与蛋白质结构生成、语音与音频合成、视频生成，乃至机器人动作轨迹规划等领域。这里就不再展开。`}
+        />
       </div>
 
-      <div className="max-w-3xl mx-auto mt-16 rounded-2xl border border-[var(--line)] bg-purple-50/40 p-6">
-        <h3 className="serif text-lg text-ink mb-2">从 2D 玩具到真实模型</h3>
-        <p className="text-sm text-ink-2 leading-relaxed">
-          把维度从二维换成图像 / 潜空间，把这里的闭式速度场换成训练好的网络 vθ，其余机器完全一样。
-          Rectified Flow 正是 Stable Diffusion 3、FLUX 等模型少步生成的核心思想之一。
-          理解了这张二维实验台，你就理解了它的内核。
-        </p>
-        <p className="mt-3 text-xs text-ink-4">
-          复刻自 Alec Helbling《A Visual Introduction to Rectified Flows》
-          (alechelbling.com/blog/rectified-flow)；理论参考 Liu et al. 2022 (Rectified Flow)、
-          Lipman et al. 2023 (Flow Matching)。本页所有轨迹用经验分布的闭式边缘速度场实时积分得到，无需训练。
-        </p>
-      </div>
+      <References />
+    </div>
+  );
+}
+
+function References() {
+  const refs = [
+    {
+      authors: "Alec Helbling",
+      title: "A Visual Introduction to Rectified Flows",
+      year: "2026",
+      href: "https://alechelbling.com/blog/rectified-flow",
+      note: "本页交互复刻来源",
+    },
+    {
+      authors: "Xingchao Liu, Chengyue Gong, Qiang Liu",
+      title: "Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow",
+      year: "2022",
+      href: "https://arxiv.org/abs/2209.03003",
+    },
+    {
+      authors: "Yaron Lipman, Ricky T. Q. Chen, Heli Ben-Hamu, Maximilian Nickel, Matt Le",
+      title: "Flow Matching for Generative Modeling",
+      year: "2023",
+      href: "https://arxiv.org/abs/2210.02747",
+    },
+  ];
+  return (
+    <div className="max-w-3xl mx-auto mt-16 border-t border-[var(--line)] pt-6">
+      <h3 className="serif text-lg text-ink mb-3">参考文献</h3>
+      <ol className="space-y-2 text-sm text-ink-2">
+        {refs.map((r, i) => (
+          <li key={r.href} className="flex gap-2">
+            <span className="text-ink-4">[{i + 1}]</span>
+            <span>
+              {r.authors}.{" "}
+              <a
+                href={r.href}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[#8b5cf6] underline decoration-dotted underline-offset-2 hover:text-purple-700"
+              >
+                <em>{r.title}</em>
+              </a>
+              . {r.year}.{r.note ? <span className="text-ink-4">（{r.note}）</span> : null}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-4 text-xs text-ink-4">
+        注：本页所有轨迹均用经验分布的闭式边缘速度场实时积分得到，无需训练。
+      </p>
     </div>
   );
 }

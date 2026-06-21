@@ -9,10 +9,11 @@ export function Hero() {
         扩散模型 · 流匹配与 Rectified Flow
       </h1>
       <p className="mt-4 max-w-2xl mx-auto text-ink-2 text-sm sm:text-base leading-relaxed">
-        生成模型把随机噪声「流」成数据。Flow Matching 学到的路径却是
-        <span className="text-[#8b5cf6] font-medium">弯曲</span>的 —— 弯曲就意味着采样要跑很多步。
-        <span className="text-[#22c55e] font-medium">Rectified Flow</span> 用「重流」把轨迹
-        <strong>拉直</strong>，于是几步甚至一步就能采样。下面每一张图都是用闭式速度场跑出来的<strong>真实</strong>流，不是动画。
+        生成一张图，本质上是把<strong>一把随机撒开的点</strong>，顺着一张「风的地图」移动，最后聚成想要的图案。
+        Flow Matching 能学到这张风图，但它指引的路线是
+        <span className="text-[#8b5cf6] font-medium">弯</span>的 —— 弯就意味着要走很多步、很慢。
+        <span className="text-[#22c55e] font-medium">Rectified Flow</span> 用一个叫「重流」的技巧把路线
+        <strong>拉直</strong>，于是几步甚至一步就能生成。下面每张图都是用真实速度场实时算出来的，可以自己动手玩。
       </p>
     </div>
   );
