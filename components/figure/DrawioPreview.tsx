@@ -17,7 +17,7 @@ declare global {
   }
 }
 
-export function DrawioPreview({ xml }: { xml: string }) {
+export function DrawioPreview({ xml, className }: { xml: string; className?: string }) {
   const holderRef = useRef<HTMLDivElement>(null);
   // 脚本可能已被其它实例加载过：用惰性初值探一次，避免在 effect 里 setState。
   const [ready, setReady] = useState(
@@ -68,7 +68,7 @@ export function DrawioPreview({ xml }: { xml: string }) {
   const degraded = failed || (!ready && false); // ready 由脚本回调驱动；失败才降级
 
   return (
-    <div className="surface rounded-[20px] overflow-hidden">
+    <div className={cn("surface rounded-[20px] overflow-hidden flex flex-col", className)}>
       <Script
         src={VIEWER_SRC}
         strategy="afterInteractive"
@@ -106,7 +106,7 @@ export function DrawioPreview({ xml }: { xml: string }) {
         </div>
       </div>
 
-      <div className="p-4 bg-white min-h-[320px]">
+      <div className="p-4 bg-white min-h-[320px] flex-1">
         {showXml || degraded ? (
           <>
             {degraded && !showXml && (

@@ -8,8 +8,9 @@ import { StreamOutput } from "@/components/stream-output";
 import { useStream } from "@/components/use-stream";
 import { consumeHandoff } from "@/lib/workflow/handoff";
 import { HandoffBanner, SaveToLibrary } from "@/components/workflow/handoff-controls";
+import { Download } from "lucide-react";
 import { DrawioPreview } from "@/components/figure/DrawioPreview";
-import { extractMxfile } from "@/lib/figure/drawio";
+import { extractMxfile, downloadDrawio } from "@/lib/figure/drawio";
 import { DRAWIO_EXAMPLE } from "@/lib/figure/drawio-example";
 import { cn } from "@/lib/utils";
 
@@ -221,8 +222,8 @@ export default function Page() {
 
       {mode === "prompt" && (
       <>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <div className="surface rounded-[20px] p-6">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-stretch">
+        <div className="surface rounded-[20px] p-6 h-full">
           {handoffFrom && (
             <HandoffBanner from={handoffFrom} onDismiss={() => setHandoffFrom(null)} />
           )}
@@ -361,7 +362,7 @@ export default function Page() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 h-full">
           <StreamOutput
             text={text}
             loading={loading}
@@ -369,6 +370,7 @@ export default function Page() {
             onRetry={submit}
             onStop={stop}
             emptyHint="填入主题与要展示的内容，生成可直接粘贴的科研绘图提示词。"
+            className="flex-1"
           />
           {sourcePaperId && text && !loading && (
             <div className="flex justify-end">
@@ -462,8 +464,8 @@ export default function Page() {
 
       {mode === "drawio" && (
       <>
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-          <div className="surface rounded-[20px] p-6">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-stretch">
+          <div className="surface rounded-[20px] p-6 h-full">
             <label className="overline block mb-2">图型</label>
             <div className="grid grid-cols-3 gap-2">
               {DIAGRAM_TYPES.map((t) => (
@@ -575,9 +577,9 @@ export default function Page() {
             </p>
           </div>
 
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 h-full">
             {drawio.error ? (
-              <div className="surface rounded-[20px] p-6 text-sm text-[#a53425]">
+              <div className="surface rounded-[20px] p-6 text-sm text-[#a53425] flex-1">
                 <p className="font-medium">生成失败</p>
                 <p className="mt-1 text-[12px] opacity-80">{drawio.error}</p>
                 <button
@@ -588,13 +590,13 @@ export default function Page() {
                 </button>
               </div>
             ) : drawio.loading && !drawioXml ? (
-              <div className="surface rounded-[20px] min-h-[320px] flex items-center justify-center">
+              <div className="surface rounded-[20px] flex-1 min-h-[320px] flex items-center justify-center">
                 <p className="serif-italic text-[18px] text-ink-3">正在生成 drawio 图…</p>
               </div>
             ) : drawioXml ? (
-              <DrawioPreview xml={drawioXml} />
+              <DrawioPreview xml={drawioXml} className="flex-1" />
             ) : (
-              <div className="surface rounded-[20px] min-h-[320px] flex items-center justify-center text-center px-6">
+              <div className="surface rounded-[20px] flex-1 min-h-[320px] flex items-center justify-center text-center px-6">
                 <p className="serif-italic text-[22px] text-ink-3 max-w-xs leading-snug">
                   描述要画的模块与关系，AI 直接画成可编辑的 draw.io 图。
                 </p>
@@ -618,9 +620,9 @@ export default function Page() {
             <div className="hairline hidden sm:block flex-1 mx-8 self-end mb-3" />
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-start">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-stretch">
             {/* ① 还原的输入 */}
-            <div className="surface rounded-[20px] p-6">
+            <div className="surface rounded-[20px] p-6 h-full">
               <div className="flex items-center justify-between mb-4">
                 <span className="overline">① 输入（可一键填入表单）</span>
                 <button
@@ -647,7 +649,7 @@ export default function Page() {
             </div>
 
             {/* ② 描述(提示词) + ③ drawio 成图 */}
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 h-full">
               <div className="surface rounded-[20px] p-6">
                 <div className="overline mb-3">② 喂给 AI 的描述（提示词）</div>
                 <pre
@@ -660,9 +662,30 @@ export default function Page() {
                 </pre>
               </div>
 
-              <div>
-                <div className="overline mb-2">③ 对应的 drawio 成图（站内渲染）</div>
-                <DrawioPreview xml={DRAWIO_EXAMPLE.xml} />
+              <div className="surface rounded-[20px] p-6 flex-1 flex flex-col">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="overline">③ 对应的 drawio 成图</span>
+                  <button
+                    onClick={() => downloadDrawio(DRAWIO_EXAMPLE.xml, "fwmamba-unet.drawio")}
+                    className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] text-ink-2 hover:text-ink hover:bg-[rgba(26,23,19,0.04)] transition-colors"
+                    title="下载 .drawio 源文件"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    <span className="serif-italic">.drawio</span>
+                  </button>
+                </div>
+                <div className="relative w-full aspect-[12/5] overflow-hidden rounded-xl border border-line bg-white">
+                  <Image
+                    src="/figure-prompt/framework3.jpg"
+                    alt="FWMamba-UNet 架构图（drawio 渲染示例）"
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 58vw"
+                    className="object-contain"
+                  />
+                </div>
+                <p className="mt-3 text-[11px] text-ink-3 serif-italic">
+                  此图由上方描述生成的 draw.io 图渲染而来，可点「.drawio」下载源文件在 draw.io 中打开编辑。
+                </p>
               </div>
             </div>
           </div>

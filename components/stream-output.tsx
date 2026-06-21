@@ -27,6 +27,7 @@ export function StreamOutput({
   onRetry,
   onStop,
   emptyHint,
+  className,
 }: {
   text: string;
   loading: boolean;
@@ -34,6 +35,7 @@ export function StreamOutput({
   onRetry?: () => void;
   onStop?: () => void;
   emptyHint?: string;
+  className?: string;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -48,7 +50,7 @@ export function StreamOutput({
   const fe = error ? friendlyError(error) : null;
 
   return (
-    <div className="surface rounded-[20px] min-h-[320px] flex flex-col overflow-hidden">
+    <div className={cn("surface rounded-[20px] min-h-[320px] flex flex-col overflow-hidden", className)}>
       <div className="flex items-center justify-between border-b border-line px-5 py-3">
         <div className="flex items-center gap-2">
           <span
