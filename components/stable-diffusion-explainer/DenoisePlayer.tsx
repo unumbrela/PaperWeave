@@ -46,14 +46,15 @@ export function DenoisePlayer() {
     preloadRef.current = imgs;
   }, [dir, seed, gs]);
 
-  // 自动播放：t 从 0 走到 50 后停。
+  // 自动播放：t 从 0 走到 50 后停。停止在 setTimeout 回调里做，
+  // 避免在 effect 体内同步 setState（react-hooks/set-state-in-effect）。
   useEffect(() => {
-    if (!playing) return;
-    if (t >= MAX_T) {
-      setPlaying(false);
-      return;
-    }
-    const id = setTimeout(() => setT((v) => Math.min(MAX_T, v + 1)), STEP_MS);
+    if (!playing || t >= MAX_T) return;
+    const id = setTimeout(() => {
+      const next = Math.min(MAX_T, t + 1);
+      setT(next);
+      if (next >= MAX_T) setPlaying(false);
+    }, STEP_MS);
     return () => clearTimeout(id);
   }, [playing, t]);
 
