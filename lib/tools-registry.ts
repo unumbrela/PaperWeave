@@ -223,7 +223,7 @@ export const TOOLS: Tool[] = [
     slug: "stable-diffusion-explainer",
     name: "生成模型 · Stable Diffusion",
     description:
-      "交互式理解文生图：从一句 prompt 出发，看 CLIP 文本编码 → UNet 逐步去噪 → 图像浮现，可调时间步 / 引导强度 / 随机种子。复刻 Polo Club「Diffusion Explainer」(MIT)。",
+      "把扩散模型讲清楚：从一团噪声出发，亲手体验反向去噪、文字牵引与前向加噪三个互动，理解时间步 / 引导强度 / 随机种子如何塑造成图。",
     phases: [],
     track: "gallery",
     icon: "🎨",
