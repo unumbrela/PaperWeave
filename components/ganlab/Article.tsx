@@ -1,49 +1,86 @@
 import React from 'react'
+import { Markdown } from '@/components/markdown'
+
+const CONTENT = `
+# 一分钟读懂 GAN
+
+GAN（生成对抗网络）可以想成一对互相较劲的角色：
+
+- **生成器 G（造假者）**：从一团随机噪声出发，努力"伪造"出以假乱真的数据。
+- **判别器 D（鉴定师）**：拿到一个样本，判断它是真实数据，还是 G 伪造的。
+
+两者反复对抗——鉴定师越来越会挑错，造假者就被逼着越造越像；最终造假者做到鉴定师再也分不清真假，这时生成分布就逼近了真实分布。
+
+## 两个网络具体在算什么
+
+判别器对任意一点 $x$ 输出一个概率
+
+$$
+D(x)\in(0,1)
+$$
+
+表示"我认为 $x$ 是真实数据的可能性"：越接近 $1$ 越像真，越接近 $0$ 越像假。
+
+生成器则把噪声 $z$（这里是 $[0,1]^2$ 上的均匀随机点）映射成一个二维样本 $G(z)$。你在图里看到的紫色点，就是一批 $G(z)$。
+
+## 它们的目标：一个极小极大博弈
+
+GAN 的训练可以写成判别器要**最大化**、生成器要**最小化**的同一个目标函数：
+
+$$
+\\min_{G}\\ \\max_{D}\\ V(D,G)=\\mathbb{E}_{x\\sim p_{\\text{data}}}\\bigl[\\log D(x)\\bigr]+\\mathbb{E}_{z\\sim p_{z}}\\bigl[\\log\\bigl(1-D(G(z))\\bigr)\\bigr]
+$$
+
+直觉：
+
+- 判别器希望对真实样本 $D(x)\\to 1$、对假样本 $D(G(z))\\to 0$，于是把上式**做大**；
+- 生成器希望假样本被判成真，即 $D(G(z))\\to 1$，于是把上式**做小**。
+
+## 实际训练时优化的两个损失
+
+代码里每一步交替更新两者。判别器最小化（带 $0.95$ 的标签平滑，让训练更稳）：
+
+$$
+\\mathcal{L}_{D}=-\\Bigl(0.95\\,\\mathbb{E}_{x\\sim p_{\\text{data}}}\\bigl[\\log D(x)\\bigr]+\\mathbb{E}_{z\\sim p_{z}}\\bigl[\\log\\bigl(1-D(G(z))\\bigr)\\bigr]\\Bigr)
+$$
+
+生成器最小化（常用的"非饱和"形式，早期梯度更充足）：
+
+$$
+\\mathcal{L}_{G}=-\\,\\mathbb{E}_{z\\sim p_{z}}\\bigl[\\log D(G(z))\\bigr]
+$$
+
+如果在控制栏把损失切到 **LSGAN**（最小二乘），目标改成用平方误差衡量：
+
+$$
+\\mathcal{L}_{D}=\\mathbb{E}_{x}\\bigl[(D(x)-1)^2\\bigr]+\\mathbb{E}_{z}\\bigl[D(G(z))^2\\bigr],\\qquad
+\\mathcal{L}_{G}=\\mathbb{E}_{z}\\bigl[(D(G(z))-1)^2\\bigr]
+$$
+
+## 怎么看这张图
+
+整张方格代表二维数据空间 $[0,1]^2$：
+
+- **绿色 / 紫色背景**：判别器热力图。某处越绿，表示该处 $D$ 越接近 $1$（判为真）；越紫越接近 $0$（判为假）；灰白处 $D\\approx 0.5$，即鉴定师拿不准。
+- **绿色点**是真实样本，**紫色点**是生成样本 $G(z)$。训练收敛时，两种点应当重叠。
+- **橙色网格**是**生成器流形**：把输入噪声方格 $[0,1]^2$ 经 $G$ 映射后的形变网格。格子被压得越小、越不透明，说明生成样本在那里越密集。
+- **粉色短线**是**梯度方向**。每个生成样本沿着让 $\\mathcal{L}_{G}$ 下降的方向移动，即 $-\\,\\partial \\mathcal{L}_{G}/\\partial\\,G(z)$，箭头指向生成器"下一步想把这个点挪去的地方"——通常是判别器认为更"真"的区域。
+
+## 动手试试
+
+- 切换目标分布（双高斯 / 斜线 / 环形 / 分离三簇），或用"自绘分布"画出任意形状，看 G 如何追上去。
+- 调学习率、批大小，或在 Log loss 与 LSGAN 间切换，体会训练稳定性的差别。
+- 用"单步"配合"慢放"逐帧观察：判别器热力图、流形与梯度箭头如何相互拉扯，最终达到平衡。
+
+---
+
+交互设计与算法参考改编自 GAN Lab（[poloclub/ganlab](https://poloclub.github.io/ganlab/)，Apache-2.0）。
+`
 
 export function Article() {
   return (
-    <article className="prose mt-8 max-w-3xl text-stone-700">
-      <h2>什么是 GAN？</h2>
-      <p>
-        生成对抗网络（GAN）让两个网络互相博弈来学习数据分布：<strong>生成器</strong>（Generator）从随机噪声
-        合成样本，<strong>判别器</strong>（Discriminator）则判断样本来自真实数据还是生成器。两者交替优化，
-        最终希望生成器能产出以假乱真、与真实分布重合的样本。
-      </p>
-
-      <h3>怎么看这张图</h3>
-      <ul>
-        <li>
-          <span style={{ color: '#10b981' }}>■ 绿色背景</span> / <span style={{ color: '#7c3aed' }}>■ 紫色背景</span>
-          ：判别器热力图，越绿表示判别器越认为该处是真实数据，越紫表示越认为是假的，灰白处接近 0.5（拿不准）。
-        </li>
-        <li>
-          <span style={{ color: '#10b981' }}>● 绿点</span>为真实样本，<span style={{ color: '#7c3aed' }}>● 紫点</span>为生成样本；
-          训练收敛时两者应当重叠。
-        </li>
-        <li>
-          <span style={{ color: '#f97316' }}>橙色网格</span>是<strong>生成器流形</strong>：把输入噪声方格 [0,1]²
-          经生成器映射后的形变网格，格子越密（越不透明）表示该区域生成样本越集中。
-        </li>
-        <li>
-          <span style={{ color: '#ec4899' }}>粉色线</span>是<strong>梯度方向</strong>：每个生成样本在当前判别器下
-          会被推往的移动方向——它指示生成器下一步想把样本挪去哪里。
-        </li>
-      </ul>
-
-      <h3>可以试试</h3>
-      <ul>
-        <li>切换目标分布（双高斯 / 斜线 / 环形 / 分离三簇），或用「自绘分布」画出任意形状。</li>
-        <li>调节学习率、批大小与损失函数（Log loss / LSGAN），观察训练稳定性与收敛速度的差异。</li>
-        <li>用「单步」和「慢放」逐帧观察判别器热力图、流形与梯度箭头如何相互拉扯。</li>
-      </ul>
-
-      <p className="text-sm text-stone-400">
-        交互设计与算法参考改编自 GAN Lab（
-        <a href="https://poloclub.github.io/ganlab/" target="_blank" rel="noreferrer">
-          poloclub/ganlab
-        </a>
-        ，Apache-2.0）。
-      </p>
+    <article className="mt-8 max-w-3xl">
+      <Markdown>{CONTENT}</Markdown>
     </article>
   )
 }
