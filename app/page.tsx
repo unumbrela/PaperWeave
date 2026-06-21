@@ -9,6 +9,7 @@ import { WeaveJourney } from "@/components/home/WeaveJourney";
 import { HeroBackdrop } from "@/components/home/HeroBackdrop";
 import {
   getSupportingTools,
+  getUtilityTools,
   getGalleryTools,
   getLabTools,
   type Phase,
@@ -48,6 +49,7 @@ export default function Home() {
   const currentDate = formatDisplayDate(new Date());
 
   const supportingTools = useMemo(() => getSupportingTools(), []);
+  const utilityTools = useMemo(() => getUtilityTools(), []);
   const galleryTools = useMemo(() => getGalleryTools(), []);
   const labTools = useMemo(() => getLabTools(), []);
 
@@ -65,6 +67,10 @@ export default function Home() {
   const filteredSupporting = useMemo(
     () => supportingTools.filter((t) => matchesQuery(t, q)),
     [q, supportingTools],
+  );
+  const filteredUtility = useMemo(
+    () => utilityTools.filter((t) => matchesQuery(t, q)),
+    [q, utilityTools],
   );
   const filteredLab = useMemo(
     () => labTools.filter((t) => matchesQuery(t, q)),
@@ -114,7 +120,7 @@ export default function Home() {
               <div className="hairline mb-4" />
               <p className="text-[13px] leading-relaxed text-ink-2 max-w-xs">
                 这里是 <span className="serif-italic text-ink">PaperWeave</span>
-                ，一个以论文为核心、本地优先的研究工作台。从检索最新论文，到精读、提炼、{" "}
+                ，一个以论文为核心、本地优先的研究工作台。从检索最新论文，到精读、梳理、{" "}
                 <span className="serif-italic text-ink">立论</span>
                 、撰写、制图——一条线走完。只搭骨架不代写正文，让每一步都顺起来。
               </p>
@@ -199,11 +205,11 @@ export default function Home() {
           <h2 className="serif text-[28px] sm:text-[34px] tracking-tight text-ink">
             <span className="serif-italic text-ink-2">Supporting</span> Tools
           </h2>
-          <span className="overline">配套工具 · 按需取用</span>
+          <span className="overline">配套工具 · 围绕主干</span>
         </Reveal>
         <Reveal delay={60}>
           <p className="text-[13px] leading-relaxed text-ink-2 max-w-xl mb-8">
-            挂在主线各环上、可一键流转的配套工具——速读、整理、对比、问库、图谱、提示词，需要哪一步就取哪一个。
+            紧贴主线各环、可一键流转的配套——要点提炼、文献对比、引文图谱，都直接喂回检索·精读·梳理。需要哪一步就取哪一个。
           </p>
         </Reveal>
 
@@ -220,6 +226,29 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {/* UTILITIES — 与主干松耦合的外围工具（网页速览 / 文库问答 / 格式转译），下放但仍可直达 */}
+      {filteredUtility.length > 0 && (
+        <section className="mx-auto w-full max-w-6xl px-6 pb-24">
+          <div className="hairline mb-12" />
+          <Reveal className="flex items-baseline justify-between mb-3">
+            <h2 className="serif text-[28px] sm:text-[34px] tracking-tight text-ink">
+              <span className="serif-italic text-ink-2">More</span> Utilities
+            </h2>
+            <span className="overline">更多工具 · 松耦合</span>
+          </Reveal>
+          <Reveal delay={60}>
+            <p className="text-[13px] leading-relaxed text-ink-2 max-w-xl mb-8">
+              与主干松耦合、按需取用：网页速览、文库问答、格式转译——不在主线上，但随手够得着。
+            </p>
+          </Reveal>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filteredUtility.map((tool, i) => (
+              <ToolCard key={tool.slug} tool={tool} index={i + 1} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* LAB — 命令行 / 自动化扩展，独立于论文主线（终端气质，区别于玻璃卡） */}
       {filteredLab.length > 0 && (

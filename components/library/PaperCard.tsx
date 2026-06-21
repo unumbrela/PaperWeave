@@ -144,6 +144,16 @@ export function PaperCard({
                 精读
               </Link>
               <SendToTool
+                targetSlug="research-genealogy"
+                label="梳理该方向"
+                payload={{
+                  from: paper.title,
+                  fields: {
+                    direction: paper.direction || paper.tags[0] || "",
+                  },
+                }}
+              />
+              <SendToTool
                 targetSlug="idea-generator"
                 label="发往 创新点立论"
                 payload={{

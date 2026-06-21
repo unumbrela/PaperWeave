@@ -10,6 +10,7 @@ import {
   getWorkflowTools,
   getGalleryTools,
   getLabTools,
+  getUtilityTools,
   getSupportingTools,
   CORE_FLOW,
   CORE_FLOW_SLUGS,
@@ -38,11 +39,11 @@ describe('tools-registry 不变量', () => {
       expect(t.icon, `icon of ${t.slug}`).toBeTruthy();
       expect(t.gradient, `gradient of ${t.slug}`).toBeTruthy();
       expect(t.href, `href of ${t.slug}`).toBeTruthy();
-      expect(['workflow', 'gallery', 'lab'], `track of ${t.slug}`).toContain(t.track);
+      expect(['workflow', 'utility', 'gallery', 'lab'], `track of ${t.slug}`).toContain(t.track);
     }
   });
 
-  it('workflow 工具挂在 5 环主线；gallery / lab 工具不属于任何工作流阶段', () => {
+  it('workflow 工具挂在 6 环主线；utility / gallery / lab 工具不属于任何工作流阶段', () => {
     const valid = new Set(WORKFLOW_PHASES);
     for (const t of TOOLS) {
       if (t.track === 'workflow') {
@@ -58,14 +59,17 @@ describe('tools-registry 不变量', () => {
     }
   });
 
-  it('getWorkflowTools / getGalleryTools / getLabTools 完整划分 TOOLS', () => {
+  it('getWorkflowTools / getUtilityTools / getGalleryTools / getLabTools 完整划分 TOOLS', () => {
     const wf = getWorkflowTools();
+    const util = getUtilityTools();
     const gal = getGalleryTools();
     const lab = getLabTools();
-    expect(wf.length + gal.length + lab.length).toBe(TOOLS.length);
+    expect(wf.length + util.length + gal.length + lab.length).toBe(TOOLS.length);
     expect(wf.every((t) => t.track === 'workflow')).toBe(true);
+    expect(util.every((t) => t.track === 'utility')).toBe(true);
     expect(gal.every((t) => t.track === 'gallery')).toBe(true);
     expect(lab.every((t) => t.track === 'lab')).toBe(true);
+    expect(util.length, '应保留至少一个外围工具').toBeGreaterThan(0);
     expect(gal.length, '应保留至少一个展厅工具').toBeGreaterThan(0);
     expect(lab.length, '应保留至少一个 lab 工具').toBeGreaterThan(0);
   });
@@ -80,10 +84,11 @@ describe('tools-registry 不变量', () => {
     }
   });
 
-  it('PHASES = 「全部」+ 5 环主线', () => {
+  it('PHASES = 「全部」+ 6 环主线', () => {
     expect(PHASES[0]).toBe('全部');
     expect(PHASES.slice(1)).toEqual(WORKFLOW_PHASES);
-    expect(WORKFLOW_PHASES).toHaveLength(5);
+    expect(WORKFLOW_PHASES).toHaveLength(6);
+    expect(WORKFLOW_PHASES).toContain('梳理');
     // 讲结果 / 可视化表达 已从工作流剥离
     expect(WORKFLOW_PHASES).not.toContain('讲结果' as never);
     expect(WORKFLOW_PHASES).not.toContain('可视化表达' as never);
@@ -132,7 +137,7 @@ describe('tools-registry 不变量', () => {
     expect(getTool('definitely-not-a-tool')).toBeUndefined();
   });
 
-  describe('链路位置推导（5 环闭环可视化）', () => {
+  describe('链路位置推导（6 环闭环可视化）', () => {
     it('每环都有代表工具', () => {
       for (const phase of WORKFLOW_PHASES) {
         expect(getPhaseLeadTool(phase), `${phase} 无代表工具`).toBeDefined();

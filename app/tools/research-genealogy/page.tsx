@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { Terminal, GitBranch, ExternalLink } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Terminal, GitBranch, ExternalLink, Loader2, Sparkles } from "lucide-react";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
 import { cn } from "@/lib/utils";
+import { userKeyHeaders } from "@/lib/ai/user-keys";
+import { consumeHandoff } from "@/lib/workflow/handoff";
+import { HandoffBanner, SendToTool } from "@/components/workflow/handoff-controls";
+import type { HandoffPayload } from "@/lib/workflow/handoff";
 import {
   parseLineage,
   buildRows,
@@ -31,10 +35,47 @@ const RELATION_CONNECTOR: Record<Relation, string> = {
   parallel: "∥",
 };
 
+/** 从渲染好的族谱里抽出前沿工作，组织成「送去立论」的参考文本（找研究空白用）。 */
+function gapPayload(lineage: Lineage): HandoffPayload {
+  const maxYear = Math.max(...lineage.nodes.map((n) => n.year));
+  const frontier = lineage.nodes
+    .filter((n) => n.year >= maxYear - 1)
+    .sort((a, b) => (b.citations ?? 0) - (a.citations ?? 0))
+    .slice(0, 8);
+  const refs = (frontier.length ? frontier : lineage.nodes.slice(-6))
+    .map(
+      (n) =>
+        `- ${n.authors} (${n.year}): ${n.title}${n.contribution ? ` —— ${n.contribution}` : ""}`,
+    )
+    .join("\n");
+  return {
+    from: "研究脉络族谱",
+    fields: {
+      direction: lineage.field,
+      references: `「${lineage.field}」方向的前沿工作（来自发展谱系，可据此找差异化切入点 / 研究空白）：\n${refs}`,
+    },
+  };
+}
+
 export default function Page() {
+  const [direction, setDirection] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [handoffFrom, setHandoffFrom] = useState<string | null>(null);
+
   const [raw, setRaw] = useState("");
   const [lineage, setLineage] = useState<Lineage | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // 挂载时一次性消费上游 handoff（如「精读」步把论文方向带过来），非级联渲染
+    /* eslint-disable react-hooks/set-state-in-effect */
+    const h = consumeHandoff("research-genealogy");
+    if (!h) return;
+    if (h.fields.direction) setDirection(h.fields.direction);
+    setHandoffFrom(h.from);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   const render = (text: string) => {
     try {
@@ -46,6 +87,32 @@ export default function Page() {
     }
   };
 
+  const generate = async () => {
+    const d = direction.trim();
+    if (d.length < 2 || generating) return;
+    setGenerating(true);
+    setGenError(null);
+    try {
+      const res = await fetch("/api/research-genealogy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...userKeyHeaders() },
+        body: JSON.stringify({ direction: d }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setLineage(data.data as Lineage);
+        setRaw(JSON.stringify(data.data, null, 2));
+        setError(null);
+      } else {
+        setGenError(data.error || "生成失败，请重试");
+      }
+    } catch {
+      setGenError("网络异常或服务不可用，请稍后重试");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const loadExample = () => {
     const text = JSON.stringify(exampleLineage, null, 2);
     setRaw(text);
@@ -54,19 +121,83 @@ export default function Page() {
 
   return (
     <ToolShell tool={TOOL}>
-      {/* 这是什么：终端深度调研 + 站内可视化 */}
+      {/* 主路径：输入方向 → 一键生成发展谱系 */}
       <div className="surface rounded-[20px] p-6 mb-6">
-        <div className="grid gap-6 lg:grid-cols-2">
+        {handoffFrom && (
+          <HandoffBanner from={handoffFrom} onDismiss={() => setHandoffFrom(null)} />
+        )}
+        <div className="overline mb-2 flex items-center gap-1.5">
+          <Sparkles className="h-3.5 w-3.5" /> 梳理方向 · 一键生成发展谱系
+        </div>
+        <p className="text-[13.5px] leading-relaxed text-ink-2 mb-4">
+          输入一个研究方向，从 OpenAlex 真实检索<strong>奠基</strong>（被引最高）与
+          <strong>前沿</strong>（最新）论文作为节点，再由 AI 在其上推断发展脉络——
+          谁在谁之上、哪些路线并行、最新前沿与研究空白在哪。节点全部来自 OpenAlex，不杜撰。
+        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <input
+            value={direction}
+            onChange={(e) => setDirection(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && generate()}
+            placeholder="如：生成图像检测 / 扩散模型 / 蛋白质结构预测"
+            className={cn(
+              "focus-ring flex-1 rounded-full bg-paper-2/80 border border-line px-5 py-2.5",
+              "text-[14px] text-ink placeholder:text-ink-4 outline-none transition-colors focus:border-line-strong",
+            )}
+          />
+          <button
+            onClick={generate}
+            disabled={direction.trim().length < 2 || generating}
+            className="cta-gradient inline-flex items-center justify-center gap-2 rounded-full px-6 py-2.5 text-[14px] font-medium transition-all focus-ring disabled:opacity-50"
+          >
+            {generating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> 生成中…
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" /> 一键生成
+              </>
+            )}
+          </button>
+        </div>
+        {genError && <p className="mt-3 text-[12.5px] text-[#a53425]">{genError}</p>}
+        <p className="mt-3 text-[12px] text-ink-4">
+          网页版为 AI 综合，边未经引文核验；需要逐边核验过的深度谱系，见下方「终端深度模式」。
+        </p>
+      </div>
+
+      {/* 族谱树渲染 + 衔接立论 */}
+      {lineage && (
+        <>
+          <GenealogyTree lineage={lineage} />
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <span className="text-[12.5px] text-ink-3">
+              发现研究空白 / 差异化切入点？带着前沿工作去
+            </span>
+            <SendToTool
+              targetSlug="idea-generator"
+              payload={gapPayload(lineage)}
+              label="送去「创新点立论」"
+            />
+          </div>
+        </>
+      )}
+
+      {/* 终端深度模式（高级）：跑 skill 做引文核验深度调研，再粘贴 lineage.json */}
+      <details className="surface rounded-[20px] p-6 mt-6 group">
+        <summary className="cursor-pointer list-none overline flex items-center gap-1.5 text-ink-2 transition-colors hover:text-ink">
+          <Terminal className="h-3.5 w-3.5" /> 终端深度模式 · 引文核验的发展族谱（可选）
+        </summary>
+        <div className="grid gap-6 lg:grid-cols-2 mt-5">
           <div>
             <div className="overline mb-2 flex items-center gap-1.5">
               <Terminal className="h-3.5 w-3.5" /> 第一步 · 终端里跑 skill（深度调研）
             </div>
             <p className="text-[13.5px] leading-relaxed text-ink-2">
               <code className="text-[12px] bg-paper-2/80 border border-line rounded px-1.5 py-0.5">research-genealogy</code>{" "}
-              是本仓自带的 Claude Code skill：输入一个研究方向，它做多轮 OpenAlex 检索 +
-              引文滚雪球 + 谱系推导，产出整个方向的<strong>发展族谱</strong>——奠基工作 →
-              谁在谁之上 → 哪些路线并行 → 最新前沿，每条 builds-on 边都经真实引文核验，
-              并附完整叙事报告。
+              是本仓自带的 Claude Code skill：做多轮 OpenAlex 检索 + 引文滚雪球 + 谱系推导，
+              每条 builds-on 边都经真实引文核验，并附完整叙事报告。
             </p>
             <pre className="mt-3 rounded-xl bg-paper-2/80 border border-line px-4 py-3 text-[12px] leading-relaxed text-ink-2 overflow-x-auto">
               {`# 安装（仓库根目录）
@@ -81,9 +212,8 @@ cp -r skills/research-genealogy ~/.claude/skills/
               <GitBranch className="h-3.5 w-3.5" /> 第二步 · 把 lineage.json 带回站内
             </div>
             <p className="text-[13.5px] leading-relaxed text-ink-2 mb-3">
-              skill 的中间产物是一份 <code className="text-[12px] bg-paper-2/80 border border-line rounded px-1.5 py-0.5">lineage.json</code>。
-              粘贴到下面即可在站内渲染成可点击的族谱树——与「引文网络图谱」互补：
-              图谱看<strong>单篇</strong>的引用邻域，族谱看<strong>整个方向</strong>的来龙去脉。
+              skill 的中间产物是一份 <code className="text-[12px] bg-paper-2/80 border border-line rounded px-1.5 py-0.5">lineage.json</code>，
+              粘贴到下面即可在站内渲染成同款族谱树（含 ✓ 引文核验标记）。
             </p>
             <textarea
               value={raw}
@@ -114,10 +244,7 @@ cp -r skills/research-genealogy ~/.claude/skills/
             {error && <p className="mt-2 text-[12.5px] text-[#a53425]">解析失败：{error}</p>}
           </div>
         </div>
-      </div>
-
-      {/* 族谱树渲染 */}
-      {lineage && <GenealogyTree lineage={lineage} />}
+      </details>
 
       {/* 防幻觉说明 */}
       <div className="surface rounded-[20px] p-6 mt-6">
@@ -125,18 +252,18 @@ cp -r skills/research-genealogy ~/.claude/skills/
         <div className="grid gap-4 text-[13px] leading-relaxed text-ink-2 sm:grid-cols-3">
           <p>
             <strong className="text-ink">节点不靠回忆。</strong>
-            每个节点都来自 OpenAlex 拉取的真实元数据，摘要总结基于论文真实 abstract——skill
-            的硬规则是「组织与叙述，绝不凭记忆报论文」。
+            每个节点都来自 OpenAlex 拉取的真实元数据（标题/作者/年份/被引），网页版与终端版皆然——
+            「组织与叙述，绝不凭记忆报论文」。
           </p>
           <p>
-            <strong className="text-ink">边可以核验。</strong>
-            builds-on 边按构造即真实引文；verify.py 会复核每条边并打上 ✓ / ⚠ 标记，
-            树上如实展示，不掩盖未核验的边。
+            <strong className="text-ink">边分两档。</strong>
+            网页版的边由 AI 在真实节点上综合，快但未经核验；终端版 verify.py 会逐边复核并打上
+            ✓ / ⚠ 标记，树上如实展示。
           </p>
           <p>
             <strong className="text-ink">前沿有保障。</strong>
-            专门的 frontier 检索批次保证近两年工作入树（≥3 个不同的新方向），
-            避免「族谱停在三年前」这一最常见失败。
+            专门的 frontier 检索批次保证近两年工作入树，避免「族谱停在三年前」这一最常见失败，
+            也为下一步「立论」找空白提供着力点。
           </p>
         </div>
       </div>

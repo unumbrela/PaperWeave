@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { Annotation, AnnotationType, StickyNote } from '@/lib/db/types';
 import { ANNOTATION_COLORS } from '@/lib/annotation/hooks';
+import { SendToTool } from '@/components/workflow/handoff-controls';
 
 const ANNOTATION_TYPE_LABELS: Record<AnnotationType, string> = {
   highlight: 'Highlight',
@@ -41,6 +42,9 @@ interface SidebarProps {
   onDeleteStickyNote?: (id: string) => void;
   /** 跳转到便签所在页（0-based 页码） */
   onJumpToPage?: (page: number) => void;
+  /** 当前论文 id / 方向：用于把「可迁移点」标注一键发往创新点立论（衔接 精读 → 立论） */
+  paperId?: string;
+  paperDirection?: string;
 }
 
 type TabType = 'all' | 'highlight' | 'insight' | 'todo' | 'transferable' | 'ai' | 'notes';
@@ -65,6 +69,8 @@ export default function Sidebar({
   onResearchNotesChange,
   onDeleteStickyNote,
   onJumpToPage,
+  paperId,
+  paperDirection,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -228,6 +234,26 @@ export default function Sidebar({
                     </>
                   );
                 })()}
+              </div>
+            )}
+
+            {annotation.type === 'transferable' && paperId && (
+              <div className="mb-2">
+                <SendToTool
+                  targetSlug="idea-generator"
+                  label="拿这条去立论"
+                  payload={{
+                    from: '精读 · 可迁移点',
+                    sourcePaperId: paperId,
+                    fields: {
+                      direction: paperDirection ?? '',
+                      references: [annotation.selectedText, annotation.comment]
+                        .filter(Boolean)
+                        .join('\n\n'),
+                    },
+                  }}
+                  className="px-3 py-1.5 text-[11px]"
+                />
               </div>
             )}
 

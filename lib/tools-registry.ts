@@ -53,12 +53,13 @@ export const TOOLS: Tool[] = [
     gradient: "from-[#b14bff] to-[#4bb3ff]",
     href: "/tools/citation-graph",
   },
+  // ── 梳理（整理方向 · 梳理发展历程）──────────────────────
   {
     slug: "research-genealogy",
     name: "研究脉络族谱",
     description:
-      "图谱看单篇，族谱看方向：配套 Claude Code skill 深度调研一个方向的发展脉络（奠基 → 路线分叉 → 前沿，引文边均经核验），产出的 lineage.json 在本页渲染成可点击的族谱树。",
-    phases: ["检索"],
+      "梳理整个方向的发展历程：输入研究方向一键生成发展谱系（奠基 → 路线分叉 → 前沿，引文边均经核验），看清谁在谁之上、哪些路线并行、最新前沿在哪、空白在哪。也可在终端跑同名 skill 做深度调研后粘贴 lineage.json。",
+    phases: ["梳理"],
     track: "workflow",
     icon: "🌳",
     gradient: "from-[#2e9e6b] to-[#b14bff]",
@@ -66,27 +67,6 @@ export const TOOLS: Tool[] = [
   },
 
   // ── 精读（含提炼工序）────────────────────────────────────
-  {
-    slug: "summarize",
-    name: "网页文献速览",
-    description: "粘贴 URL，拿到 30 秒能读完的结构化要点与关键引述。",
-    phases: ["精读"],
-    track: "workflow",
-    icon: "📰",
-    gradient: "from-[#ff4f8b] to-[#b14bff]",
-    href: "/tools/summarize",
-  },
-  {
-    slug: "markdown-convert",
-    name: "文献格式转译",
-    description:
-      "拖拽批量上传 Word/PDF/HTML/TXT，本地解析输出带 LaTeX 公式与表格的干净 Markdown。",
-    phases: ["精读"],
-    track: "workflow",
-    icon: "📄",
-    gradient: "from-[#4bb3ff] to-[#b14bff]",
-    href: "/tools/markdown-convert",
-  },
   {
     slug: "markdown-summarize",
     name: "要点提炼",
@@ -102,23 +82,12 @@ export const TOOLS: Tool[] = [
     slug: "paper-compare",
     name: "文献对比矩阵",
     description:
-      "从论文库勾选 2-6 篇，AI 生成「研究问题/方法/数据集/指标/创新点/局限」横向对比矩阵，一键导出 Markdown，综述写作刚需。",
-    phases: ["精读"],
+      "从论文库勾选 2-6 篇，AI 生成「研究问题/方法/数据集/指标/创新点/局限」横向对比矩阵，一键导出 Markdown——横向对比是梳理一个方向、看清路线分叉的刚需。",
+    phases: ["梳理"],
     track: "workflow",
     icon: "📊",
     gradient: "from-[#4bb3ff] to-[#6b8ed6]",
     href: "/tools/paper-compare",
-  },
-  {
-    slug: "library-qa",
-    name: "文库问答",
-    description:
-      "对入库论文建语义索引，用自然语言提问（embedding 检索 + LLM 归纳），返回带引用、可溯源到具体论文的答案。无 embedding key 时自动降级本地关键词检索。",
-    phases: ["精读"],
-    track: "workflow",
-    icon: "💬",
-    gradient: "from-[#b14bff] to-[#6b8ed6]",
-    href: "/tools/library-qa",
   },
 
   // ── 立论 ────────────────────────────────────────────────
@@ -158,6 +127,40 @@ export const TOOLS: Tool[] = [
     icon: "🎨",
     gradient: "from-[#4bb3ff] to-[#b14bff]",
     href: "/tools/figure-prompt",
+  },
+
+  // ── 外围工具（utility）：与主干松耦合，首页下放到 Utilities 区 ──────
+  {
+    slug: "summarize",
+    name: "网页文献速览",
+    description: "粘贴 URL，拿到 30 秒能读完的结构化要点与关键引述。",
+    phases: [],
+    track: "utility",
+    icon: "📰",
+    gradient: "from-[#ff4f8b] to-[#b14bff]",
+    href: "/tools/summarize",
+  },
+  {
+    slug: "library-qa",
+    name: "文库问答",
+    description:
+      "对入库论文建语义索引，用自然语言提问（embedding 检索 + LLM 归纳），返回带引用、可溯源到具体论文的答案。无 embedding key 时自动降级本地关键词检索。",
+    phases: [],
+    track: "utility",
+    icon: "💬",
+    gradient: "from-[#b14bff] to-[#6b8ed6]",
+    href: "/tools/library-qa",
+  },
+  {
+    slug: "markdown-convert",
+    name: "文献格式转译",
+    description:
+      "拖拽批量上传 Word/PDF/HTML/TXT，本地解析输出带 LaTeX 公式与表格的干净 Markdown。",
+    phases: [],
+    track: "utility",
+    icon: "📄",
+    gradient: "from-[#4bb3ff] to-[#b14bff]",
+    href: "/tools/markdown-convert",
   },
 
   // ── 可视化展厅（gallery）：交互式教学演示，独立于工作流 ──────
@@ -255,8 +258,8 @@ export const TOOLS: Tool[] = [
 ];
 
 // ── 核心论文流程（首页主线）────────────────────────────────
-// 围绕「一篇论文」的线性旅程，二字动词链：检索 → 精读 → 提炼 → 立论 → 撰写 → 制图。
-// 这是首页一上来就展示的核心；其余工具（配套 / lab / 展厅）一律下放。
+// 围绕「一篇论文 / 一个方向」的线性旅程，二字动词链：检索 → 精读 → 梳理 → 立论 → 撰写 → 制图。
+// 这是首页一上来就展示的核心；其余工具（配套 / utility / lab / 展厅）一律下放。
 // 与 Phase/Track 解耦：Phase 用于分类与 handoff，CORE_FLOW 是面向用户的旅程地图。
 export type CoreStep = {
   /** 步骤名（首页大字） */
@@ -289,7 +292,7 @@ export const CORE_FLOW: CoreStep[] = [
   },
   {
     title: "精读",
-    blurb: "导入论文库，PDF 精读批注，挑出真正值得深读的那一篇。",
+    blurb: "一键速览总结，把感兴趣的论文加入文献索引库，再在线 PDF 精读批注、做笔记。",
     href: "/library",
     icon: "📖",
     accent: "#4bb3ff",
@@ -297,22 +300,22 @@ export const CORE_FLOW: CoreStep[] = [
     output: "批注 · 精读笔记",
   },
   {
-    title: "提炼",
-    blurb: "把精读的论文结构化拆成要点 / 方法 / 实验设置 / 引文，沉淀可复用素材。",
-    href: "/tools/markdown-summarize",
-    icon: "📚",
-    accent: "#6b8ed6",
-    input: "论文 Markdown",
-    output: "结构化要点",
-    toolSlug: "markdown-summarize",
+    title: "梳理",
+    blurb: "整理研究方向、梳理整个方向的发展历程：输入方向一键生成发展谱系，看清路线分叉、最新前沿与研究空白。",
+    href: "/tools/research-genealogy",
+    icon: "🌳",
+    accent: "#2e9e6b",
+    input: "方向 · 论文库",
+    output: "发展谱系 · 研究空白",
+    toolSlug: "research-genealogy",
   },
   {
     title: "立论",
-    blurb: "拆解选中论文的现有创新点与局限，在其之上立起可验证的差异化新创新点。",
+    blurb: "两条创新来源：把新论文里读到的可迁移方法/架构搬到自己领域，或从梳理后发现的研究空白切入——立起可验证的差异化创新点。",
     href: "/tools/idea-generator",
     icon: "💡",
     accent: "#f59e0b",
-    input: "参考创新点",
+    input: "可迁移方法 · 研究空白",
     output: "假设 · 验证实验",
     toolSlug: "idea-generator",
   },
@@ -352,15 +355,17 @@ export const PHASES: ("全部" | Phase)[] = [
   "全部",
   "检索",
   "精读",
+  "梳理",
   "立论",
   "撰写",
   "制图",
 ];
 
-// 仅主线 5 环（不含「全部」）用于首页 Workflow 走廊
+// 仅主线 6 环（不含「全部」）用于首页 Workflow 走廊
 export const WORKFLOW_PHASES: Phase[] = [
   "检索",
   "精读",
+  "梳理",
   "立论",
   "撰写",
   "制图",
@@ -371,7 +376,7 @@ export function getTool(slug: string): Tool | undefined {
 }
 
 // ── 链路位置推导 ────────────────────────────────────────────
-// 让 5 环闭环在 UI 上显性化：每个 workflow 工具能算出自己处在第几环、
+// 让 6 环闭环在 UI 上显性化：每个 workflow 工具能算出自己处在第几环、
 // 上游/下游代表工具是谁（见 components/workflow/WorkflowRail.tsx）。
 // gallery 工具（phases 为空）不参与链路，相关函数返回 undefined。
 
@@ -380,7 +385,7 @@ export function getPrimaryPhase(tool: Tool): Phase | undefined {
   return tool.phases[0];
 }
 
-/** 5 环顺序中的序号（0-based），非工作流环返回 -1。 */
+/** 6 环顺序中的序号（0-based），非工作流环返回 -1。 */
 export function getPhaseIndex(phase: Phase): number {
   return WORKFLOW_PHASES.indexOf(phase);
 }
@@ -418,9 +423,14 @@ export function getToolsInPhase(phase: Phase): Tool[] {
   return TOOLS.filter((t) => t.phases.includes(phase));
 }
 
-// 工作流工具：挂在 5 环主线、参与一键流转闭环。
+// 工作流工具：挂在 6 环主线、参与一键流转闭环。
 export function getWorkflowTools(): Tool[] {
   return TOOLS.filter((t) => t.track === "workflow");
+}
+
+// 外围工具：与主干松耦合（网页速览 / 文库问答 / 格式转译），首页下放到 Utilities 区。
+export function getUtilityTools(): Tool[] {
+  return TOOLS.filter((t) => t.track === "utility");
 }
 
 // 展厅工具：交互式教学演示，独立于工作流。

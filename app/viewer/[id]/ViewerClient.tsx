@@ -511,6 +511,8 @@ export default function ViewerClient() {
             onResearchNotesChange={setResearchNotes}
             onDeleteStickyNote={deleteStickyNote}
             onJumpToPage={(page) => setCurrentPage(page + 1)}
+            paperId={paper.id}
+            paperDirection={paper.direction}
           />
         )}
       </div>
