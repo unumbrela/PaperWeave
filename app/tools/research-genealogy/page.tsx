@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Terminal, GitBranch, ExternalLink, Loader2, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Terminal, GitBranch, Loader2, Sparkles } from "lucide-react";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
 import { cn } from "@/lib/utils";
@@ -11,29 +11,18 @@ import { HandoffBanner, SendToTool } from "@/components/workflow/handoff-control
 import type { HandoffPayload } from "@/lib/workflow/handoff";
 import {
   parseLineage,
-  buildRows,
   lineageStats,
+  RELATIONS,
   type Lineage,
-  type RenderRow,
-  type Relation,
 } from "@/lib/genealogy/lineage";
+import { buildLayout, type LayoutRow } from "@/lib/genealogy/layout";
+import { ROLE_COLOR, ROLE_LABEL, RELATION_STYLE } from "@/lib/genealogy/theme";
+import { GenealogyTree, type TreeFilter } from "@/components/genealogy/GenealogyTree";
+import { GenealogyControls } from "@/components/genealogy/GenealogyControls";
+import { NodeDetail } from "@/components/genealogy/NodeDetail";
 import exampleLineage from "@/skills/research-genealogy/examples/generated-image-detection.json";
 
 const TOOL = getTool("research-genealogy")!;
-
-const ROLE_GLYPH = { founder: "●", hub: "◉", frontier: "★", normal: "○" } as const;
-const ROLE_COLOR = {
-  founder: "#d24b7f",
-  hub: "#7c3aed",
-  frontier: "#b8860b",
-  normal: "var(--ink-3, #8a8377)",
-} as const;
-const RELATION_CONNECTOR: Record<Relation, string> = {
-  "builds-on": "└──",
-  "inspired-by": "└┈┈",
-  supersedes: "└══",
-  parallel: "∥",
-};
 
 /** 从渲染好的族谱里抽出前沿工作，组织成「送去立论」的参考文本（找研究空白用）。 */
 function gapPayload(lineage: Lineage): HandoffPayload {
@@ -57,6 +46,11 @@ function gapPayload(lineage: Lineage): HandoffPayload {
   };
 }
 
+const ALL_RELATIONS: TreeFilter = {
+  relations: new Set(RELATIONS),
+  trunkOnly: false,
+};
+
 export default function Page() {
   const [direction, setDirection] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -66,6 +60,10 @@ export default function Page() {
   const [raw, setRaw] = useState("");
   const [lineage, setLineage] = useState<Lineage | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [filter, setFilter] = useState<TreeFilter>(ALL_RELATIONS);
+  const [selected, setSelected] = useState<LayoutRow | null>(null);
+  const [jumpNonce, setJumpNonce] = useState(0);
 
   useEffect(() => {
     // 挂载时一次性消费上游 handoff（如「精读」步把论文方向带过来），非级联渲染
@@ -77,10 +75,16 @@ export default function Page() {
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
+  const accept = (l: Lineage) => {
+    setLineage(l);
+    setError(null);
+    setSelected(null);
+    setFilter({ relations: new Set(RELATIONS), trunkOnly: false });
+  };
+
   const render = (text: string) => {
     try {
-      setLineage(parseLineage(text));
-      setError(null);
+      accept(parseLineage(text));
     } catch (e) {
       setLineage(null);
       setError(e instanceof Error ? e.message : String(e));
@@ -100,9 +104,8 @@ export default function Page() {
       });
       const data = await res.json();
       if (data.success) {
-        setLineage(data.data as Lineage);
+        accept(data.data as Lineage);
         setRaw(JSON.stringify(data.data, null, 2));
-        setError(null);
       } else {
         setGenError(data.error || "生成失败，请重试");
       }
@@ -167,10 +170,24 @@ export default function Page() {
         </p>
       </div>
 
-      {/* 族谱树渲染 + 衔接立论 */}
+      {/* 族谱：统计头 + 工具条 + 树 + 衔接立论 */}
       {lineage && (
         <>
-          <GenealogyTree lineage={lineage} />
+          <StatsHeader lineage={lineage} />
+          <GenealogyControls
+            lineage={lineage}
+            filter={filter}
+            setFilter={setFilter}
+            onJumpFrontier={() => setJumpNonce((n) => n + 1)}
+          />
+          <GenealogyTree
+            lineage={lineage}
+            filter={filter}
+            selectedId={selected?.node.id}
+            onSelect={setSelected}
+            jumpNonce={jumpNonce}
+          />
+          <Legend />
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <span className="text-[12.5px] text-ink-3">
               发现研究空白 / 差异化切入点？带着前沿工作去
@@ -181,6 +198,14 @@ export default function Page() {
               label="送去「创新点立论」"
             />
           </div>
+
+          <NodeDetail
+            lineage={lineage}
+            node={selected?.node ?? null}
+            role={selected?.role}
+            verified={selected?.verified}
+            onClose={() => setSelected(null)}
+          />
         </>
       )}
 
@@ -271,99 +296,73 @@ cp -r skills/research-genealogy ~/.claude/skills/
   );
 }
 
-function GenealogyTree({ lineage }: { lineage: Lineage }) {
-  const rows = buildRows(lineage);
+function Metric({ value, label }: { value: string | number; label: string }) {
+  return (
+    <div className="flex flex-col">
+      <span className="serif text-[20px] leading-none text-ink">{value}</span>
+      <span className="mt-1 text-[11px] text-ink-3">{label}</span>
+    </div>
+  );
+}
+
+/** 族谱标题栏：方向名 + 关键统计 + 核验进度条。 */
+function StatsHeader({ lineage }: { lineage: Lineage }) {
   const stats = lineageStats(lineage);
+  const layout = useMemo(() => buildLayout(lineage), [lineage]);
+  const routes = layout.rows.filter((r) => r.depth === 0).length;
+  const parallels = layout.parallelLinks.length;
+  const pct =
+    stats.totalTreeEdges > 0
+      ? Math.round((100 * stats.verifiedEdges) / stats.totalTreeEdges)
+      : 0;
 
   return (
-    <div className="surface rounded-[20px] p-6 overflow-x-auto">
-      <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="serif text-[22px] text-ink">{lineage.field}</h2>
-        <span className="text-[12px] text-ink-3">
-          {stats.count} 篇 · {stats.minYear} → {stats.maxYear} · 引文核验 {stats.verifiedEdges}/
-          {stats.totalTreeEdges} 条边
-        </span>
-      </div>
-
-      <div className="min-w-[640px] font-mono text-[13px] leading-[1.45]">
-        {rows.map((r) => (
-          <TreeRow key={r.node.id} row={r} />
-        ))}
-      </div>
-
-      <div className="mt-4 border-t border-line pt-3 text-[11.5px] text-ink-3">
-        <span style={{ color: ROLE_COLOR.founder }}>●</span> 奠基{"  "}
-        <span style={{ color: ROLE_COLOR.hub }}>◉</span> 枢纽{"  "}
-        <span style={{ color: ROLE_COLOR.frontier }}>★</span> 前沿 ·{" "}
-        <span className="font-mono">└──</span> builds-on{"  "}
-        <span className="font-mono">└┈┈</span> inspired-by{"  "}
-        <span className="font-mono">└══</span> supersedes{"  "}
-        <span className="font-mono">∥</span> parallel · ✓ 引文已核验
+    <div className="surface mb-3 rounded-[20px] px-6 py-5">
+      <h2 className="serif text-[24px] leading-tight text-ink">{lineage.field}</h2>
+      <div className="mt-4 flex flex-wrap items-end gap-x-8 gap-y-4">
+        <Metric value={stats.count} label="篇论文" />
+        <Metric value={`${stats.minYear} → ${stats.maxYear}`} label="时代跨度" />
+        <Metric value={routes} label="条主线路" />
+        <Metric value={parallels} label="组并行路线" />
+        <div className="flex flex-col">
+          <span className="serif text-[20px] leading-none text-ink">
+            {stats.verifiedEdges}/{stats.totalTreeEdges}
+          </span>
+          <span className="mt-1 text-[11px] text-ink-3">引文核验边</span>
+          <span className="mt-1.5 h-[3px] w-28 overflow-hidden rounded-full bg-[rgba(26,23,19,0.10)]">
+            <span
+              className="block h-full rounded-full"
+              style={{ width: `${pct}%`, background: ROLE_COLOR.hub, opacity: 0.6 }}
+            />
+          </span>
+        </div>
       </div>
     </div>
   );
 }
 
-function TreeRow({ row }: { row: RenderRow }) {
-  const { node, depth, relation, verified, role, extraParents, parallels } = row;
+/** 族谱图例：角色标记 + 关系样式。 */
+function Legend() {
   return (
-    <div className="group py-1" style={{ paddingLeft: `${depth * 28}px` }}>
-      <div className="flex flex-wrap items-baseline gap-x-2">
-        {relation && (
-          <span className="text-ink-4">{RELATION_CONNECTOR[relation]}</span>
-        )}
-        <span style={{ color: ROLE_COLOR[role] }}>{ROLE_GLYPH[role]}</span>
-        <span className="text-ink font-medium">
-          {node.authors} <span className="text-ink-3 font-normal">({node.year})</span>
+    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-[11.5px] text-ink-3">
+      {(["founder", "hub", "frontier"] as const).map((r) => (
+        <span key={r} className="inline-flex items-center gap-1">
+          <span style={{ color: ROLE_COLOR[r] }}>
+            {r === "founder" ? "●" : r === "hub" ? "◉" : "★"}
+          </span>
+          {ROLE_LABEL[r]}
         </span>
-        {verified === true && <span className="text-[#2e7d32]" title="builds-on 边经引文核验">✓</span>}
-        {verified === false && <span className="text-[#b26a00]" title="该边未经引文核验">⚠</span>}
-        {node.venue && <span className="text-[11px] text-ink-3">{node.venue}</span>}
-        {typeof node.citations === "number" && (
-          <span className="text-[11px] text-ink-4">被引 {node.citations}</span>
-        )}
-        {node.url && (
-          <a
-            href={node.url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-ink-4 opacity-0 transition-opacity group-hover:opacity-100 hover:text-ink"
-            aria-label="打开论文链接"
-          >
-            <ExternalLink className="h-3 w-3" />
-          </a>
-        )}
-      </div>
-      <div className="text-[12px] text-ink-3 italic" style={{ paddingLeft: relation ? "44px" : "20px" }}>
-        “{node.title}”
-      </div>
-      {(node.problem || node.contribution) && (
-        <div
-          className="max-w-[760px] text-[12px] leading-snug text-ink-3"
-          style={{ paddingLeft: relation ? "44px" : "20px" }}
-        >
-          {node.problem}
-          {node.problem && node.contribution && <span className="text-ink-4"> ⇒ </span>}
-          <span className="text-ink-2">{node.contribution}</span>
-        </div>
-      )}
-      {(extraParents.length > 0 || parallels.length > 0) && (
-        <div
-          className="text-[11.5px] text-ink-4"
-          style={{ paddingLeft: relation ? "44px" : "20px" }}
-        >
-          {extraParents.map((p) => (
-            <span key={p.authors} className="mr-3">
-              → {p.relation}: {p.authors}
-            </span>
-          ))}
-          {parallels.map((p) => (
-            <span key={p} className="mr-3">
-              ∥ parallel: {p}
-            </span>
-          ))}
-        </div>
-      )}
+      ))}
+      <span className="h-3 w-px bg-line" />
+      {RELATIONS.map((r) => (
+        <span key={r} className="inline-flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: RELATION_STYLE[r].color }} />
+          {RELATION_STYLE[r].label}
+        </span>
+      ))}
+      <span className="h-3 w-px bg-line" />
+      <span><span className="text-[#2e7d32]">✓</span> 引文已核验</span>
+      <span className="text-ink-4">· 悬停看血缘路径 · 点击看详情</span>
     </div>
   );
 }
