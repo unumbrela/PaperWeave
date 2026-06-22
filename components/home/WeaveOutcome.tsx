@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
-import { FileText, ArrowUpRight, Microscope } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { FileText, BookOpen, Microscope, Loader2 } from "lucide-react";
 import { Reveal } from "@/components/reveal";
+import { repository } from "@/lib/db/repository";
 
 /** 完整示例论文（作者自有，与展厅 FWMamba-UNet 医学分割演示同源）。 */
 const PAPER = {
@@ -13,6 +15,7 @@ const PAPER = {
   authors: "Zihao Guo, Haoyu Yang, Zehan Zhao, Jiaming Xu, Hongyan Yin, Yuechen Zhang",
   affiliation: "Jiangnan University",
   venue: "会议论文 · 投稿格式",
+  sourceUrl: "https://github.com/unumbrela/FWMamba-UNet",
   abstract:
     "状态空间模型（Mamba）在密集预测里边界总是模糊——我们把它归因为一种结构性高频衰减（SHFA），并提出 FWMamba-UNet：用小波分支把高频信息走外部通路绕过 SSM 的固有衰减，仅增 10.1% 参数即在 Synapse / ACDC / ISIC 2018 上取得 SOTA。",
 } as const;
@@ -35,6 +38,39 @@ const STEP_MAP: { k: string; icon: string; d: string }[] = [
  * PDF 与封面在 public/examples/ 下，封面可点开整篇 PDF。
  */
 export function WeaveOutcome() {
+  const router = useRouter();
+  const [adding, setAdding] = useState(false);
+
+  /** 加入文献库阅读：本地入库（按标题去重复用），随后直达 PDF 阅读器。 */
+  const readInLibrary = async () => {
+    if (adding) return;
+    setAdding(true);
+    try {
+      const existing = await repository.findPaperByTitle(PAPER.title);
+      const id =
+        existing?.id ??
+        (
+          await repository.savePaper({
+            title: PAPER.title,
+            authors: PAPER.authors.split(",").map((name) => ({ name: name.trim() })),
+            abstract: PAPER.abstract,
+            summary: PAPER.abstract,
+            sourceType: "LOCAL",
+            sourceUrl: PAPER.sourceUrl,
+            pdfPath: PAPER.pdf,
+            publishedAt: "2025-01-01",
+            tags: ["示例", "医学图像分割", "Mamba"],
+          })
+        ).id;
+      router.push(`/viewer/${id}`);
+    } catch {
+      // 本地存储不可用时退化为直接打开 PDF，不阻塞
+      window.open(PAPER.pdf, "_blank", "noopener");
+    } finally {
+      setAdding(false);
+    }
+  };
+
   return (
     <section className="mx-auto w-full max-w-6xl px-6 pt-24">
       <Reveal className="flex items-baseline justify-between mb-3">
@@ -105,23 +141,31 @@ export function WeaveOutcome() {
                 ))}
               </ol>
 
-              {/* 衔接：去看同源的交互演示 */}
+              {/* 终点动作：加入文献库阅读（入库 + 直达阅读器） */}
               <div className="mt-7 flex flex-wrap items-center gap-3 border-t border-line pt-5">
+                <button
+                  onClick={readInLibrary}
+                  disabled={adding}
+                  className="cta-gradient focus-ring inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-medium transition-all disabled:opacity-60"
+                >
+                  {adding ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> 入库中…
+                    </>
+                  ) : (
+                    <>
+                      <BookOpen className="h-4 w-4" /> 加入文献库阅读
+                    </>
+                  )}
+                </button>
                 <a
                   href={PAPER.pdf}
                   target="_blank"
                   rel="noreferrer"
-                  className="cta-gradient focus-ring inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-medium"
-                >
-                  <FileText className="h-4 w-4" /> 阅读论文 PDF
-                </a>
-                <Link
-                  href="/tools/med-seg-explainer"
                   className="surface focus-ring inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] text-ink-2 transition-colors hover:text-ink hover:border-[var(--line-strong)]"
                 >
-                  <span className="serif-italic">看同源的交互演示</span>
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                </Link>
+                  <FileText className="h-3.5 w-3.5" /> 直接看 PDF
+                </a>
               </div>
             </div>
           </div>
