@@ -60,7 +60,7 @@ export function ToolCard({ tool, index }: { tool: Tool; index: number }) {
       el.style.setProperty("--tilt-lift", "-6px");
       el.style.setProperty("--glow-x", `${px * 100}%`);
       el.style.setProperty("--glow-y", `${py * 100}%`);
-      el.style.setProperty("--glow-o", "0.7");
+      el.style.setProperty("--glow-o", "1");
     });
   };
 

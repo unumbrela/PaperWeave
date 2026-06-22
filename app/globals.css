@@ -685,10 +685,14 @@ kbd {
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
+  /* Denser, weightier cursor bloom: a brighter near-white core, a held mid
+     band, then a wider falloff so the light reads as a solid halo rather than
+     a faint smudge. Screen-blended so it lifts the glass instead of washing. */
   background: radial-gradient(
     circle at var(--glow-x) var(--glow-y),
-    rgba(255, 255, 255, 0.55) 0%,
-    transparent 42%
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.5) 26%,
+    transparent 62%
   );
   opacity: var(--glow-o);
   transition: opacity 0.3s ease;
@@ -1061,43 +1065,23 @@ kbd {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* Continuous / auto-playing / cursor-driven motion stays off … */
+  /* Philosophy: DIRECT POINTER INTERACTION is exempt — the card tilt + glow,
+     the hover lifts and the hero cursor bloom only fire when the user
+     deliberately moves over an element, so we keep them (this is what makes a
+     Windows machine with "animation effects" off still feel alive on hover).
+     We only suppress AMBIENT / AUTO-PLAYING / LOOPING motion that happens
+     without any user action. */
   .weave-thread { animation: none; }
   .hero-photo::before { animation: none; }
   .hero-photo { transform: none; }
   .weave-thread-progress { transform: scaleY(1); }
-  .sheen:hover::after { animation: none; opacity: 0; }
   .weave-flow { display: none; }
   .weave-node::after { animation: none; display: none; }
   .flow-dot { animation: none; }
-
-  /* … but discrete, user-triggered hover affordances stay (lift / border /
-     shadow / accent). We deliberately keep .weave-station:hover,
-     .terminal-card:hover and .flow-panel:hover lifting — they read as a state
-     change, not as motion — and just shorten the transitions so they snap in
-     near-instantly instead of sliding. */
-  .card-glass,
-  .tilt,
-  .weave-station,
-  .terminal-card,
-  .flow-panel { transition-duration: 0.12s; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  /* The loom keeps a gentle ambient drift (dye clouds + a calm thread field
-     driven from JS); we only disable the cursor-driven parallax/bloom here. */
-  .loom-dye,
-  .loom-spot { transform: none; transition: none; }
+  .loom-blob { animation: none; }
   .text-flow { animation: none; }
   .reveal-word > span { animation: none; transform: none; }
   .reveal { opacity: 1; transform: none; transition: none; }
   .logo-dot-spin,
   .shimmer-line { animation: none; }
-  /* No cursor-following parallax tilt and no moving spotlight … */
-  .tilt { transform: none !important; }
-  .tilt::after { display: none; }
-  /* … but keep a clear, static hover lift so the tool cards still respond to
-     the pointer (the underlying .card-glass:hover already brightens the border
-     + shadow, which reads as the glow). */
-  .tilt.card-glass:hover { transform: translateY(-6px) !important; }
 }
