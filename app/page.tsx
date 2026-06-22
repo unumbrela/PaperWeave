@@ -7,6 +7,7 @@ import { ToolCard } from "@/components/tool-card";
 import { Reveal } from "@/components/reveal";
 import { WeaveJourney } from "@/components/home/WeaveJourney";
 import { WeaveOutcome } from "@/components/home/WeaveOutcome";
+import { SearchSpotlight } from "@/components/home/SearchSpotlight";
 import { HeroBackdrop } from "@/components/home/HeroBackdrop";
 import {
   getSupportingTools,
@@ -179,6 +180,9 @@ export default function Home() {
 
         <WeaveJourney />
       </section>
+
+      {/* 检索聚光 —— 把第一步「文献检索」讲清楚：Perplexity 式检索架构 + 自绘架构图 */}
+      <SearchSpotlight />
 
       {/* 完整示例 —— 工作流的终点产物：一篇真实跑完整条流程的论文 */}
       <WeaveOutcome />
