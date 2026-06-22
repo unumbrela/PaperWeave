@@ -6,6 +6,7 @@ import { Search, ArrowUpRight, ArrowRight, Terminal } from "lucide-react";
 import { ToolCard } from "@/components/tool-card";
 import { Reveal } from "@/components/reveal";
 import { WeaveJourney } from "@/components/home/WeaveJourney";
+import { WeaveOutcome } from "@/components/home/WeaveOutcome";
 import { HeroBackdrop } from "@/components/home/HeroBackdrop";
 import {
   getSupportingTools,
@@ -178,6 +179,9 @@ export default function Home() {
 
         <WeaveJourney />
       </section>
+
+      {/* 完整示例 —— 工作流的终点产物：一篇真实跑完整条流程的论文 */}
+      <WeaveOutcome />
 
       {/* SEARCH（仅用于过滤核心流程之下的配套 / 扩展 / 展厅工具） */}
       <section className="mx-auto w-full max-w-6xl px-6 pt-24">
