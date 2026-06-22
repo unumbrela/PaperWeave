@@ -33,8 +33,8 @@ export function PdfToolbar({
   onToggleNoteMode: () => void;
 }) {
   return (
-    <div className="bg-paper-2/60 border-b border-line px-4 py-2 flex items-center justify-between">
-      <div className="flex items-center gap-4">
+    <div className="bg-paper-2/60 border-b border-line px-4 py-2 flex items-center justify-between gap-2 overflow-x-auto">
+      <div className="flex items-center gap-4 shrink-0">
         <button
           onClick={onPrev}
           disabled={currentPage <= 1}
@@ -42,7 +42,7 @@ export function PdfToolbar({
         >
           <ChevronLeft className="w-5 h-5 text-ink-2" />
         </button>
-        <span className="text-sm text-ink-3 tabular-nums">
+        <span className="text-sm text-ink-3 tabular-nums whitespace-nowrap">
           第 <span className="text-ink-2">{currentPage}</span> 页 / 共 {numPages} 页
         </span>
         <button
@@ -54,10 +54,10 @@ export function PdfToolbar({
         </button>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={onToggleNoteMode}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
             noteMode ? 'bg-sun/30 text-ink ring-1 ring-sun' : 'hover:bg-paper-3 text-ink-2'
           }`}
           title={noteMode ? '退出贴便签模式' : '贴便签：点击页面任意位置新建一个笔记'}

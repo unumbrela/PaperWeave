@@ -42,7 +42,12 @@ export default function ViewerClient() {
   const [floatingMenu, setFloatingMenu] = useState<{ x: number; y: number; text: string } | null>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const [selectionRects, setSelectionRects] = useState<Array<{ x: number; y: number; width: number; height: number }>>([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  // 移动端默认收起侧栏，让 PDF 占满窄屏；桌面端保持展开。惰性初始化只在首渲读一次
+  // window 宽度（首帧为加载态、侧栏尚未挂载，不会有 hydration 偏差）；之后由用户手动
+  // 开合（移动端以浮层抽屉呈现，不挤压 PDF）。
+  const [isSidebarOpen, setIsSidebarOpen] = useState(
+    () => typeof window === 'undefined' || window.innerWidth >= 768,
+  );
   const [copiedState, setCopiedState] = useState<{ [key: string]: boolean }>({});
   const [noteMode, setNoteMode] = useState(false);
   // 正在生成 AI 解释的标注 id —— 解释逐条挂到标注，不再共用一个全局槽位。
@@ -448,7 +453,7 @@ export default function ViewerClient() {
         onBack={() => router.push(`/library/${paper.id}`)}
       />
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="relative flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden">
           <PdfToolbar
             currentPage={currentPage}
@@ -500,6 +505,15 @@ export default function ViewerClient() {
           </div>
         </div>
 
+        {/* 移动端：侧栏开启时铺一层半透明背景，点击即收起（桌面端不显示） */}
+        {isSidebarOpen && (
+          <button
+            type="button"
+            aria-label="收起侧栏"
+            onClick={() => setIsSidebarOpen(false)}
+            className="md:hidden absolute inset-0 z-20 bg-ink/20"
+          />
+        )}
         {isSidebarOpen && (
           <Sidebar
             annotations={annotations}

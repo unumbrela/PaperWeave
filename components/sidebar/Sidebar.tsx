@@ -377,7 +377,7 @@ export default function Sidebar({
   };
 
   return (
-    <div className="w-80 h-full flex flex-col bg-paper/80 backdrop-blur-sm border-l border-line">
+    <div className="absolute inset-y-0 right-0 z-30 w-80 max-w-[85vw] shadow-2xl bg-paper/95 md:static md:z-auto md:max-w-none md:shadow-none md:bg-paper/80 h-full flex flex-col backdrop-blur-sm border-l border-line">
       {/* 紧凑图标 Tab 行：7 个全部铺满一行，不再挤压换行 */}
       <div className="flex items-stretch border-b border-line px-1.5 pt-1.5">
         {tabs.map((tab) => {

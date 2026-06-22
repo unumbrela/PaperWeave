@@ -57,6 +57,19 @@ html,
 body {
   background: var(--paper);
   color: var(--ink);
+  /* 兜底：装饰层（mesh 光晕等）或个别宽元素都不得撑出横向滚动；
+     用 clip 而非 hidden，避免破坏后代的 position: sticky（导航/工具栏依赖它）。 */
+  overflow-x: clip;
+}
+
+/* 块级公式（KaTeX display）在窄屏下可能比视口更宽：让它在自身容器内横向滚动，
+   而不是撑破页面或被 body 的 overflow-x: clip 截断。 */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  /* 给横向滚动条留点空间，避免裁掉公式下缘 */
+  padding-bottom: 2px;
 }
 
 body {

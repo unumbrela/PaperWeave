@@ -131,8 +131,12 @@ export function setupHiDPICanvas(
   const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
   canvas.width = cssSize * dpr;
   canvas.height = cssSize * dpr;
+  // 逻辑尺寸为目标宽度，但窄屏（手机）下不得溢出容器：max-width 100% 收窄、
+  // height 由 1:1 宽高比自适应，画布内容随之等比缩放（backing store 不变，依旧清晰）。
   canvas.style.width = `${cssSize}px`;
-  canvas.style.height = `${cssSize}px`;
+  canvas.style.maxWidth = "100%";
+  canvas.style.height = "auto";
+  canvas.style.aspectRatio = "1 / 1";
   const ctx = canvas.getContext("2d")!;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   return { ctx, w: cssSize, h: cssSize };
