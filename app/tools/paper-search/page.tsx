@@ -676,7 +676,7 @@ export default function Page() {
                     检索架构 · 借鉴 Perplexity 检索管线
                   </p>
                   <a
-                    href="/home/paper-search-architecture.png"
+                    href="/paper-search/architecture.png"
                     target="_blank"
                     rel="noreferrer"
                     className="group focus-ring mt-3 block overflow-hidden rounded-2xl border border-line bg-white"
@@ -684,7 +684,7 @@ export default function Page() {
                   >
                     <div className="relative aspect-[1672/941] w-full">
                       <Image
-                        src="/home/paper-search-architecture.png"
+                        src="/paper-search/architecture.png"
                         alt="文献检索架构图：研究意图 → LLM 查询扩展 → 多源并行检索 → 去重合并 → 联合打分重排 → 排序结果"
                         fill
                         sizes="(max-width: 768px) 100vw, 760px"
