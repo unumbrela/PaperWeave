@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import {
   Terminal,
   GitBranch,
   Loader2,
   Sparkles,
   ExternalLink,
-  Search,
+  ShieldCheck,
   Network,
-  ListTree,
-  FileText,
+  GitFork,
+  ArrowRightLeft,
 } from "lucide-react";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
@@ -38,6 +39,10 @@ const TOOL = getTool("research-genealogy")!;
 /** skill 仓库地址（终端深度模式安装与查看源码）。 */
 const SKILL_REPO = "https://github.com/unumbrela/research-genealogy";
 
+/** 仓库内的配图（已下载到 public/research-genealogy/）。 */
+const PIPELINE_IMG = "/research-genealogy/pipeline.png";
+const DIFFUSION_IMG = "/research-genealogy/diffusion-genealogy.png";
+
 /** 站内可一键载入的真实示例（来自 skill 仓库 examples/，已逐边引文核验）。 */
 const EXAMPLES = [
   {
@@ -49,6 +54,54 @@ const EXAMPLES = [
     data: detectionLineage,
     label: "生成图像检测",
     meta: "12 篇 · 2018 → 2026 · 全边核验",
+  },
+] as const;
+
+/** 这个模块能做什么 —— 开头功能介绍的三点。 */
+const FEATURES = [
+  {
+    icon: Network,
+    t: "看整个方向，而非单篇",
+    d: "引文图谱看一篇论文的邻居；族谱把一个方向从奠基到前沿的发展脉络整张铺开。",
+  },
+  {
+    icon: ShieldCheck,
+    t: "节点不杜撰，边可核验",
+    d: "每个节点来自 OpenAlex / Semantic Scholar 真实元数据；终端版逐边复核引文，✓/⚠ 如实标注。",
+  },
+  {
+    icon: ArrowRightLeft,
+    t: "找到空白，接着立论",
+    d: "族谱把前沿与研究空白显化，一键把前沿工作送往「创新点立论」，闭合科研工作流。",
+  },
+] as const;
+
+/** 扩散模型示例的五条技术路线（与结果图对应，供图文并茂叙事）。 */
+const DIFFUSION_LANES = [
+  {
+    k: "理论奠基",
+    y: "2011 → 2015",
+    d: "score matching（Vincent）与非平衡热力学扩散（Sohl-Dickstein）埋下分数 / 扩散的理论种子。",
+  },
+  {
+    k: "DDPM 引爆",
+    y: "2020",
+    d: "Ho 等把扩散做成可行的高质量生成器，成为整个方向的枢纽，分数路线（NCSN / Score-SDE）在此汇流。",
+  },
+  {
+    k: "采样加速",
+    y: "2020 → 2023",
+    d: "DDIM → DPM-Solver → Consistency，把上千步采样压到几步，是扩散落地的关键分叉。",
+  },
+  {
+    k: "可控与潜空间",
+    y: "2021 → 2023",
+    d: "classifier guidance → CFG → ControlNet 解决「可控」，LDM / Stable Diffusion 把生成搬进潜空间、推向民用。",
+  },
+  {
+    k: "并行竞争与前沿",
+    y: "2022 → 2025",
+    d: "Transformer 骨干（DiT）与自回归挑战者（VAR）并行推进，扩散逐步取代 GAN；SD3 / Janus-Pro 走向多模态统一。",
   },
 ] as const;
 
@@ -237,32 +290,103 @@ export default function Page() {
         </>
       )}
 
-      {/* 不想配 key / 想要逐边核验？先看真实示例，再走终端深度模式 */}
+      {/* 功能介绍 + 架构图 + 图文并茂的完整示例（无族谱时展示） */}
       {!lineage && (
-        <div className="surface rounded-[20px] p-6 mb-6">
-          <div className="overline mb-2 flex items-center gap-1.5">
-            <ListTree className="h-3.5 w-3.5" /> 先看两个真实示例（已逐边引文核验）
-          </div>
-          <p className="text-[13.5px] leading-relaxed text-ink-2 mb-4">
-            没配 API key 也能体验——下面两份族谱由终端 skill 跑出、每条边经真实引文核验，
-            点开即在站内渲染成可交互的发展谱系。
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {EXAMPLES.map((ex) => (
+        <>
+          {/* 一、这个模块能做什么 */}
+          <section className="surface rounded-[20px] p-6 mb-6">
+            <div className="overline mb-3">这个模块能做什么</div>
+            <p className="serif text-[19px] leading-snug text-ink mb-1">
+              输入一个研究方向，得到它<span className="serif-italic">从奠基到前沿</span>的发展族谱
+            </p>
+            <p className="text-[13.5px] leading-relaxed text-ink-2 mb-5 max-w-3xl">
+              不是一份扁平的论文列表，而是一棵「谁在谁之上、哪些路线并行、什么被取代、最新前沿在哪」的
+              非线性发展树——每个节点都是真实论文，组织与叙述绝不凭记忆杜撰。
+            </p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {FEATURES.map((f) => (
+                <div key={f.t} className="rounded-xl border border-line bg-paper-2/50 p-4">
+                  <div className="flex items-center gap-2 text-[13.5px] font-medium text-ink">
+                    <f.icon className="h-4 w-4 text-ink-3" /> {f.t}
+                  </div>
+                  <p className="mt-1.5 text-[12px] leading-relaxed text-ink-3">{f.d}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* 架构图：四段流水线 */}
+            <div className="mt-6">
+              <div className="overline mb-2 flex items-center gap-1.5">
+                <Network className="h-3.5 w-3.5" /> 它是怎么跑出来的 · 四段流水线
+              </div>
+              <Figure
+                src={PIPELINE_IMG}
+                alt="research-genealogy 四段流水线架构图：输入与检索派生 → 真实引用图谱挖掘（OpenAlex）→ 谱系构建管线 → 谱系发展报告输出，底部为零幻觉保障"
+                ratio="1491 / 1055"
+                caption="方向 → 真实引文图谱挖掘（OpenAlex / Semantic Scholar）→ 领域内打分 + 传递约简 + 并行检测 → 非线性谱系报告。底部一行是「零幻觉」保障：节点来自真实元数据、边经引文核验。"
+              />
+            </div>
+          </section>
+
+          {/* 二、完整示例：扩散模型图像生成（图文并茂） */}
+          <section className="surface rounded-[20px] p-6 mb-6">
+            <div className="overline mb-2 flex items-center gap-1.5">
+              <GitFork className="h-3.5 w-3.5" /> 完整示例 · 扩散模型图像生成
+            </div>
+            <p className="serif text-[20px] leading-tight text-ink">
+              扩散模型图像生成的发展历程 <span className="text-ink-3 text-[15px]">2011 → 2025</span>
+            </p>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2 max-w-3xl">
+              21 篇论文、5 条技术路线、25/27 条边经 OpenAlex / Semantic Scholar 引文核验。
+              下面是终端 skill 跑出的完整谱系结果图——
+            </p>
+
+            <div className="mt-4">
+              <Figure
+                src={DIFFUSION_IMG}
+                alt="扩散模型图像生成发展历程谱系图（2011→2025）：分数/SDE、扩散+采样、潜空间生成、引导/架构/统一、GAN 线五条横向时间线，含 builds-on / inspired-by / parallel / supersedes 关系"
+                ratio="1672 / 941"
+                caption="五条技术路线横向并置的时间线谱系；实线 builds-on、虚线 inspired-by、∥ parallel、双线 supersedes（扩散逐步取代 GAN）。"
+              />
+            </div>
+
+            {/* 五条路线叙事 */}
+            <ol className="mt-5 space-y-3">
+              {DIFFUSION_LANES.map((l, i) => (
+                <li key={l.k} className="flex gap-3">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-paper-2 text-[11px] font-semibold text-ink-3">
+                    {i + 1}
+                  </span>
+                  <p className="text-[13px] leading-relaxed text-ink-2">
+                    <span className="font-medium text-ink">{l.k}</span>
+                    <span className="ml-1.5 text-[11.5px] text-ink-4">{l.y}</span>
+                    <span className="mx-1.5 text-ink-4">·</span>
+                    {l.d}
+                  </p>
+                </li>
+              ))}
+            </ol>
+
+            {/* 在站内打开可交互版 */}
+            <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-line pt-5">
+              <span className="text-[12.5px] text-ink-3">
+                想自己点开看？在站内渲染成<strong>可交互</strong>的族谱——悬停看血缘、点击看详情、一键送去立论：
+              </span>
               <button
-                key={ex.label}
-                onClick={() => loadExample(ex.data)}
-                className="group/ex flex items-center justify-between rounded-xl border border-line bg-paper-2/60 px-4 py-3 text-left transition-all hover:border-line-strong hover:bg-paper-2 focus-ring"
+                onClick={() => loadExample(diffusionLineage)}
+                className="cta-gradient inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-[13px] font-medium transition-all focus-ring"
               >
-                <span>
-                  <span className="block text-[14px] font-medium text-ink">{ex.label}</span>
-                  <span className="mt-0.5 block text-[11.5px] text-ink-3">{ex.meta}</span>
-                </span>
-                <GitBranch className="h-4 w-4 text-ink-4 transition-colors group-hover/ex:text-ink-2" />
+                <Sparkles className="h-3.5 w-3.5" /> 打开扩散模型族谱
               </button>
-            ))}
-          </div>
-        </div>
+              <button
+                onClick={() => loadExample(detectionLineage)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper-2/60 px-4 py-2 text-[13px] text-ink-2 transition-colors hover:border-line-strong hover:text-ink focus-ring"
+              >
+                <GitBranch className="h-3.5 w-3.5" /> 换个示例 · 生成图像检测
+              </button>
+            </div>
+          </section>
+        </>
       )}
 
       {/* 终端深度模式（高级）：跑 skill 做引文核验深度调研，再粘贴 lineage.json */}
@@ -287,24 +411,6 @@ export default function Page() {
             每条 builds-on 边都经 <code className="text-[12px] bg-paper-2 border border-line rounded px-1 py-0.5">verify.py</code> 逐边复核
             （<span className="text-[#2e7d32]">✓ verified</span> / <span className="text-[#b26a00]">⚠ unverified</span> / ↺ reversed / ‼ cross-cite）。stdlib-only、免 pip、OpenAlex 免 key。
           </p>
-
-          {/* 四段流水线 */}
-          <div className="mt-4 grid gap-2 sm:grid-cols-4">
-            {[
-              { icon: Search, t: "检索派生", d: "方向 → 主词 + 2~3 个英文别名" },
-              { icon: Network, t: "引文挖掘", d: "多轮检索 + 引文滚雪球" },
-              { icon: ListTree, t: "谱系构建", d: "领域内打分 + 传递约简 + 并行检测" },
-              { icon: FileText, t: "谱系报告", d: "真实摘要精修 + 树 + 叙事" },
-            ].map((s, i) => (
-              <div key={s.t} className="rounded-lg bg-paper-2/70 px-3 py-2.5">
-                <div className="flex items-center gap-1.5 text-[12px] font-medium text-ink">
-                  <s.icon className="h-3.5 w-3.5 text-ink-3" />
-                  <span className="text-ink-4">{i + 1}</span> {s.t}
-                </div>
-                <p className="mt-1 text-[11px] leading-snug text-ink-3">{s.d}</p>
-              </div>
-            ))}
-          </div>
 
           {/* 多格式产出 */}
           <div className="mt-4 flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -379,29 +485,41 @@ python3 scripts/genealogy.py "扩散模型图像生成" \\
           </div>
         </div>
       </details>
-
-      {/* 防幻觉说明 */}
-      <div className="surface rounded-[20px] p-6 mt-6">
-        <div className="overline mb-3">为什么这棵树可信</div>
-        <div className="grid gap-4 text-[13px] leading-relaxed text-ink-2 sm:grid-cols-3">
-          <p>
-            <strong className="text-ink">节点不靠回忆。</strong>
-            每个节点都来自 OpenAlex 拉取的真实元数据（标题/作者/年份/被引），网页版与终端版皆然——
-            「组织与叙述，绝不凭记忆报论文」。
-          </p>
-          <p>
-            <strong className="text-ink">边可核验。</strong>
-            「B 引用 A」才会连出 A→B 的边；终端版 verify.py 逐边复核 OpenAlex / Semantic Scholar 引文，
-            打上 ✓ verified / ⚠ unverified / ↺ reversed / ‼ cross-cite，树上如实展示。网页版边为 AI 综合、未核验。
-          </p>
-          <p>
-            <strong className="text-ink">前沿有保障。</strong>
-            专门的 frontier 检索批次保证近两年工作入树，避免「族谱停在三年前」这一最常见失败，
-            也为下一步「立论」找空白提供着力点。
-          </p>
-        </div>
-      </div>
     </ToolShell>
+  );
+}
+
+/** 带边框 / 浅底 / 可点击放大的配图。 */
+function Figure({
+  src,
+  alt,
+  ratio,
+  caption,
+}: {
+  src: string;
+  alt: string;
+  ratio: string;
+  caption: string;
+}) {
+  return (
+    <figure>
+      <a
+        href={src}
+        target="_blank"
+        rel="noreferrer"
+        className="group/fig relative block w-full overflow-hidden rounded-xl border border-line bg-white focus-ring"
+        style={{ aspectRatio: ratio }}
+        title="点击查看大图"
+      >
+        <Image src={src} alt={alt} fill sizes="(max-width: 1024px) 100vw, 880px" className="object-contain" />
+        <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-paper/85 px-2 py-0.5 text-[10px] text-ink-3 opacity-0 transition-opacity group-hover/fig:opacity-100">
+          <ExternalLink className="h-3 w-3" /> 看大图
+        </span>
+      </a>
+      <figcaption className="mt-2 text-[11.5px] leading-relaxed text-ink-3 serif-italic">
+        {caption}
+      </figcaption>
+    </figure>
   );
 }
 
