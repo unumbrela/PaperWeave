@@ -71,7 +71,7 @@ export const TOOLS: Tool[] = [
     slug: "markdown-summarize",
     name: "要点提炼",
     description:
-      "输入一篇论文的 Markdown，结构化提炼关键点、方法、实验设置、引文，便于后续串联与对比。",
+      "输入一篇论文的 Markdown，结构化提炼方法、实验与引文，并读出「创新点画像 + 局限留白」，再用八个创新算子把留白系统化衍生成可验证的新创新方向，直接喂给「创新点立论」。",
     phases: ["精读"],
     track: "workflow",
     icon: "📚",
@@ -108,7 +108,7 @@ export const TOOLS: Tool[] = [
     slug: "paper-writer",
     name: "结构撰写",
     description:
-      "把创新点、参考论文与精读产出组织成论文结构：章节大纲 + 每节要点 + Related Work 分组 + 每段写作脚手架（主题句/应含要点/过渡）。只搭骨架与表述建议，不替你写正文。",
+      "把创新点、参考论文与精读产出组织成论文结构：一句话故事线 + 章节大纲 + 每段写作脚手架（主题句意图/应含要点/过渡 + 英文 topic sentence 模板）+ Related Work 分组 + 投稿自查清单。方法论源自《英语科技写作》与 learning_research，内置端到端示例与方法论面板。只搭骨架，不替你写正文。",
     phases: ["撰写"],
     track: "workflow",
     icon: "✍️",
