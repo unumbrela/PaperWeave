@@ -258,6 +258,10 @@ export default function Page() {
                   from: TOOL.name,
                   sourcePaperId: sourcePaperId ?? undefined,
                   fields: {
+                    // 同时带上 subject，避免下游「科研绘图」落地时主题为空、提交键被禁用。
+                    subject: topic.trim()
+                      ? `${topic.trim()} · 方法/实验配图`
+                      : "论文方法/实验配图",
                     content: `为下面这篇论文的方法/实验部分设计配图（先想清楚每张图要传达的结论，再选图型）：\n\n${text}`,
                   },
                 }}

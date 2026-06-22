@@ -558,6 +558,10 @@ function ConvergeStage({
                   from: TOOL.name,
                   sourcePaperId: sourcePaperId ?? undefined,
                   fields: {
+                    // 同时带上 subject，避免下游「科研绘图」落地时主题为空、提交键被禁用。
+                    subject: direction.trim()
+                      ? `${direction.trim()} · 验证实验示意`
+                      : "研究 idea 的验证实验示意",
                     content: `为下面这个研究 idea 的最小验证实验设计配图（先想清楚要传达的结论，再选图型）：\n\n${ideaToText(activeIdea)}`,
                   },
                 }}
