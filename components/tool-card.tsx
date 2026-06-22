@@ -4,6 +4,7 @@ import { useRef } from "react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import type { Tool } from "@/lib/tools-registry";
+import { writeTilt, clearTilt } from "@/lib/tilt";
 import { cn } from "@/lib/utils";
 
 const ACCENTS: Record<string, string> = {
@@ -30,8 +31,6 @@ const ACCENTS: Record<string, string> = {
   "optimize-prompt": "#3b6ef6",
 };
 
-const MAX_TILT = 7; // degrees
-
 export function ToolCard({ tool, index }: { tool: Tool; index: number }) {
   const accent = ACCENTS[tool.slug] ?? "#8854d0";
   // 展厅 / lab 工具不属于任何工作流阶段，眉标用统一标签。
@@ -46,21 +45,14 @@ export function ToolCard({ tool, index }: { tool: Tool; index: number }) {
   const tiltRef = useRef<HTMLDivElement | null>(null);
   const raf = useRef(0);
 
-  const onMove = (e: React.PointerEvent<HTMLAnchorElement>) => {
+  const onMove = (e: React.PointerEvent) => {
     const el = tiltRef.current;
     if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / rect.width; // 0–1
-    const py = (e.clientY - rect.top) / rect.height; // 0–1
+    const { clientX, clientY } = e;
     if (raf.current) return;
     raf.current = requestAnimationFrame(() => {
       raf.current = 0;
-      el.style.setProperty("--tilt-y", `${(px - 0.5) * 2 * MAX_TILT}deg`);
-      el.style.setProperty("--tilt-x", `${-(py - 0.5) * 2 * MAX_TILT}deg`);
-      el.style.setProperty("--tilt-lift", "-6px");
-      el.style.setProperty("--glow-x", `${px * 100}%`);
-      el.style.setProperty("--glow-y", `${py * 100}%`);
-      el.style.setProperty("--glow-o", "1");
+      writeTilt(el, clientX, clientY, -6, 0.78);
     });
   };
 
@@ -69,10 +61,7 @@ export function ToolCard({ tool, index }: { tool: Tool; index: number }) {
     if (!el) return;
     if (raf.current) cancelAnimationFrame(raf.current);
     raf.current = 0;
-    el.style.setProperty("--tilt-x", "0deg");
-    el.style.setProperty("--tilt-y", "0deg");
-    el.style.setProperty("--tilt-lift", "0px");
-    el.style.setProperty("--glow-o", "0");
+    clearTilt(el);
   };
 
   return (

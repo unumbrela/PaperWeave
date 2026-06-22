@@ -4,8 +4,120 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { ArrowUpRight, CornerDownLeft } from "lucide-react";
 import { Reveal } from "@/components/reveal";
-import { CORE_FLOW, getTool } from "@/lib/tools-registry";
+import { CORE_FLOW, getTool, type CoreStep } from "@/lib/tools-registry";
+import { writeTilt, clearTilt } from "@/lib/tilt";
 import { cn } from "@/lib/utils";
+
+/** 单个核心站点卡——与工具卡共用指针 tilt + 白色光圈（usePointerTilt）。 */
+function StationCard({
+  step,
+  index,
+  left,
+  upstream,
+  downstream,
+  target,
+}: {
+  step: CoreStep;
+  index: number;
+  left: boolean;
+  upstream?: string;
+  downstream?: string;
+  target: string;
+}) {
+  // 站点偏大，抬升给小一点（-4px），光圈强度与工具卡一致（0.78）。
+  const tiltRef = useRef<HTMLAnchorElement | null>(null);
+  const raf = useRef(0);
+
+  const onMove = (e: React.PointerEvent) => {
+    const el = tiltRef.current;
+    if (!el) return;
+    const { clientX, clientY } = e;
+    if (raf.current) return;
+    raf.current = requestAnimationFrame(() => {
+      raf.current = 0;
+      writeTilt(el, clientX, clientY, -4, 0.78);
+    });
+  };
+
+  const onLeave = () => {
+    const el = tiltRef.current;
+    if (!el) return;
+    if (raf.current) cancelAnimationFrame(raf.current);
+    raf.current = 0;
+    clearTilt(el);
+  };
+
+  return (
+    <Link
+      ref={tiltRef}
+      href={step.href}
+      onPointerMove={onMove}
+      onPointerLeave={onLeave}
+      className={cn(
+        "weave-station tilt group focus-ring relative block rounded-[22px] p-6 sm:p-7",
+        left ? "lg:text-right" : "lg:text-left",
+      )}
+      style={{ ["--accent" as string]: step.accent }}
+    >
+      <span
+        className={cn(
+          "overline flex items-center gap-1.5 text-ink-4",
+          left ? "lg:justify-end" : "lg:justify-start",
+        )}
+      >
+        {upstream ? `上游 · ${upstream}` : "链路起点"}
+      </span>
+
+      <div
+        className={cn(
+          "mt-3 flex items-baseline gap-4",
+          left ? "lg:flex-row-reverse" : "lg:flex-row",
+        )}
+      >
+        <span
+          className="numeral text-[58px] leading-none sm:text-[68px]"
+          style={{ color: step.accent }}
+        >
+          {String(index + 1).padStart(2, "0")}
+        </span>
+        <h3 className="serif text-[34px] leading-none tracking-tight text-ink sm:text-[40px]">
+          {step.title}
+        </h3>
+        <span aria-hidden className="text-[22px] leading-none">
+          {step.icon}
+        </span>
+      </div>
+
+      <p
+        className={cn(
+          "mt-4 max-w-md text-[13.5px] leading-relaxed text-ink-2",
+          left ? "lg:ml-auto" : "",
+        )}
+      >
+        {step.blurb}
+      </p>
+
+      <div
+        className={cn(
+          "mt-6 flex items-center gap-4",
+          left ? "lg:flex-row-reverse" : "lg:flex-row",
+        )}
+      >
+        <span
+          className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[12.5px] text-ink-2 transition-colors group-hover:text-ink"
+          style={{ borderColor: "var(--line-strong)" }}
+        >
+          打开
+          <span className="serif-italic text-ink">{target}</span>
+          <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+        </span>
+        <span className="overline text-ink-4">
+          {downstream ? `下游 · ${downstream}` : "回存论文库"}
+        </span>
+      </div>
+    </Link>
+  );
+}
 
 /** 沿织线下落的「数据包」——少量彩色光点持续从上游流向下游，呼应一键流转。 */
 const PARTICLES = [
@@ -123,71 +235,14 @@ export function WeaveJourney() {
                   left ? "lg:col-start-1" : "lg:col-start-2",
                 )}
               >
-                <Link
-                  href={step.href}
-                  className={cn(
-                    "weave-station sheen group focus-ring relative block rounded-[22px] p-6 sm:p-7",
-                    left ? "lg:text-right" : "lg:text-left",
-                  )}
-                  style={{ ["--accent" as string]: step.accent }}
-                >
-                  <span
-                    className={cn(
-                      "overline flex items-center gap-1.5 text-ink-4",
-                      left ? "lg:justify-end" : "lg:justify-start",
-                    )}
-                  >
-                    {upstream ? `上游 · ${upstream}` : "链路起点"}
-                  </span>
-
-                  <div
-                    className={cn(
-                      "mt-3 flex items-baseline gap-4",
-                      left ? "lg:flex-row-reverse" : "lg:flex-row",
-                    )}
-                  >
-                    <span
-                      className="numeral text-[58px] leading-none sm:text-[68px]"
-                      style={{ color: step.accent }}
-                    >
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <h3 className="serif text-[34px] leading-none tracking-tight text-ink sm:text-[40px]">
-                      {step.title}
-                    </h3>
-                    <span aria-hidden className="text-[22px] leading-none">
-                      {step.icon}
-                    </span>
-                  </div>
-
-                  <p
-                    className={cn(
-                      "mt-4 max-w-md text-[13.5px] leading-relaxed text-ink-2",
-                      left ? "lg:ml-auto" : "",
-                    )}
-                  >
-                    {step.blurb}
-                  </p>
-
-                  <div
-                    className={cn(
-                      "mt-6 flex items-center gap-4",
-                      left ? "lg:flex-row-reverse" : "lg:flex-row",
-                    )}
-                  >
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[12.5px] text-ink-2 transition-colors group-hover:text-ink"
-                      style={{ borderColor: "var(--line-strong)" }}
-                    >
-                      打开
-                      <span className="serif-italic text-ink">{target}</span>
-                      <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                    </span>
-                    <span className="overline text-ink-4">
-                      {downstream ? `下游 · ${downstream}` : "回存论文库"}
-                    </span>
-                  </div>
-                </Link>
+                <StationCard
+                  step={step}
+                  index={i}
+                  left={left}
+                  upstream={upstream}
+                  downstream={downstream}
+                  target={target}
+                />
               </Reveal>
 
               {/* 工序卡：输入 → 产出（另一侧，填补留白 + 显性化流水线） */}

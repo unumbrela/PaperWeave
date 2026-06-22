@@ -200,11 +200,13 @@ body {
   pointer-events: none;
   --mx: 0.5;
   --my: 0.5;
+  /* Denser warm-pink cursor bloom (multiply): richer coral core + warmer mid
+     band + wider reach so the background halo reads clearly under the cursor. */
   background: radial-gradient(
     circle at center,
-    rgba(255, 138, 120, 0.18) 0%,
-    rgba(255, 198, 120, 0.08) 28%,
-    transparent 48%
+    rgba(255, 120, 105, 0.34) 0%,
+    rgba(255, 188, 120, 0.16) 30%,
+    transparent 54%
   );
   mix-blend-mode: multiply;
   transform: translate3d(
@@ -679,20 +681,35 @@ kbd {
   transform: perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y))
     translate3d(0, var(--tilt-lift), 0);
 }
+/* The core-flow stations join the tilt family. Keep their glass/border/shadow
+   transitions, but hand the transform over to the pointer tilt (the bare
+   .weave-station:hover lift would otherwise win the cascade and cancel it). */
+.tilt.weave-station {
+  transition:
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.4s ease,
+    border-color 0.4s ease,
+    box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tilt.weave-station:hover {
+  transform: perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y))
+    translate3d(0, var(--tilt-lift), 0);
+}
 .tilt::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  /* Denser, weightier cursor bloom: a brighter near-white core, a held mid
-     band, then a wider falloff so the light reads as a solid halo rather than
-     a faint smudge. Screen-blended so it lifts the glass instead of washing. */
+  /* Soft white cursor bloom. Kept gentle on purpose — a light core + quick
+     falloff so it reads as a subtle highlight, not a hard white blob.
+     Screen-blended so it lifts the glass instead of washing it out. The peak
+     opacity is dialed per-surface via --glow-o (see usePointerTilt). */
   background: radial-gradient(
     circle at var(--glow-x) var(--glow-y),
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(255, 255, 255, 0.5) 26%,
-    transparent 62%
+    rgba(255, 255, 255, 0.6) 0%,
+    rgba(255, 255, 255, 0.28) 28%,
+    transparent 55%
   );
   opacity: var(--glow-o);
   transition: opacity 0.3s ease;
