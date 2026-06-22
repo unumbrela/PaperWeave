@@ -670,7 +670,7 @@ export default function Page() {
             {/* 初始空态：先讲清检索架构（自绘架构图），再引导开始 */}
             {!isLoading && !hasSearched && results.length === 0 && (
               <div className="flex flex-1 flex-col items-center justify-center gap-6 p-6 text-center sm:p-8">
-                <div className="w-full max-w-3xl">
+                <div className="w-full max-w-5xl">
                   <p className="overline inline-flex items-center gap-1.5 text-ink-3">
                     <Sparkles className="h-3 w-3 text-plum" />
                     检索架构 · 借鉴 Perplexity 检索管线
@@ -683,11 +683,14 @@ export default function Page() {
                     title="点击查看大图"
                   >
                     <div className="relative aspect-[1672/941] w-full">
+                      {/* 架构图细节多、文字小：跳过优化器（其上限 1080px / quality 80 + WebP
+                          重压会把细线和小字糊掉），直接出原图 PNG，最清晰。 */}
                       <Image
                         src="/paper-search/architecture.png"
                         alt="文献检索架构图：研究意图 → LLM 查询扩展 → 多源并行检索 → 去重合并 → 联合打分重排 → 排序结果"
                         fill
-                        sizes="(max-width: 768px) 100vw, 760px"
+                        sizes="(max-width: 1024px) 100vw, 1000px"
+                        unoptimized
                         className="object-contain transition-transform duration-500 group-hover:scale-[1.01]"
                       />
                     </div>
