@@ -200,13 +200,13 @@ body {
   pointer-events: none;
   --mx: 0.5;
   --my: 0.5;
-  /* Denser warm-pink cursor bloom (multiply): richer coral core + warmer mid
-     band + wider reach so the background halo reads clearly under the cursor. */
+  /* Soft warm-pink cursor bloom (multiply): a small, light coral halo that
+     tints the background just under the cursor without dominating it. */
   background: radial-gradient(
     circle at center,
-    rgba(255, 120, 105, 0.34) 0%,
-    rgba(255, 188, 120, 0.16) 30%,
-    transparent 54%
+    rgba(255, 120, 105, 0.2) 0%,
+    rgba(255, 188, 120, 0.09) 24%,
+    transparent 40%
   );
   mix-blend-mode: multiply;
   transform: translate3d(
