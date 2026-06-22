@@ -1061,17 +1061,26 @@ kbd {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Continuous / auto-playing / cursor-driven motion stays off … */
   .weave-thread { animation: none; }
-  .weave-station:hover,
-  .terminal-card:hover { transform: none; }
   .hero-photo::before { animation: none; }
   .hero-photo { transform: none; }
   .weave-thread-progress { transform: scaleY(1); }
   .sheen:hover::after { animation: none; opacity: 0; }
   .weave-flow { display: none; }
   .weave-node::after { animation: none; display: none; }
-  .flow-panel:hover { transform: none; }
   .flow-dot { animation: none; }
+
+  /* … but discrete, user-triggered hover affordances stay (lift / border /
+     shadow / accent). We deliberately keep .weave-station:hover,
+     .terminal-card:hover and .flow-panel:hover lifting — they read as a state
+     change, not as motion — and just shorten the transitions so they snap in
+     near-instantly instead of sliding. */
+  .card-glass,
+  .tilt,
+  .weave-station,
+  .terminal-card,
+  .flow-panel { transition-duration: 0.12s; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1084,6 +1093,11 @@ kbd {
   .reveal { opacity: 1; transform: none; transition: none; }
   .logo-dot-spin,
   .shimmer-line { animation: none; }
+  /* No cursor-following parallax tilt and no moving spotlight … */
   .tilt { transform: none !important; }
   .tilt::after { display: none; }
+  /* … but keep a clear, static hover lift so the tool cards still respond to
+     the pointer (the underlying .card-glass:hover already brightens the border
+     + shadow, which reads as the glow). */
+  .tilt.card-glass:hover { transform: translateY(-6px) !important; }
 }
