@@ -1,7 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Terminal, GitBranch, Loader2, Sparkles } from "lucide-react";
+import {
+  Terminal,
+  GitBranch,
+  Loader2,
+  Sparkles,
+  ExternalLink,
+  Search,
+  Network,
+  ListTree,
+  FileText,
+} from "lucide-react";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
 import { cn } from "@/lib/utils";
@@ -20,9 +30,27 @@ import { ROLE_COLOR, ROLE_LABEL, RELATION_STYLE } from "@/lib/genealogy/theme";
 import { GenealogyTree, type TreeFilter } from "@/components/genealogy/GenealogyTree";
 import { GenealogyControls } from "@/components/genealogy/GenealogyControls";
 import { NodeDetail } from "@/components/genealogy/NodeDetail";
-import exampleLineage from "@/skills/research-genealogy/examples/generated-image-detection.json";
+import detectionLineage from "@/skills/research-genealogy/examples/generated-image-detection.json";
+import diffusionLineage from "@/skills/research-genealogy/examples/diffusion-models.json";
 
 const TOOL = getTool("research-genealogy")!;
+
+/** skill 仓库地址（终端深度模式安装与查看源码）。 */
+const SKILL_REPO = "https://github.com/unumbrela/research-genealogy";
+
+/** 站内可一键载入的真实示例（来自 skill 仓库 examples/，已逐边引文核验）。 */
+const EXAMPLES = [
+  {
+    data: diffusionLineage,
+    label: "扩散模型图像生成",
+    meta: "21 篇 · 2011 → 2025 · 25/27 边核验",
+  },
+  {
+    data: detectionLineage,
+    label: "生成图像检测",
+    meta: "12 篇 · 2018 → 2026 · 全边核验",
+  },
+] as const;
 
 /** 从渲染好的族谱里抽出前沿工作，组织成「送去立论」的参考文本（找研究空白用）。 */
 function gapPayload(lineage: Lineage): HandoffPayload {
@@ -116,8 +144,8 @@ export default function Page() {
     }
   };
 
-  const loadExample = () => {
-    const text = JSON.stringify(exampleLineage, null, 2);
+  const loadExample = (data: unknown) => {
+    const text = JSON.stringify(data, null, 2);
     setRaw(text);
     render(text);
   };
@@ -209,27 +237,105 @@ export default function Page() {
         </>
       )}
 
+      {/* 不想配 key / 想要逐边核验？先看真实示例，再走终端深度模式 */}
+      {!lineage && (
+        <div className="surface rounded-[20px] p-6 mb-6">
+          <div className="overline mb-2 flex items-center gap-1.5">
+            <ListTree className="h-3.5 w-3.5" /> 先看两个真实示例（已逐边引文核验）
+          </div>
+          <p className="text-[13.5px] leading-relaxed text-ink-2 mb-4">
+            没配 API key 也能体验——下面两份族谱由终端 skill 跑出、每条边经真实引文核验，
+            点开即在站内渲染成可交互的发展谱系。
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {EXAMPLES.map((ex) => (
+              <button
+                key={ex.label}
+                onClick={() => loadExample(ex.data)}
+                className="group/ex flex items-center justify-between rounded-xl border border-line bg-paper-2/60 px-4 py-3 text-left transition-all hover:border-line-strong hover:bg-paper-2 focus-ring"
+              >
+                <span>
+                  <span className="block text-[14px] font-medium text-ink">{ex.label}</span>
+                  <span className="mt-0.5 block text-[11.5px] text-ink-3">{ex.meta}</span>
+                </span>
+                <GitBranch className="h-4 w-4 text-ink-4 transition-colors group-hover/ex:text-ink-2" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 终端深度模式（高级）：跑 skill 做引文核验深度调研，再粘贴 lineage.json */}
       <details className="surface rounded-[20px] p-6 mt-6 group">
         <summary className="cursor-pointer list-none overline flex items-center gap-1.5 text-ink-2 transition-colors hover:text-ink">
           <Terminal className="h-3.5 w-3.5" /> 终端深度模式 · 引文核验的发展族谱（可选）
         </summary>
+
+        {/* 这是什么 + 四段流水线 + 多格式产出 */}
+        <div className="mt-5 rounded-xl border border-line bg-paper-2/40 p-5">
+          <p className="text-[13.5px] leading-relaxed text-ink-2">
+            <a
+              href={SKILL_REPO}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 font-medium text-ink underline decoration-line-strong underline-offset-2 hover:text-coral"
+            >
+              research-genealogy <ExternalLink className="h-3 w-3" />
+            </a>{" "}
+            是一个独立开源的 Claude Code skill：把一个研究方向，做成「谁在谁之上、哪些路线并行、什么被取代、前沿在哪」的
+            <strong>非线性发展谱系</strong>。节点全来自 OpenAlex / Semantic Scholar 真实元数据，
+            每条 builds-on 边都经 <code className="text-[12px] bg-paper-2 border border-line rounded px-1 py-0.5">verify.py</code> 逐边复核
+            （<span className="text-[#2e7d32]">✓ verified</span> / <span className="text-[#b26a00]">⚠ unverified</span> / ↺ reversed / ‼ cross-cite）。stdlib-only、免 pip、OpenAlex 免 key。
+          </p>
+
+          {/* 四段流水线 */}
+          <div className="mt-4 grid gap-2 sm:grid-cols-4">
+            {[
+              { icon: Search, t: "检索派生", d: "方向 → 主词 + 2~3 个英文别名" },
+              { icon: Network, t: "引文挖掘", d: "多轮检索 + 引文滚雪球" },
+              { icon: ListTree, t: "谱系构建", d: "领域内打分 + 传递约简 + 并行检测" },
+              { icon: FileText, t: "谱系报告", d: "真实摘要精修 + 树 + 叙事" },
+            ].map((s, i) => (
+              <div key={s.t} className="rounded-lg bg-paper-2/70 px-3 py-2.5">
+                <div className="flex items-center gap-1.5 text-[12px] font-medium text-ink">
+                  <s.icon className="h-3.5 w-3.5 text-ink-3" />
+                  <span className="text-ink-4">{i + 1}</span> {s.t}
+                </div>
+                <p className="mt-1 text-[11px] leading-snug text-ink-3">{s.d}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* 多格式产出 */}
+          <div className="mt-4 flex flex-wrap items-center gap-1.5 text-[11px]">
+            <span className="text-ink-3">一次产出多种格式：</span>
+            {["终端 ASCII 树", "Mermaid", "Markdown 报告", "BibTeX", "draw.io", "lineage.json"].map((f) => (
+              <span key={f} className="rounded-full border border-line bg-paper-2/70 px-2 py-0.5 text-ink-2">
+                {f}
+              </span>
+            ))}
+          </div>
+        </div>
+
         <div className="grid gap-6 lg:grid-cols-2 mt-5">
           <div>
             <div className="overline mb-2 flex items-center gap-1.5">
               <Terminal className="h-3.5 w-3.5" /> 第一步 · 终端里跑 skill（深度调研）
             </div>
             <p className="text-[13.5px] leading-relaxed text-ink-2">
-              <code className="text-[12px] bg-paper-2/80 border border-line rounded px-1.5 py-0.5">research-genealogy</code>{" "}
-              是本仓自带的 Claude Code skill：做多轮 OpenAlex 检索 + 引文滚雪球 + 谱系推导，
-              每条 builds-on 边都经真实引文核验，并附完整叙事报告。
+              装好后在 Claude Code 里用自然语言提问即可；也可走免 LLM 的 CLI 快路径直接出树。
             </p>
             <pre className="mt-3 rounded-xl bg-paper-2/80 border border-line px-4 py-3 text-[12px] leading-relaxed text-ink-2 overflow-x-auto">
-              {`# 安装（仓库根目录）
-cp -r skills/research-genealogy ~/.claude/skills/
+              {`# 安装（任选其一）
+npx skills add unumbrela/research-genealogy -g -a claude-code
+# 或手动放到 ~/.claude/skills/research-genealogy/
 
-# 在 Claude Code 里直接说：
-#   帮我梳理「生成图像检测」这个方向的发展历程`}
+# A · 在 Claude Code 里直接说：
+#   帮我梳理「扩散模型图像生成」这个方向的发展历程
+
+# B · 免 LLM 的 CLI 快路径（直接出树 + lineage.json）
+python3 scripts/genealogy.py "扩散模型图像生成" \\
+  --nodes 21 --render`}
             </pre>
           </div>
           <div>
@@ -251,7 +357,7 @@ cp -r skills/research-genealogy ~/.claude/skills/
                 "outline-none transition-colors focus:border-line-strong resize-y",
               )}
             />
-            <div className="mt-3 flex gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               <button
                 onClick={() => render(raw)}
                 disabled={!raw.trim()}
@@ -259,12 +365,15 @@ cp -r skills/research-genealogy ~/.claude/skills/
               >
                 渲染族谱
               </button>
-              <button
-                onClick={loadExample}
-                className="rounded-full border border-line bg-paper-2/60 px-5 py-2 text-[13px] text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
-              >
-                载入真实示例（生成图像检测 · 12 篇）
-              </button>
+              {EXAMPLES.map((ex) => (
+                <button
+                  key={ex.label}
+                  onClick={() => loadExample(ex.data)}
+                  className="rounded-full border border-line bg-paper-2/60 px-4 py-2 text-[13px] text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
+                >
+                  载入「{ex.label}」
+                </button>
+              ))}
             </div>
             {error && <p className="mt-2 text-[12.5px] text-[#a53425]">解析失败：{error}</p>}
           </div>
@@ -281,9 +390,9 @@ cp -r skills/research-genealogy ~/.claude/skills/
             「组织与叙述，绝不凭记忆报论文」。
           </p>
           <p>
-            <strong className="text-ink">边分两档。</strong>
-            网页版的边由 AI 在真实节点上综合，快但未经核验；终端版 verify.py 会逐边复核并打上
-            ✓ / ⚠ 标记，树上如实展示。
+            <strong className="text-ink">边可核验。</strong>
+            「B 引用 A」才会连出 A→B 的边；终端版 verify.py 逐边复核 OpenAlex / Semantic Scholar 引文，
+            打上 ✓ verified / ⚠ unverified / ↺ reversed / ‼ cross-cite，树上如实展示。网页版边为 AI 综合、未核验。
           </p>
           <p>
             <strong className="text-ink">前沿有保障。</strong>
