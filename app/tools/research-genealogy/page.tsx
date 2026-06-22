@@ -12,6 +12,9 @@ import {
   Network,
   GitFork,
   ArrowRightLeft,
+  Package,
+  Copy,
+  Check,
 } from "lucide-react";
 import { getTool } from "@/lib/tools-registry";
 import { ToolShell } from "@/components/tool-shell";
@@ -36,12 +39,14 @@ import diffusionLineage from "@/skills/research-genealogy/examples/diffusion-mod
 
 const TOOL = getTool("research-genealogy")!;
 
-/** skill 仓库地址（终端深度模式安装与查看源码）。 */
+/** skill 仓库地址（自研 Claude Code skill，安装与查看源码）。 */
 const SKILL_REPO = "https://github.com/unumbrela/research-genealogy";
+/** 一键安装命令。 */
+const INSTALL_CMD = "npx skills add unumbrela/research-genealogy -g -a claude-code";
 
-/** 仓库内的配图（已下载到 public/research-genealogy/）。 */
-const PIPELINE_IMG = "/research-genealogy/pipeline.png";
-const DIFFUSION_IMG = "/research-genealogy/diffusion-genealogy.png";
+/** 配图：原分辨率高质量 WebP（绕过优化器 ≤1080/q80 上限，优先保清晰，见 Figure）。 */
+const PIPELINE_IMG = "/research-genealogy/pipeline.webp";
+const DIFFUSION_IMG = "/research-genealogy/diffusion-genealogy.webp";
 
 /** 站内可一键载入的真实示例（来自 skill 仓库 examples/，已逐边引文核验）。 */
 const EXAMPLES = [
@@ -295,14 +300,32 @@ export default function Page() {
         <>
           {/* 一、这个模块能做什么 */}
           <section className="surface rounded-[20px] p-6 mb-6">
-            <div className="overline mb-3">这个模块能做什么</div>
+            <div className="overline mb-3 flex items-center gap-1.5">
+              <Package className="h-3.5 w-3.5" /> 自研 Claude Code Skill · 站内 + 终端两用
+            </div>
             <p className="serif text-[19px] leading-snug text-ink mb-1">
               输入一个研究方向，得到它<span className="serif-italic">从奠基到前沿</span>的发展族谱
             </p>
-            <p className="text-[13.5px] leading-relaxed text-ink-2 mb-5 max-w-3xl">
-              不是一份扁平的论文列表，而是一棵「谁在谁之上、哪些路线并行、什么被取代、最新前沿在哪」的
-              非线性发展树——每个节点都是真实论文，组织与叙述绝不凭记忆杜撰。
+            <p className="text-[13.5px] leading-relaxed text-ink-2 mb-4 max-w-3xl">
+              背后是一个<strong>自研、开源的 Claude Code skill</strong>
+              <a
+                href={SKILL_REPO}
+                target="_blank"
+                rel="noreferrer"
+                className="mx-1 inline-flex items-center gap-0.5 font-medium text-ink underline decoration-line-strong underline-offset-2 hover:text-coral"
+              >
+                research-genealogy <ExternalLink className="h-3 w-3" />
+              </a>
+              ——一行命令即可装进你自己的 Claude Code，在终端做引文核验的深度调研；它的产物又能一键带回站内，
+              渲染成下面这棵「谁在谁之上、哪些路线并行、什么被取代、前沿在哪」的非线性发展树。每个节点都是真实论文，绝不凭记忆杜撰。
             </p>
+
+            {/* 一键安装命令 */}
+            <div className="mb-5">
+              <div className="overline mb-1.5 text-[10px]">一行安装到你的 Claude Code</div>
+              <CopyCommand cmd={INSTALL_CMD} />
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-3">
               {FEATURES.map((f) => (
                 <div key={f.t} className="rounded-xl border border-line bg-paper-2/50 p-4">
@@ -489,6 +512,43 @@ python3 scripts/genealogy.py "扩散模型图像生成" \\
   );
 }
 
+/** 一行命令 + 复制按钮。 */
+function CopyCommand({ cmd }: { cmd: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(cmd);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* 剪贴板不可用时静默——用户仍可手动选中复制 */
+    }
+  };
+  return (
+    <div className="flex items-stretch gap-2">
+      <code className="flex-1 overflow-x-auto whitespace-nowrap rounded-lg border border-line bg-paper-2/80 px-3.5 py-2.5 font-mono text-[12.5px] text-ink-2">
+        <span className="select-none text-ink-4">$ </span>
+        {cmd}
+      </code>
+      <button
+        onClick={copy}
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-paper-2/60 px-3 text-[12px] text-ink-2 transition-colors hover:border-line-strong hover:text-ink focus-ring"
+        aria-label="复制安装命令"
+      >
+        {copied ? (
+          <>
+            <Check className="h-3.5 w-3.5 text-[#2e7d32]" /> 已复制
+          </>
+        ) : (
+          <>
+            <Copy className="h-3.5 w-3.5" /> 复制
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
 /** 带边框 / 浅底 / 可点击放大的配图。 */
 function Figure({
   src,
@@ -511,7 +571,15 @@ function Figure({
         style={{ aspectRatio: ratio }}
         title="点击查看大图"
       >
-        <Image src={src} alt={alt} fill sizes="(max-width: 1024px) 100vw, 880px" className="object-contain" />
+        {/* unoptimized：直出原分辨率高质量 WebP，绕过优化器 ≤1080/q80 的降采样，优先保清晰 */}
+        <Image
+          src={src}
+          alt={alt}
+          fill
+          unoptimized
+          sizes="(max-width: 1024px) 100vw, 880px"
+          className="object-contain"
+        />
         <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-paper/85 px-2 py-0.5 text-[10px] text-ink-3 opacity-0 transition-opacity group-hover/fig:opacity-100">
           <ExternalLink className="h-3 w-3" /> 看大图
         </span>
