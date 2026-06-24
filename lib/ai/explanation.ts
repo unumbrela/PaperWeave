@@ -38,7 +38,8 @@ export async function getAIExplanation(text: string, keys?: ResolvedKeys): Promi
     ], { model: 'gpt-4o-mini', temperature: 0.3, max_tokens: 1000 }, keys);
 
     const parseSection = (sectionName: string): string => {
-      const regex = new RegExp(`${sectionName}:\\n([\\s\\S]*?)(?=\\n[A-Z_]+:|$)`);
+      // 容忍冒号后到换行间的空白（部分模型会输出 `CORE_IDEA:  \n`，多余空格会让严格的 `:\n` 失配）
+      const regex = new RegExp(`${sectionName}:[^\\S\\r\\n]*\\r?\\n([\\s\\S]*?)(?=\\n[A-Z_]+:|$)`);
       const match = content.match(regex);
       return match ? match[1].trim() : '';
     };

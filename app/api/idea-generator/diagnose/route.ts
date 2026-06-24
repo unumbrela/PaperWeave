@@ -48,7 +48,7 @@ export async function POST(req: Request) {
   const keys = resolveKeys(req);
   if (!hasAnyKey(keys)) {
     return new Response(
-      "AI 服务未配置：请在右上角「API Key」填入你自己的 key（DeepSeek / OpenAI / Gemini / OpenRouter 任一）。",
+      "AI 服务未配置：请在右上角「API Key」填入你自己的 key（DeepSeek / OpenAI / Gemini / ZenMux 任一）。",
       { status: 503 },
     );
   }

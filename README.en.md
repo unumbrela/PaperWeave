@@ -64,7 +64,7 @@ The main line is a chain of two-character verbs that reads as the journey of a p
 | --- | --- |
 | Framework | Next.js 16 (App Router) · React 19 · TypeScript 5 |
 | Styling | Tailwind CSS v4 + a home-grown warm-paper design system |
-| AI | streaming and non-streaming both go through **DeepSeek → OpenAI → Gemini** three-tier auto-fallback (any one key unlocks all AI tools); embedding goes through OpenAI / Gemini |
+| AI | default **DeepSeek → OpenAI → Gemini** three-tier auto-fallback (any one key unlocks all AI tools); plus a **ZenMux** gateway — "one key unlocks higher-end models", routing Claude / GPT / Gemini / DeepSeek / Qwen etc. (pick one in `/settings`; the selected model becomes the primary provider, falling back to the default chain on failure); embedding goes through OpenAI / Gemini |
 | Search | OpenAlex + arXiv + Crossref + Europe PMC aggregation (with timeouts and rate limiting, cross-source dedup) |
 | Persistence | **local** Dexie / IndexedDB (single source of truth, incl. PDF Blob) + **optional cloud** Supabase (Auth + Postgres + row-level security RLS) cross-device sync |
 | Visualization | D3.js · Three.js / React Three Fiber · TensorFlow.js |
@@ -91,11 +91,12 @@ Iron rules:
 
 | Path | Module | Notes |
 | --- | --- | --- |
-| Streaming | `streamChat()` in [`lib/ai/stream.ts`](lib/ai/stream.ts) | DeepSeek → OpenAI → Gemini sequential fallback, switching automatically before the first token; a route-level guard returns a readable 503 when no key is configured, never breaking mid-stream; `idea-generator` can use a reasoner deep-reasoning tier |
-| Non-streaming | [`lib/ai/client.ts`](lib/ai/client.ts) | same-order fallback, 30s timeout per provider, returns on first success |
+| Streaming | `streamChat()` in [`lib/ai/stream.ts`](lib/ai/stream.ts) | if the visitor selected a ZenMux model it is used first, otherwise DeepSeek → OpenAI → Gemini sequential fallback, switching automatically before the first token; a route-level guard returns a readable 503 when no key is configured, never breaking mid-stream; `idea-generator` can use a reasoner deep-reasoning tier |
+| Non-streaming | [`lib/ai/client.ts`](lib/ai/client.ts) | same order (selected ZenMux model first → DeepSeek/OpenAI/Gemini), 30s timeout per provider, returns on first success |
+| Model gateway | [`lib/ai/zenmux.ts`](lib/ai/zenmux.ts) · [`lib/ai/models.ts`](lib/ai/models.ts) | ZenMux is an OpenAI-compatible gateway (baseURL `https://zenmux.ai/api/v1`); the curated `ZENMUX_MODELS` list (`vendor/model` ids, all verified callable) is passed via the `x-zenmux-model` header; closed-source models route directly without extra opt-in |
 | Embedding | [`lib/ai/embeddings.ts`](lib/ai/embeddings.ts) | OpenAI `text-embedding-3-small` (1536d) primary → Gemini `text-embedding-004` (768d) backup; returns a `model` tag, and **vectors from different models must never be compared** |
 
-**BYOK (bring your own key)**: `resolveKeys(req)` in [`lib/ai/keys.ts`](lib/ai/keys.ts) resolves keys by "request headers `x-deepseek-key`/`x-openai-key`/`x-gemini-key` first → env vars as fallback"; the frontend counterpart is `lib/ai/user-keys.ts` + the `/settings` page. Placeholder keys (`ci-placeholder` etc.) are treated as unconfigured. In a public deployment the server can carry no LLM key at all — zero cost to the host, and not abusable.
+**BYOK (bring your own key)**: `resolveKeys(req)` in [`lib/ai/keys.ts`](lib/ai/keys.ts) resolves keys by "request headers `x-deepseek-key`/`x-openai-key`/`x-gemini-key`/`x-zenmux-key` (plus `x-zenmux-model` selection) first → env vars as fallback"; the frontend counterpart is `lib/ai/user-keys.ts` + the `/settings` page. Placeholder keys (`ci-placeholder` etc.) are treated as unconfigured. In a public deployment the server can carry no LLM key at all — zero cost to the host, and not abusable.
 
 ### Registry-driven
 
@@ -142,6 +143,7 @@ At this point **all core features already work**: search, ingest, PDF reading/an
 | --- | --- | --- |
 | `DEEPSEEK_API_KEY` | streaming AI available by default (idea generation can use reasoner deep reasoning) | readable 503 prompt, guiding visitors to bring their own key in `/settings` |
 | `OPENAI_API_KEY` / `GOOGLE_API_KEY` | DeepSeek-equivalent fallback + embedding | same as above |
+| `ZENMUX_API_KEY` | unlocks higher-end models (Claude / GPT / Gemini / DeepSeek / Qwen etc. via the ZenMux gateway, pick one in `/settings`) | does not affect the default chain; DeepSeek/OpenAI/Gemini work as usual |
 | `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` | shows the login entry; login enables two-way cloud sync | login entry hidden, pure local mode |
 | `SUPABASE_SERVICE_ROLE_KEY` (+ `SUPABASE_URL`) | search cache, hot queries, read-only sharing | cache transparently degrades to direct; sharing entry hidden |
 | `METRICS_TOKEN` | gates `/api/metrics` | the metrics endpoint is public |

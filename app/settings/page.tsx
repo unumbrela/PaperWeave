@@ -10,7 +10,7 @@ import {
   setSelectedModel,
   type UserKeys,
 } from "@/lib/ai/user-keys";
-import { OPENROUTER_MODELS } from "@/lib/ai/models";
+import { ZENMUX_MODELS } from "@/lib/ai/models";
 
 const FIELDS: Array<{
   id: keyof UserKeys;
@@ -20,18 +20,18 @@ const FIELDS: Array<{
   href: string;
 }> = [
   {
-    id: "openrouter",
-    label: "OpenRouter API Key（推荐 · 解锁多模型）",
-    placeholder: "sk-or-v1-...",
-    hint: "一个 key 解锁 Claude / GPT / Gemini / DeepSeek / Qwen / Llama 等多家模型，下面可挑选。",
-    href: "https://openrouter.ai/keys",
-  },
-  {
     id: "deepseek",
-    label: "DeepSeek API Key",
+    label: "DeepSeek API Key（默认）",
     placeholder: "sk-...",
     hint: "默认 LLM，所有流式工具（速读 / 总结 / idea / 规划 / 封装）都用它，最便宜。",
     href: "https://platform.deepseek.com/api_keys",
+  },
+  {
+    id: "zenmux",
+    label: "ZenMux API Key（推荐 · 解锁高级模型）",
+    placeholder: "sk-ai-v1-...",
+    hint: "一个 key 解锁 Claude / GPT / Gemini / DeepSeek / Qwen 等更高级模型，下面可挑选。",
+    href: "https://zenmux.ai/settings/keys",
   },
   {
     id: "openai",
@@ -90,7 +90,7 @@ export default function SettingsPage() {
     setSaved(false);
   };
 
-  const hasOpenRouter = !!keys.openrouter?.trim();
+  const hasZenMux = !!keys.zenmux?.trim();
 
   return (
     <section className="mx-auto w-full max-w-2xl px-6 pt-14 pb-24">
@@ -143,34 +143,20 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {/* OpenRouter 模型选择：仅在填了 OpenRouter key 后启用 */}
+      {/* ZenMux 模型选择：仅在填了 ZenMux key 后启用 */}
       <div className="mt-8">
         <div className="flex items-center gap-2 mb-1.5">
           <Sparkles className="h-4 w-4 text-[#9b5de5]" />
           <h2 className="text-[14px] font-medium text-ink">选择模型</h2>
         </div>
         <p className="text-[12px] text-ink-3 mb-3">
-          {hasOpenRouter
+          {hasZenMux
             ? "选中一个模型后，全站 AI 调用会优先用它（失败自动回退到你配置的其他 key）。再点一次可取消选择。"
-            : "填入上方 OpenRouter API Key 后即可解锁以下模型。未选择时使用默认链路（DeepSeek → OpenAI → Gemini）。"}
+            : "填入上方 ZenMux API Key 后即可解锁以下模型。未选择时使用默认链路（DeepSeek → OpenAI → Gemini）。"}
         </p>
-        {hasOpenRouter ? (
-          <p className="text-[11px] text-ink-3 mb-3 -mt-1.5">
-            带「需开启数据策略」标记的闭源模型（Claude / GPT / Gemini）需先到{" "}
-            <a
-              href="https://openrouter.ai/settings/privacy"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#9b5de5] hover:underline"
-            >
-              OpenRouter 隐私设置
-            </a>{" "}
-            开启数据策略，否则会被供应商拒绝（403）；开源模型（DeepSeek / Qwen / Llama）无需此步。
-          </p>
-        ) : null}
 
-        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2.5 ${hasOpenRouter ? "" : "opacity-50 pointer-events-none"}`}>
-          {OPENROUTER_MODELS.map((m) => {
+        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2.5 ${hasZenMux ? "" : "opacity-50 pointer-events-none"}`}>
+          {ZENMUX_MODELS.map((m) => {
             const active = model === m.id;
             return (
               <button
@@ -192,9 +178,6 @@ export default function SettingsPage() {
                 </div>
                 <div className="mt-0.5 text-[11px] text-ink-3">{m.vendor}</div>
                 <p className="mt-1.5 text-[12px] leading-snug text-ink-2">{m.hint}</p>
-                {m.needsDataPolicy ? (
-                  <span className="mt-1.5 inline-block text-[10px] text-ink-3">需开启数据策略</span>
-                ) : null}
                 {active ? (
                   <span className="mt-2 inline-flex items-center gap-1 text-[11px] text-[#9b5de5]">
                     <Check className="h-3 w-3" /> 已选用

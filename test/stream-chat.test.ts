@@ -60,7 +60,7 @@ beforeEach(() => {
   vi.stubEnv('DEEPSEEK_API_KEY', '');
   vi.stubEnv('OPENAI_API_KEY', '');
   vi.stubEnv('GOOGLE_API_KEY', '');
-  vi.stubEnv('OPENROUTER_API_KEY', '');
+  vi.stubEnv('ZENMUX_API_KEY', '');
 });
 
 describe('streamChat 多供应商 fallback', () => {
@@ -101,38 +101,38 @@ describe('streamChat 多供应商 fallback', () => {
     expect(params.model).toBe('deepseek-reasoner');
   });
 
-  it('选定 OpenRouter 模型时优先用它，且带归属头与该 model', async () => {
-    createMock.mockImplementation(() => fakeChunks(['via', ' or']));
+  it('选定 ZenMux 模型时优先用它，且带归属头与该 model', async () => {
+    createMock.mockImplementation(() => fakeChunks(['via', ' zm']));
 
     let provider = '';
     const stream = await streamChat(
       MESSAGES,
       {},
-      { deepseek: 'ds-key', openrouter: 'or-key', openrouterModel: 'anthropic/claude-sonnet-4.5' },
+      { deepseek: 'ds-key', zenmux: 'zm-key', zenmuxModel: 'anthropic/claude-sonnet-4.6' },
       (meta) => { provider = meta.provider; },
     );
 
-    expect(await readAll(stream)).toBe('via or');
-    expect(provider).toBe('openrouter:anthropic/claude-sonnet-4.5');
-    // 第一手就走 OpenRouter（DeepSeek 没被触达）
+    expect(await readAll(stream)).toBe('via zm');
+    expect(provider).toBe('zenmux:anthropic/claude-sonnet-4.6');
+    // 第一手就走 ZenMux（DeepSeek 没被触达）
     expect(createMock).toHaveBeenCalledTimes(1);
     const [cfg, params] = createMock.mock.calls[0] as [
       { baseURL?: string; defaultHeaders?: Record<string, string> },
       { model: string },
     ];
-    expect(cfg.baseURL).toContain('openrouter.ai');
+    expect(cfg.baseURL).toContain('zenmux.ai');
     expect(cfg.defaultHeaders?.['X-Title']).toBeTruthy();
-    expect(params.model).toBe('anthropic/claude-sonnet-4.5');
+    expect(params.model).toBe('anthropic/claude-sonnet-4.6');
   });
 
-  it('仅有 OpenRouter key、未选型时用兜底模型', async () => {
+  it('仅有 ZenMux key、未选型时用兜底模型', async () => {
     createMock.mockImplementation(() => fakeChunks(['ok']));
 
     let provider = '';
-    const stream = await streamChat(MESSAGES, {}, { openrouter: 'or-key' }, (meta) => { provider = meta.provider; });
+    const stream = await streamChat(MESSAGES, {}, { zenmux: 'zm-key' }, (meta) => { provider = meta.provider; });
 
     expect(await readAll(stream)).toBe('ok');
-    expect(provider).toMatch(/^openrouter:/);
+    expect(provider).toMatch(/^zenmux:/);
   });
 
   it('全供应商失败时流以最后一个错误收尾（不静默吞掉）', async () => {
