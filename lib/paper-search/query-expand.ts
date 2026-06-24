@@ -14,7 +14,10 @@ import type { SearchQuery } from './types';
 import { buildKeywordQuery } from './search-service';
 
 /** 单次扩展产出的最大子查询数（含原始查询；防 fan-out 放大上游与延迟）。 */
-export const MAX_SUBQUERIES = 5;
+export const MAX_SUBQUERIES = 3;
+
+/** LLM 扩展调用的软超时（ms）：超时即降级单查询，不让一次慢扩展拖住整次检索。 */
+export const EXPAND_TIMEOUT_MS = 6000;
 
 /** 从 LLM 文本中提取字符串数组，容忍 ```json 围栏与前后杂文。解析不出返回 null。 */
 export function extractStringArray(text: string): string[] | null {
@@ -76,18 +79,25 @@ ${intent ? `研究意图：${intent}` : ''}
 只返回一个 JSON 字符串数组，不要任何其他文字。例如：["query one", "query two"]`;
 
   try {
-    const raw = await chatCompletion(
-      [
-        {
-          role: 'system',
-          content:
-            '你是学术检索专家，擅长把一个研究主题展开成互补的多条检索式以最大化召回。只输出 JSON 数组。',
-        },
-        { role: 'user', content: prompt },
-      ],
-      { temperature: 0.4, max_tokens: 400 },
-      keys,
-    );
+    // 软超时：chatCompletion 自身默认 30s 太久；超时直接走 catch 降级单查询。
+    // （底层 fetch 不会被取消，但 serverless 下提前返回即可，不影响检索时延）
+    const raw = await Promise.race([
+      chatCompletion(
+        [
+          {
+            role: 'system',
+            content:
+              '你是学术检索专家，擅长把一个研究主题展开成互补的多条检索式以最大化召回。只输出 JSON 数组。',
+          },
+          { role: 'user', content: prompt },
+        ],
+        { temperature: 0.4, max_tokens: 400 },
+        keys,
+      ),
+      new Promise<string>((_, reject) =>
+        setTimeout(() => reject(new Error('expandQuery timeout')), EXPAND_TIMEOUT_MS),
+      ),
+    ]);
     const extra = extractStringArray(raw) ?? [];
     return dedupeQueries([base, ...extra]).slice(0, MAX_SUBQUERIES);
   } catch (e) {

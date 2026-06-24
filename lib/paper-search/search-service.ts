@@ -1,5 +1,26 @@
 import type { SearchQuery, PaperResult } from './types';
 
+/** 单个上游请求的默认超时（ms）。超时即按该源失败处理，不拖垮整体（allSettled 容错）。 */
+export const UPSTREAM_TIMEOUT_MS = 8000;
+
+/**
+ * 带超时的 fetch：超时用 AbortController 取消，避免某个慢上游让 Promise.allSettled
+ * 一直等到浏览器/Node 默认超时（~30s）。超时抛错，由各 search 函数的 catch 接住 → 记入 failedSources。
+ */
+export async function fetchWithTimeout(
+  url: string,
+  init?: RequestInit,
+  timeoutMs: number = UPSTREAM_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function getFieldKeywords(field?: string) {
   const fieldMap: Record<string, string> = {
     'medical-imaging': 'medical image segmentation',
@@ -100,7 +121,7 @@ export async function searchOpenAlex(query: SearchQuery): Promise<PaperResult[]>
     }
     
     
-    const response = await fetch(url);
+    const response = await fetchWithTimeout(url);
     if (!response.ok) {
       throw new Error(`OpenAlex API error: ${response.status}`);
     }
@@ -188,9 +209,12 @@ export async function searchArXiv(query: SearchQuery): Promise<PaperResult[]> {
     // arXiv 的 sortBy 仅支持 relevance / lastUpdatedDate / submittedDate；
     // sortOrder 只接受 ascending / descending（传 "desc" 会被 arXiv 直接 400）。
     const arxivSortBy = query.sortBy === 'year' ? 'submittedDate' : query.sortBy === 'relevance' ? 'relevance' : 'submittedDate';
-    const url = `https://export.arxiv.org/api/query?search_query=${searchQuery}&max_results=${query.maxResults || 20}&sortBy=${arxivSortBy}&sortOrder=descending`;
+    // 多取一些：arXiv 是「可打开主源」，跨源去重 + 综合截断前先攒够候选，
+    // 避免最新的 2026 预印本在相关性排序里被过早砍掉（与 OpenAlex/Crossref over-fetch 对齐）。
+    const arxivMax = Math.min(Math.max(query.maxResults || 30, 50), 100);
+    const url = `https://export.arxiv.org/api/query?search_query=${searchQuery}&max_results=${arxivMax}&sortBy=${arxivSortBy}&sortOrder=descending`;
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (compatible; PaperWeave/1.0; +https://github.com/unumbrela/toolbox)',
@@ -284,7 +308,8 @@ export async function searchSemanticScholar(query: SearchQuery, apiKey?: string)
     
     const params = new URLSearchParams();
     params.set('query', buildKeywordQuery(query));
-    params.set('limit', String(query.maxResults || 20));
+    // over-fetch：S2 带 openAccessPdf 直链、是可打开源，多取候选给跨源合并/截断留余量
+    params.set('limit', String(Math.min(Math.max(query.maxResults || 30, 50), 100)));
     // 不带 fields 时 S2 只返回 paperId + title（摘要/引用数/年份全为空），必须显式声明
     params.set(
       'fields',
@@ -297,8 +322,8 @@ export async function searchSemanticScholar(query: SearchQuery, apiKey?: string)
     }
 
     const url = `https://api.semanticscholar.org/graph/v1/paper/search?${params.toString()}`;
-    
-    const response = await fetch(url, {
+
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers,
     });
@@ -359,7 +384,7 @@ export async function searchCrossref(query: SearchQuery): Promise<PaperResult[]>
     }
 
     const url = `https://api.crossref.org/works?${params.toString()}`;
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       headers: {
         // Crossref 礼貌池：带可联系信息换取更稳定的限流配额
         'User-Agent':
@@ -444,7 +469,7 @@ export async function searchEuropePMC(query: SearchQuery): Promise<PaperResult[]
     else if (query.sortBy === 'citations') params.set('sort', 'CITED desc');
 
     const url = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?${params.toString()}`;
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       headers: {
         'User-Agent':
           'PaperWeave/1.0 (https://github.com/unumbrela/toolbox; mailto:noreply@paperweave.app)',
@@ -616,8 +641,24 @@ export function mergeDuplicates(results: PaperResult[]): PaperResult[] {
 }
 
 /**
- * 综合排序 = 按源交错（round-robin）：各源内部保持上游自己的相关性顺序，
- * 跨源轮流取，避免「有引用数的源整体压过没有引用数的源」。
+ * 「可打开优先」的源排序：arXiv / Semantic Scholar / Europe PMC 大多带稳定直链或预印本 PDF，
+ * 能直接在论文库阅读；Crossref / OpenAlex 常只有 DOI 落地页（打不开）。排在前面的更靠前出现。
+ * 未列出的源（理论上不会有）排在已知源之后。
+ */
+export const SOURCE_PRIORITY = ['arxiv', 'semantic-scholar', 'europepmc', 'crossref', 'openalex'];
+
+/** 每轮交错时各源的取数权重：arXiv 是可打开主源，给双倍名额（其余源各 1）。 */
+const SOURCE_WEIGHT: Record<string, number> = { arxiv: 2 };
+
+function sourceRank(source: string): number {
+  const i = SOURCE_PRIORITY.indexOf(source);
+  return i === -1 ? SOURCE_PRIORITY.length : i;
+}
+
+/**
+ * 综合排序 = 按源加权交错：各源内部保持上游自己的相关性顺序，跨源按「可打开优先」
+ * 的顺序轮流取，并给 arXiv 双倍名额——既避免「有引用数的源整体压过没有引用数的源」，
+ * 又让可在论文库打开的源（arXiv 等）更靠前。不丢弃任何结果（OpenAlex 仍在，只是靠后）。
  */
 export function interleaveBySource(results: PaperResult[]): PaperResult[] {
   const groups = new Map<string, PaperResult[]>();
@@ -626,11 +667,17 @@ export function interleaveBySource(results: PaperResult[]): PaperResult[] {
     if (g) g.push(p);
     else groups.set(p.source, [p]);
   }
-  const queues = [...groups.values()];
+  // 按可打开优先级排序队列（稳定：同级保持插入序）
+  const queues = [...groups.entries()].sort((a, b) => sourceRank(a[0]) - sourceRank(b[0]));
+  const cursors = queues.map(() => 0);
   const out: PaperResult[] = [];
-  for (let i = 0; out.length < results.length; i++) {
-    for (const q of queues) {
-      if (i < q.length) out.push(q[i]);
+  while (out.length < results.length) {
+    for (let qi = 0; qi < queues.length; qi++) {
+      const [source, list] = queues[qi];
+      const take = SOURCE_WEIGHT[source] ?? 1;
+      for (let t = 0; t < take && cursors[qi] < list.length; t++) {
+        out.push(list[cursors[qi]++]);
+      }
     }
   }
   return out;
@@ -662,20 +709,23 @@ export async function searchPapers(
   const failedSources: string[] = [];
   const labeled: Array<{ source: string; task: Promise<PaperResult[]> }> = [];
 
-  if (sources.includes('openalex')) {
-    labeled.push({ source: 'openalex', task: searchOpenAlex(query) });
-  }
+  // 入队顺序 = 跨源合并时「先到者」即代表的优先级（mergeDuplicates 以最小下标为根）。
+  // 按「可打开优先」排（arXiv → S2 → Europe PMC → Crossref → OpenAlex），这样同一篇论文
+  // 跨源命中时，代表身份取自带稳定 PDF/预印本的源 → 合并结果可在论文库直接打开。
   if (sources.includes('arxiv')) {
     labeled.push({ source: 'arxiv', task: searchArXiv(query) });
   }
   if (sources.includes('semantic-scholar')) {
     labeled.push({ source: 'semantic-scholar', task: searchSemanticScholar(query, apiKeys?.['semantic-scholar']) });
   }
+  if (sources.includes('europepmc')) {
+    labeled.push({ source: 'europepmc', task: searchEuropePMC(query) });
+  }
   if (sources.includes('crossref')) {
     labeled.push({ source: 'crossref', task: searchCrossref(query) });
   }
-  if (sources.includes('europepmc')) {
-    labeled.push({ source: 'europepmc', task: searchEuropePMC(query) });
+  if (sources.includes('openalex')) {
+    labeled.push({ source: 'openalex', task: searchOpenAlex(query) });
   }
 
   if (labeled.length === 0) {
@@ -738,6 +788,9 @@ export function rerankFanout(
     if (p.year) s += Math.max(0, 5 - (nowYear - p.year)) * 0.5;
     // 引用：对数加成，避免老论文凭高引用碾压新论文
     if (p.citations && p.citations > 0) s += Math.log10(p.citations + 1);
+    // 可打开加成：能在论文库直接阅读的（arXiv 预印本或带直链 PDF）小幅靠前，
+    // 与交错排序「可打开优先」口径一致；权重小，不盖过覆盖广度主信号。
+    if (p.arxivId || p.pdfUrl) s += 1;
     return s;
   };
   return [...results]
@@ -773,7 +826,7 @@ export async function runPooled<T>(
 }
 
 /** fan-out 时同时在飞的子查询上限（× 源数 = 实际上游并发上限）。 */
-export const FANOUT_CONCURRENCY = 2;
+export const FANOUT_CONCURRENCY = 3;
 
 /**
  * Perplexity 式 fan-out 检索：对多条子查询各自跨源检索，

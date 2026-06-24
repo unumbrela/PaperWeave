@@ -97,8 +97,8 @@ describe('normalizeTitleKey / mergeDuplicates（跨源合并）', () => {
   });
 });
 
-describe('interleaveBySource（综合排序 = 按源交错）', () => {
-  it('各源内部保持原序，跨源轮流取', () => {
+describe('interleaveBySource（综合排序 = 可打开优先的加权交错）', () => {
+  it('arXiv 优先且双倍取数，各源内部保持原序', () => {
     const out = interleaveBySource([
       paper({ id: 'o1', source: 'openalex' }),
       paper({ id: 'o2', source: 'openalex' }),
@@ -106,7 +106,8 @@ describe('interleaveBySource（综合排序 = 按源交错）', () => {
       paper({ id: 'a1', source: 'arxiv' }),
       paper({ id: 'a2', source: 'arxiv' }),
     ]);
-    expect(out.map((p) => p.id)).toEqual(['o1', 'a1', 'o2', 'a2', 'o3']);
+    // arXiv 排在 OpenAlex 前、每轮取 2：a1,a2 先出，再按 round-robin 取 OpenAlex
+    expect(out.map((p) => p.id)).toEqual(['a1', 'a2', 'o1', 'o2', 'o3']);
   });
 
   it('单源时为恒等', () => {
@@ -232,7 +233,8 @@ describe('searchPapers (allSettled 容错 + 去重)', () => {
     );
 
     const outcome = await searchPapers({ keywords: 'x', sortBy: 'relevance' }, ['openalex', 'arxiv']);
-    expect(outcome.results.map((p) => p.title)).toEqual(['OA One', 'AX One', 'OA Two', 'AX Two']);
+    // arXiv 可打开优先 + 双倍取数：AX 先出（保持各源内部相关性序），OpenAlex 紧随
+    expect(outcome.results.map((p) => p.title)).toEqual(['AX One', 'AX Two', 'OA One', 'OA Two']);
   });
 
   it('arXiv 请求 URL 使用合法的 sortOrder=descending（回归：传 desc 会被 arXiv 400）', async () => {

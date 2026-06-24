@@ -39,7 +39,7 @@ export default function Page() {
   const router = useRouter();
   const [apiConfig, setApiConfig] = useState<Record<string, string>>({});
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedSources, setSelectedSources] = useState(["openalex", "arxiv", "crossref"]);
+  const [selectedSources, setSelectedSources] = useState(["arxiv", "semantic-scholar", "openalex", "crossref"]);
 
   const [searchQuery, setSearchQuery] = useState<SearchQuery>({
     field: "",
@@ -48,7 +48,7 @@ export default function Page() {
     startYear: new Date().getFullYear() - 2,
     endYear: new Date().getFullYear(),
     venues: [],
-    maxResults: 30,
+    maxResults: 50,
     sortBy: "relevance",
   });
 
@@ -85,7 +85,7 @@ export default function Page() {
         // 挂载时一次性从 localStorage 水合配置，非级联渲染
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setApiConfig(config.apiConfig || {});
-        setSelectedSources(config.sources || ["openalex", "arxiv", "crossref"]);
+        setSelectedSources(config.sources || ["arxiv", "semantic-scholar", "openalex", "crossref"]);
       } catch {
         console.error("Failed to load search config");
       }

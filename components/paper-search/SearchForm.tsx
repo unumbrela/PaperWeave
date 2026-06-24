@@ -14,12 +14,13 @@ import { cn } from "@/lib/utils";
  * 注意：types.ts 里的 SEARCH_SOURCES 还列了 IEEE / Scopus 等未实现的源，
  * 这里只展示可用的，避免「点了没反应」的假选项。
  */
+// 顺序 = 综合排序里的「可打开优先」：arXiv 主源在前，OpenAlex/Crossref（常只有 DOI 落地页）靠后。
 const LIVE_SOURCES = [
-  { id: "openalex", name: "OpenAlex", dot: "var(--ocean)", hint: "2.5 亿学术作品 · 全学科" },
-  { id: "arxiv", name: "arXiv", dot: "var(--coral)", hint: "预印本 · 更新最快" },
+  { id: "arxiv", name: "arXiv", dot: "var(--coral)", hint: "预印本 · 更新最快 · 可直接在论文库阅读" },
+  { id: "semantic-scholar", name: "S2", fullName: "Semantic Scholar", dot: "var(--ocean)", hint: "全学科 · 多带可读直链 · 无 key 偶限流" },
+  { id: "openalex", name: "OpenAlex", dot: "var(--ocean)", hint: "2.5 亿学术作品 · 全学科 · 多为 DOI 落地页" },
   { id: "crossref", name: "Crossref", dot: "var(--plum)", hint: "1.5 亿 DOI · 正式出版" },
   { id: "europepmc", name: "Europe PMC", dot: "var(--sage)", hint: "生物医学 · 含 bioRxiv/medRxiv 预印本" },
-  { id: "semantic-scholar", name: "S2", fullName: "Semantic Scholar", dot: "var(--ocean)", hint: "需 API key（设置中填）" },
 ] as const;
 
 /** 快速方向包：一键填充关键词并立即检索。 */

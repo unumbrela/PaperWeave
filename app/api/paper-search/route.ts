@@ -27,11 +27,13 @@ export async function POST(request: Request) {
       endYear: body.endYear,
       venues: body.venues,
       // 夹上限：防止构造大值放大上游与内存开销（各上游另有自身上限）
-      maxResults: Math.min(Math.max(Number(body.maxResults) || 30, 1), 100),
+      maxResults: Math.min(Math.max(Number(body.maxResults) || 50, 1), 100),
       sortBy: body.sortBy || 'relevance',
     };
 
-    const sources = body.sources || ['openalex', 'arxiv', 'crossref'];
+    // 默认源：arXiv 优先（可打开主源）+ Semantic Scholar（带直链 PDF、覆盖全学科最新）；
+    // OpenAlex 保留但靠后（综合排序里降权，纯 OpenAlex 期刊论文常打不开）。
+    const sources = body.sources || ['arxiv', 'semantic-scholar', 'openalex', 'crossref'];
     const apiKeys = body.apiKeys;
 
     // 查询扩展（Perplexity 式 fan-out）：默认开启，可由 body.expand=false 关闭。
