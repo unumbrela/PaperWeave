@@ -10,6 +10,7 @@ import { consumeHandoff } from "@/lib/workflow/handoff";
 import { HandoffBanner, SaveToLibrary } from "@/components/workflow/handoff-controls";
 import { Download } from "lucide-react";
 import { DrawioPreview } from "@/components/figure/DrawioPreview";
+import { PromptActions } from "@/components/figure/PromptActions";
 import { extractMxfile, downloadDrawio } from "@/lib/figure/drawio";
 import { DRAWIO_EXAMPLE } from "@/lib/figure/drawio-example";
 import { cn } from "@/lib/utils";
@@ -69,18 +70,18 @@ type DiagramType = (typeof DIAGRAM_TYPES)[number]["value"];
 type Direction = (typeof DIRECTIONS)[number]["value"];
 type Mode = "prompt" | "drawio";
 
-// 一个端到端示例：输入还原 → 生成的提示词 → GPT-image 成图。
+// 一个端到端示例（医学图像方向）：输入还原 → 生成的提示词 → GPT-image 成图。
 const EXAMPLE = {
   figureType: "workflow",
-  subject: `"真实生成模型本机推理 → 逐帧数据 → 手机端回放" 的数据来源管线`,
-  content: `左段「真实模型本机 GPU 推理」：一块 GPU/服务器图标连出三条平行支线——文本=Qwen3-1.7B（逐 token 概率分布小直方图）、分子=EDM E(3) 等变扩散（de novo 3D 分子）、蛋白=Genie2 SE(3) 扩散（de novo 螺旋骨架）；中段「逐帧轨迹导出」：三条支线汇入一叠轻量 JSON 数据卡片，表示生成过程的每一帧被记录导出；右段「手机端 AR 回放」：一只手机/AR 视图图标读取数据后逐帧插值播放三维演示。中段下方加一个橙色高亮徽标标注"诚实性说明：无条件生成、真实 de novo 输出"。`,
+  subject: `多模态 MRI 脑胶质瘤自动分割与分级辅助诊断`,
+  content: `第一段「多模态 MRI 采集」：四张并排脑部 MRI 切片缩略图，分别标注 T1、T1c、T2、FLAIR；第二段「预处理」：颅骨剥离、配准对齐、强度归一化三枚小图标；第三段「深度分割网络」：一个 U 形编码器-解码器（含跳跃连接），输出一张带三色掩膜的脑切片——增强肿瘤、瘤周水肿、坏死核心；第四段「分级与报告」：影像组学特征图标接入分级分类器，输出标注 WHO 分级与肿瘤体积的结构化诊断报告卡片。`,
   layout: "horizontal",
-  palette: `蓝色与浅紫色为主色，橙色用于强调"真实模型"标识与诚实性说明徽标，白色背景`,
-  style: `扁平简洁矢量图标、细线箭头串联、三段层级分明且对齐整齐；仅保留极少量中英混合短标签（Qwen3-1.7B、EDM、Genie2、逐帧数据、AR 回放、真实模型），避免过度装饰与大段文字`,
+  palette: `蓝色与浅青色为主色，橙色用于强调肿瘤掩膜与最终诊断结论，白色背景`,
+  style: `扁平简洁医学矢量图标、细线箭头串联、四段层级分明且对齐整齐；仅保留极少量中英短标签（T1、T1c、T2、FLAIR、U-Net、Enhancing Tumor、Edema、Necrosis、WHO Grade），避免过度装饰与大段文字`,
   model: "dalle",
   lang: "zh",
-  prompt: `请生成一张适合论文发表的科研流程图，主题是"真实生成模型本机推理 → 逐帧数据 → 手机端回放"的数据来源管线，强调科学严谨性。 采用从左到右的横向流程布局，分三段并用细线箭头串联：左段「真实模型本机 GPU 推理」——一块 GPU/服务器图标，连出三条平行支线，每条支线一个简洁模型图标并配极简标签：文本=Qwen3-1.7B（逐 token 概率分布小直方图）、分子=EDM E(3) 等变扩散（de novo 3D 分子）、蛋白=Genie2 SE(3) 扩散（de novo 螺旋骨架）；中段「逐帧轨迹导出」——三条支线汇入一叠轻量 JSON 数据卡片图标，表示生成过程的每一帧被记录导出；右段「手机端 AR 回放」——一只手机/AR 视图图标，读取数据后逐帧插值播放出三维演示。 在中段下方用一个橙色高亮的小标注徽标表达"诚实性说明：无条件生成、真实 de novo 输出"，与蓝紫主色形成对比强调。 整体风格专业、清晰、矢量化科研插图质感，画面干净、三段层级分明、对齐整齐。使用白色背景，以蓝色和浅紫色为主色，橙色用于强调"真实模型"标识与诚实性说明徽标。扁平简洁图标，细线箭头串联流程。避免过度装饰，不要出现大段文字说明，仅保留极少量简短中文/英文混合标签（Qwen3-1.7B、EDM、Genie2、逐帧数据、AR 回放、真实模型）。`,
-  image: "/figure-prompt/genmodel-pipeline.png",
+  prompt: `请生成一张适合论文发表的科研流程图，主题是"多模态 MRI 脑胶质瘤自动分割与分级辅助诊断"的方法流程，强调临床可解释性。采用从左到右的横向流程布局，分四段并用细线箭头串联：第一段「多模态 MRI 采集」——四张并排的脑部 MRI 切片缩略图，分别极简标注 T1、T1c、T2、FLAIR；第二段「预处理」——一组小图标表示颅骨剥离、配准对齐、强度归一化；第三段「深度分割网络」——一个简洁的 U 形编码器-解码器结构（Encoder–Decoder，含跳跃连接），输出一张带三种彩色掩膜的脑切片，分别表示增强肿瘤、瘤周水肿、坏死核心；第四段「分级与报告」——影像组学特征图标连到一个分级分类器，输出一张结构化诊断报告卡片，标注 WHO 分级与肿瘤体积。整体风格专业、清晰、矢量化科研插图质感，画面干净、四段层级分明、对齐整齐。使用白色背景，以蓝色与浅青色为主色，橙色用于强调肿瘤掩膜与最终诊断结论。扁平简洁医学图标，细线箭头串联流程。避免过度装饰，不要出现大段文字说明，仅保留极少量简短中英文标签（T1、T1c、T2、FLAIR、U-Net、Enhancing Tumor、Edema、Necrosis、WHO Grade）。`,
+  image: "/figure-prompt/med-glioma-pipeline.png",
 } as const;
 
 // 把示例字段映射成中文展示标签，复用页面已有的选项定义。
@@ -358,7 +359,7 @@ export default function Page() {
           </button>
 
           <p className="mt-3 text-[11px] text-ink-3 text-center serif-italic">
-            生成可直接粘贴给文生图模型的图形摘要 / 示意图提示词，不替你出图
+            生成可直接粘贴给文生图模型的提示词；下方可一键直达 ChatGPT 等平台，或自带 ZenMux key 在本页出图
           </p>
         </div>
 
@@ -372,6 +373,7 @@ export default function Page() {
             emptyHint="填入主题与要展示的内容，生成可直接粘贴的科研绘图提示词。"
             className="flex-1"
           />
+          {text && !loading && !error && <PromptActions text={text} />}
           {sourcePaperId && text && !loading && (
             <div className="flex justify-end">
               <SaveToLibrary
@@ -442,7 +444,7 @@ export default function Page() {
             </div>
 
             <div className="surface rounded-[20px] p-6">
-              <div className="overline mb-3">③ GPT-image 据此提示词生成的成图</div>
+              <div className="overline mb-3">③ GPT-image 2 据此提示词生成的成图</div>
               <div className="relative w-full aspect-[16/9] overflow-hidden rounded-xl border border-line bg-white">
                 <Image
                   src={EXAMPLE.image}
@@ -453,7 +455,7 @@ export default function Page() {
                 />
               </div>
               <p className="mt-3 text-[11px] text-ink-3 serif-italic">
-                成图由 GPT-image 按上方提示词生成，非本工具产出 —— 本工具只负责写提示词。
+                此图由 GPT-image 2 按上方提示词真实生成 —— 你也可在生成结果下方自带 ZenMux key 一键出图。
               </p>
             </div>
           </div>

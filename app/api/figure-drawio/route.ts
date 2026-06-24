@@ -30,9 +30,15 @@ const DIRECTION_HINT: Record<string, string> = {
   TB: "整体自上而下(TB)布局",
 };
 
+// drawio XML 对结构完整性极敏感：默认链路（DeepSeek 等）常把长 XML 截断，导致
+// 取不到合法 <mxfile> 而「无法绘图」。只要有 ZenMux key，就**强制**用 Claude Sonnet
+// 生成——它产出的 mxfile 结构最稳、闭合可靠（实测显著优于默认模型）。
+const DRAWIO_MODEL = "anthropic/claude-sonnet-4.6";
+
 export async function POST(req: Request) {
   const keys = resolveKeys(req);
   if (!hasAnyKey(keys)) return aiNotConfiguredResponse();
+  if (keys.zenmux) keys.zenmuxModel = DRAWIO_MODEL;
   let parsed;
   try {
     parsed = Body.parse(await req.json());
@@ -77,7 +83,7 @@ export async function POST(req: Request) {
       { role: "system", content: system },
       { role: "user", content: prompt },
     ],
-    { temperature: 0.3, max_tokens: 4000 },
+    { temperature: 0.3, max_tokens: 8000 },
     keys,
   );
 
