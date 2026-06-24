@@ -591,12 +591,41 @@ export default function Page() {
                   重试
                 </button>
               </div>
-            ) : drawio.loading && !drawioXml ? (
-              <div className="surface rounded-[20px] flex-1 min-h-[320px] flex items-center justify-center">
-                <p className="serif-italic text-[18px] text-ink-3">正在生成 drawio 图…</p>
-              </div>
             ) : drawioXml ? (
               <DrawioPreview xml={drawioXml} className="flex-1" />
+            ) : drawio.loading ? (
+              <div className="surface rounded-[20px] flex-1 min-h-[320px] flex flex-col overflow-hidden">
+                <div className="border-b border-line px-5 py-3">
+                  <span className="overline">正在生成 drawio XML…</span>
+                </div>
+                {drawio.text ? (
+                  <pre className="flex-1 m-0 p-4 text-[11px] leading-relaxed text-ink-2 whitespace-pre-wrap break-words font-mono overflow-auto">
+                    {drawio.text}
+                  </pre>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center">
+                    <p className="serif-italic text-[18px] text-ink-3">正在生成 drawio 图…</p>
+                  </div>
+                )}
+              </div>
+            ) : drawio.text ? (
+              <div className="surface rounded-[20px] flex-1 min-h-[320px] flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between border-b border-line px-5 py-3">
+                  <span className="overline text-[#a3742b]">未能解析为完整图</span>
+                  <button
+                    onClick={submitDrawio}
+                    className="rounded-full border border-line px-3 py-1 text-[12px] text-ink-2 transition-colors hover:text-ink"
+                  >
+                    重试
+                  </button>
+                </div>
+                <p className="px-5 pt-3 text-[12px] text-ink-3">
+                  模型输出未包含完整的 mxfile XML，已展示原始结果，可重试或复制后手动整理。
+                </p>
+                <pre className="flex-1 m-0 p-4 text-[11px] leading-relaxed text-ink-2 whitespace-pre-wrap break-words font-mono overflow-auto">
+                  {drawio.text}
+                </pre>
+              </div>
             ) : (
               <div className="surface rounded-[20px] flex-1 min-h-[320px] flex items-center justify-center text-center px-6">
                 <p className="serif-italic text-[22px] text-ink-3 max-w-xs leading-snug">
