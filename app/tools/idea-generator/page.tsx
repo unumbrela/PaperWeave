@@ -263,7 +263,7 @@ function DiagnoseStage({
         <TextField
           value={direction}
           onChange={(e) => setDirection(e.target.value)}
-          placeholder="如：扩散模型在 3D 点云生成上的可控性"
+          placeholder="如：医学图像分割的标注高效（半监督）"
         />
 
         <FieldLabel className="mt-6">参考论文摘要 / 已知工作</FieldLabel>
@@ -279,14 +279,14 @@ function DiagnoseStage({
         <TextField
           value={baseline}
           onChange={(e) => setBaseline(e.target.value)}
-          placeholder="如：Point-E / 现有 SOTA 方法名（可选）"
+          placeholder="如：U-Net / nnU-Net / 现有 SOTA 方法名（可选）"
         />
 
         <FieldLabel className="mt-6">可用资源</FieldLabel>
         <TextField
           value={resources}
           onChange={(e) => setResources(e.target.value)}
-          placeholder="如：单卡 4090，2 周，公开数据集（可选）"
+          placeholder="如：单卡 4090，2 周，公开数据集 ACDC（可选）"
         />
 
         <Button
