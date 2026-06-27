@@ -28,7 +28,7 @@ export const maxDuration = 60;
 
 const OA = "https://api.openalex.org";
 const UA =
-  "Mozilla/5.0 (compatible; PaperWeave/1.0; +https://github.com/unumbrela/toolbox)";
+  "Mozilla/5.0 (compatible; PaperWeave/1.0; +https://github.com/unumbrela/PaperWeave)";
 const SELECT =
   "id,title,publication_year,cited_by_count,authorships,primary_location";
 

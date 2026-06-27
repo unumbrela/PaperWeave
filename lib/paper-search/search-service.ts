@@ -217,7 +217,7 @@ export async function searchArXiv(query: SearchQuery): Promise<PaperResult[]> {
     const response = await fetchWithTimeout(url, {
       headers: {
         'User-Agent':
-          'Mozilla/5.0 (compatible; PaperWeave/1.0; +https://github.com/unumbrela/toolbox)',
+          'Mozilla/5.0 (compatible; PaperWeave/1.0; +https://github.com/unumbrela/PaperWeave)',
       },
     });
     if (!response.ok) {
@@ -388,7 +388,7 @@ export async function searchCrossref(query: SearchQuery): Promise<PaperResult[]>
       headers: {
         // Crossref 礼貌池：带可联系信息换取更稳定的限流配额
         'User-Agent':
-          'PaperWeave/1.0 (https://github.com/unumbrela/toolbox; mailto:noreply@paperweave.app)',
+          'PaperWeave/1.0 (https://github.com/unumbrela/PaperWeave; mailto:noreply@paperweave.app)',
       },
     });
     if (!response.ok) {
@@ -472,7 +472,7 @@ export async function searchEuropePMC(query: SearchQuery): Promise<PaperResult[]
     const response = await fetchWithTimeout(url, {
       headers: {
         'User-Agent':
-          'PaperWeave/1.0 (https://github.com/unumbrela/toolbox; mailto:noreply@paperweave.app)',
+          'PaperWeave/1.0 (https://github.com/unumbrela/PaperWeave; mailto:noreply@paperweave.app)',
       },
     });
     if (!response.ok) {

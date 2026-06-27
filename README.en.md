@@ -2,7 +2,7 @@
 
 [中文](./README.md) · **English**
 
-[![CI](https://github.com/unumbrela/toolbox/actions/workflows/ci.yml/badge.svg)](https://github.com/unumbrela/toolbox/actions/workflows/ci.yml)
+[![CI](https://github.com/unumbrela/PaperWeave/actions/workflows/ci.yml/badge.svg)](https://github.com/unumbrela/PaperWeave/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
 [![React 19](https://img.shields.io/badge/React-19-61dafb)](https://react.dev/)
@@ -193,7 +193,7 @@ After login the library syncs across devices / browsers and survives cache clear
 
 Goal: deploy a public site that "anyone can use just by opening the link." Platform **Vercel** (official Next.js, free Hobby is enough) + domain **Cloudflare** (at cost) + AI **bring-your-own-key** (zero public cost, not abusable). Code-level adaptation is done; below are the steps you need to perform **yourself** (account login / payment).
 
-1. **Push to GitHub**: `git push` (the repo is already at `github.com/unumbrela/toolbox`).
+1. **Push to GitHub**: `git push` (the repo is already at `github.com/unumbrela/PaperWeave`).
 2. **Deploy to Vercel** (~5 minutes): log in at vercel.com with GitHub → **Add New → Project** → select and Import the repo → Framework auto-detected as Next.js (defaults are fine) → **leave all env vars empty (recommended)** (BYOK: visitors bring their key in `/settings`; to make AI available by default at your own cost, add `DEEPSEEK_API_KEY` and set a budget cap in the dashboard) → **Deploy**. Every subsequent `git push` to main redeploys automatically.
 3. **Buy a domain** (Cloudflare, ~$10/year): dash.cloudflare.com → **Domain Registration → Register Domains** → search a name and pay.
 4. **Attach the domain to Vercel** (~5 minutes): Vercel **Settings → Domains**, enter the domain and Add → per the DNS records it gives (root `A → 76.76.21.21`, `www CNAME → cname.vercel-dns.com`, follow the actual page) add them in Cloudflare **DNS → Records** → **key step**: set both records' proxy status to **DNS only (grey cloud)**, otherwise the Cloudflare proxy and the Vercel cert conflict → wait a few minutes, and Vercel issues HTTPS automatically.

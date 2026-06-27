@@ -91,7 +91,7 @@ export async function GET(request: Request) {
     const upstream = await fetch(target.toString(), {
       headers: {
         'User-Agent':
-          'Mozilla/5.0 (compatible; PaperWeave/1.0; +https://github.com/unumbrela/toolbox)',
+          'Mozilla/5.0 (compatible; PaperWeave/1.0; +https://github.com/unumbrela/PaperWeave)',
         Accept: 'application/pdf,*/*',
       },
     });

@@ -2,7 +2,7 @@
 
 **中文** · [English](./README.en.md)
 
-[![CI](https://github.com/unumbrela/toolbox/actions/workflows/ci.yml/badge.svg)](https://github.com/unumbrela/toolbox/actions/workflows/ci.yml)
+[![CI](https://github.com/unumbrela/PaperWeave/actions/workflows/ci.yml/badge.svg)](https://github.com/unumbrela/PaperWeave/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
 [![React 19](https://img.shields.io/badge/React-19-61dafb)](https://react.dev/)
@@ -192,7 +192,7 @@ pnpm build                # next build --webpack；任何 env 都不配也能构
 
 目标：部署成「任何人打开链接就能用」的公开站点。平台 **Vercel**（Next.js 官方，免费 Hobby 足够）+ 域名 **Cloudflare**（成本价）+ AI **访客自带 key**（公开零成本、不会被刷爆）。代码层适配已完成，下面是需要你**亲自操作**（登录账号 / 付费）的步骤。
 
-1. **推 GitHub**：`git push`（仓库已在 `github.com/unumbrela/toolbox`）。
+1. **推 GitHub**：`git push`（仓库已在 `github.com/unumbrela/PaperWeave`）。
 2. **部署到 Vercel**（约 5 分钟）：vercel.com 用 GitHub 登录 → **Add New → Project** → 选仓库 Import → Framework 自动识别 Next.js（默认即可）→ **环境变量推荐全部留空**（走 BYOK：访客在 `/settings` 自带 key；想让 AI 默认可用且自己付费，再加 `DEEPSEEK_API_KEY` 并在后台设预算上限）→ **Deploy**。之后每次 `git push` 到 main 自动重新部署。
 3. **买域名**（Cloudflare，约 $10/年）：dash.cloudflare.com → **Domain Registration → Register Domains** → 搜名字付款。
 4. **接域名到 Vercel**（约 5 分钟）：Vercel **Settings → Domains** 输入域名 Add → 按它给出的 DNS 记录（根域 `A → 76.76.21.21`、`www CNAME → cname.vercel-dns.com`，以页面实际为准）回 Cloudflare **DNS → Records** 添加 → **关键**：把这两条记录的代理状态设为 **DNS only（灰色云朵）**，否则 Cloudflare 代理与 Vercel 证书冲突 → 等几分钟生效，Vercel 自动签发 HTTPS。
