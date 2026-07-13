@@ -11,6 +11,8 @@ export type LossType = 'log' | 'leastSq'
 export interface GANLabConfig {
   hidden?: number
   lossType?: LossType
+  /** 权重初始化的随机种子；传入则初始权重可复现（测试用），不传为每次随机。 */
+  seed?: number
 }
 
 const EPS = 1e-7
@@ -23,6 +25,7 @@ const LEAK = 0.2
  */
 export class GANLabModel {
   readonly hidden: number
+  readonly seed?: number
   lossType: LossType
   gVariables: Variable[] = []
   dVariables: Variable[] = []
@@ -30,6 +33,7 @@ export class GANLabModel {
   constructor(private tf: TF, config: GANLabConfig = {}) {
     this.hidden = config.hidden ?? 128
     this.lossType = config.lossType ?? 'log'
+    this.seed = config.seed
     this.initializeVariables()
   }
 
@@ -37,9 +41,19 @@ export class GANLabModel {
     const tf = this.tf
     this.dispose()
     const h = this.hidden
+    // 每个权重张量取一个递增的种子，避免同形状的层拿到完全相同的初始权重。
+    let seed = this.seed
     // He 初始化（适配 relu / leakyRelu）
     const w = (rows: number, cols: number) =>
-      tf.variable(tf.randomNormal([rows, cols], 0, Math.sqrt(2 / rows)))
+      tf.variable(
+        tf.randomNormal(
+          [rows, cols],
+          0,
+          Math.sqrt(2 / rows),
+          'float32',
+          seed === undefined ? undefined : seed++,
+        ),
+      )
     const b = (n: number) => tf.variable(tf.zeros([n]))
 
     // 生成器：LATENT -> h -> h -> IMG_DIM (sigmoid)

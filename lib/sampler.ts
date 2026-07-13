@@ -39,20 +39,31 @@ export function targetTensor(targetIndex: number, tf: TF): Tensor2D {
   return tf.tensor2d(Array.from(TARGET_IMAGES[targetIndex].pixels), [1, IMG_DIM])
 }
 
-/** 真实样本批 [n, IMG_DIM]：复制选定的目标图并加轻微像素噪声做增强。 */
-export function sampleReal(n: number, targetIndex: number, tf: TF): Tensor2D {
+/**
+ * 真实样本批 [n, IMG_DIM]：复制选定的目标图并加轻微像素噪声做增强。
+ * @param rng 随机源，默认 Math.random；传入可复现的伪随机源即可让结果确定（测试用）。
+ */
+export function sampleReal(
+  n: number,
+  targetIndex: number,
+  tf: TF,
+  rng: () => number = Math.random,
+): Tensor2D {
   const t = TARGET_IMAGES[targetIndex].pixels
   const flat = new Float32Array(n * IMG_DIM)
   for (let i = 0; i < n; i++) {
     const off = i * IMG_DIM
     for (let p = 0; p < IMG_DIM; p++) {
-      flat[off + p] = Math.min(1, Math.max(0, t[p] + (Math.random() - 0.5) * 0.04))
+      flat[off + p] = Math.min(1, Math.max(0, t[p] + (rng() - 0.5) * 0.04))
     }
   }
   return tf.tensor2d(flat, [n, IMG_DIM])
 }
 
-/** 隐变量噪声 [n, LATENT_DIM]，标准正态。 */
-export function sampleNoise(n: number, tf: TF): Tensor2D {
-  return tf.randomNormal([n, LATENT_DIM]) as Tensor2D
+/**
+ * 隐变量噪声 [n, LATENT_DIM]，标准正态。
+ * @param seed 传入则该批噪声可复现（测试用）；不传为每次随机。
+ */
+export function sampleNoise(n: number, tf: TF, seed?: number): Tensor2D {
+  return tf.randomNormal([n, LATENT_DIM], 0, 1, 'float32', seed) as Tensor2D
 }
