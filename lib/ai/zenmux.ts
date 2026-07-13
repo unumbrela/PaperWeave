@@ -13,6 +13,7 @@ export const ZENMUX_URL = process.env.ZENMUX_API_URL || "https://zenmux.ai/api/v
 
 /** OpenAI SDK 的 defaultHeaders（应用归属，可选）。 */
 export const ZENMUX_HEADERS: Record<string, string> = {
-  "HTTP-Referer": process.env.ZENMUX_SITE_URL || "https://www.z1ha0.com",
+  "HTTP-Referer":
+    process.env.ZENMUX_SITE_URL || "https://paperweave-app.vercel.app",
   "X-Title": process.env.ZENMUX_SITE_NAME || "PaperWeave",
 };

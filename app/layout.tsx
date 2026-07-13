@@ -35,7 +35,8 @@ const fraunces = Fraunces({
   display: "swap",
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.z1ha0.com";
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL || "https://paperweave-app.vercel.app";
 const SITE_DESC =
   "以论文为核心、本地优先的研究工作台：检索 → 精读 → 提炼 → 立论 → 撰写 → 制图，一条二字动词链串成打通的论文主线，上游产出即下游输入。PaperWeave 只搭骨架不代写正文，让每一步都顺起来。";
 

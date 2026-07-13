@@ -26,8 +26,6 @@
 # misc
 .DS_Store
 *.pem
-.codex
-.claude
 /reference_repos/
 
 # user-generated / runtime assets (keep repo lean)

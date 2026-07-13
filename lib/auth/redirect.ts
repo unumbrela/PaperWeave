@@ -7,9 +7,9 @@
  */
 
 const FALLBACK_SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || 'https://www.z1ha0.com'
+  process.env.NEXT_PUBLIC_SITE_URL || 'https://paperweave-app.vercel.app'
 
-/** 返回鉴权回跳的完整 URL，如 `https://www.z1ha0.com/auth/callback`。 */
+/** 返回鉴权回跳的完整 URL，如 `https://paperweave-app.vercel.app/auth/callback`。 */
 export function authRedirectURL(path = '/auth/callback'): string {
   const base =
     typeof window !== 'undefined'
