@@ -2,12 +2,22 @@
 
 **中文** · [English](./README.en.md)
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-paperweave--app.vercel.app-000?logo=vercel)](https://paperweave-app.vercel.app)
 [![CI](https://github.com/unumbrela/PaperWeave/actions/workflows/ci.yml/badge.svg)](https://github.com/unumbrela/PaperWeave/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
 [![React 19](https://img.shields.io/badge/React-19-61dafb)](https://react.dev/)
 
+**在线体验 → https://paperweave-app.vercel.app** （无需注册，打开即用；AI 功能可在 `/settings` 自带 key）
+
 **PaperWeave 是一个本地优先的论文阅读与研究工作台。** 它不替你写论文，而是把写论文之外的每一步——找到论文、读懂论文、整理思路、写出结构、画出图表——集中到同一条工作流里完成。所有论文数据都存在浏览器本地的论文库中，这个论文库是唯一的数据来源（single source of truth）。
+
+| | |
+| --- | --- |
+| **规模** | 41.8k 行 TS/TSX · 19 个工具页 · 29 个 API 路由 · 253 条单测（25 文件，全绿） |
+| **技术栈** | Next.js 16（App Router）· React 19 · TypeScript 5 · Tailwind v4 · Dexie/IndexedDB · Supabase · D3 / Three.js / TensorFlow.js |
+| **工程主张** | 可用性优先：任何外部依赖（LLM key、数据库、云同步）缺失时都**降级而非报错**——不配任何环境变量也能完整构建、部署、使用 |
+| **部署** | Vercel（免费 Hobby）· CI 四道门禁（lint / tsc / test / build）· 公开部署服务端零 LLM 成本（BYOK） |
 
 ```
 检索 → 精读 → 梳理 → 立论 → 撰写 → 制图
@@ -20,6 +30,54 @@
 > 项目另外提供一个**可视化展厅**（CNN / Transformer / GAN / 扩散模型 / 医学分割等交互式教学演示），在浏览器内做真实推理或回放，用来理解和讲解模型。展厅**独立于工作流**，不进入论文库，也不参与一键流转。
 
 > **本文是仓库的唯一文档**：既面向使用者介绍功能与上手方式，也给接手的开发者提供一份代码现状说明（架构、约定、不变量、已知问题）和运维手册（登录云同步、部署上线）。如果文档描述与代码不一致，以代码为准。
+
+---
+
+## 🧭 关键工程决策
+
+> 这一节写给读代码的人：项目里真正需要权衡的地方在哪，我怎么选的，代价是什么。
+
+### 1. 本地优先 + 单一数据源：离线可用，云同步永不阻塞主流程
+
+**问题**：论文、批注、笔记、阅读进度这些数据，既要零注册、断网可用，又要能跨设备同步——两个目标天然冲突。
+
+**决策**：以浏览器 IndexedDB（Dexie）为**唯一数据来源**，所有读写强制经过仓储层 [`lib/db/repository.ts`](lib/db/repository.ts)，UI 永远不直接碰数据库、也不直接 fetch 论文接口。登录后，写操作以 **fire-and-forget** 方式镜像到 Supabase（不 `await`，失败吞掉）。也就是说：本地写入是主路径且零延迟，云同步是旁路。
+
+**代价**：放弃了强一致的多端冲突解决——冲突按 `updated_at` 走「最后写入者优先」，适用于单人多设备而非协同编辑；PDF 二进制不上云（独立的 `pdfBlobs` 表），换设备后需重新在线打开一次。
+
+**结果**：未登录或未配置云端时全程**零网络请求**（有单测守护）；Supabase 挂掉不影响本地任何一次读写。
+
+### 2. 降级链贯穿全站：缺什么都不报错，只是能力变弱
+
+这是整个项目最一以贯之的原则——**外部依赖缺失时降级，而不是崩溃**：
+
+| 依赖 | 配置后 | 缺失时 |
+| --- | --- | --- |
+| LLM key | ZenMux 选型 → DeepSeek → OpenAI → Gemini 四级 fallback，**在首个 token 之前完成切换**，不会中途断流 | 路由前置守卫返回**可读的 503**（引导去 `/settings` 自带 key），而不是 500 崩栈 |
+| Embedding key | 文库问答走向量余弦 top-k 检索 | 自动降级为**本地 BM25 关键词检索**，零费用，功能仍可用 |
+| Supabase | 服务端检索缓存 + 热门检索 + 只读分享 | **透明直连**上游四个数据源，用户无感 |
+
+**由此推出一条硬性不变量**：`pnpm build` 在**不配任何环境变量**时必须通过——所有外部依赖的初始化一律惰性、可空降级。这条由 CI 的 build 门禁守着，加新功能时想绕也绕不过去。
+
+### 3. BYOK 成本模型：公开 demo 不花我的钱，也刷不爆
+
+**问题**：一个公开可访问的 AI 站点，服务端只要带 key，就等于给全互联网付费。
+
+**决策**：访客的 key 存在**他自己浏览器的 localStorage**，调用时经请求头转发给模型厂商，服务端不持久化（[`lib/ai/keys.ts`](lib/ai/keys.ts) 的 `resolveKeys`：请求头优先 → 环境变量兜底）。服务端可以一个 LLM key 都不配。
+
+**结果**：上面那个 demo 长期公开挂着，服务端 LLM 成本为 **0**；同时检索、阅读、批注、引文导出、统计、可视化这些不依赖 key 的功能，对所有访客照常可用。
+
+### 4. 注册表驱动：新增一个工具 = 加一条数据 + 写一个页面
+
+[`lib/tools-registry.ts`](lib/tools-registry.ts) 是全站工具的单一数据来源（19 项，按 `track` 分四档）。首页展示、阶段过滤、搜索、`sitemap.xml` **全部由它派生**，没有第二处需要手工同步的地方。不变量由 [`test/tools-registry.test.ts`](test/tools-registry.test.ts) 守护：slug 唯一、`app/tools/<slug>/page.tsx` 必须存在、phase 合法、四个 track 完整划分 TOOLS——违反了 CI 直接红。
+
+### 5. 公开免 key 路由的加固
+
+检索 / 引用图 / PDF 代理 / 分享这几条路由**没有鉴权、任何人可调**，因此逐条做了防护：入参 `zod` 校验；按 IP 滑动窗口限流（`enforceRateLimit`）；所有上游 fetch 强制带超时；PDF 代理做 **SSRF 防护**（域名白名单）；云端数据靠 Postgres **行级安全（RLS）** 按 `user_id` 硬隔离，service-role key 永不进前端。
+
+### 6. 质量门禁：让"改坏了"在合并前暴露
+
+CI 四道门禁 —— `lint` / `tsc --noEmit` / `test` / `build`，任一失败即红。**253 条单测（25 文件）**能跑得快且稳，是因为可测逻辑（引用图构建、引文格式化、分享快照、RAG 检索、缓存键、限流、fan-out 重排）一律抽成 `lib/` 下的**无副作用纯函数**，路由只做编排；E2E 用 `page.route` 拦截注入 fixture，不触外网、不花钱。线上则有结构化 JSON 日志 + [`/api/metrics`](app/api/metrics/route.ts) 聚合视图（调用量 / 错误率 / 平均耗时 / 缓存命中率 / 各 LLM 供应商占比）。
 
 ---
 
@@ -90,9 +148,9 @@
 | 检索 | OpenAlex + arXiv + Crossref + Europe PMC 聚合（带超时与限流，跨来源去重） |
 | 持久化 | **本地** Dexie / IndexedDB（唯一数据来源，含 PDF Blob）＋ **可选云端** Supabase（Auth + Postgres + 行级隔离 RLS）跨设备同步 |
 | 可视化 | D3.js · Three.js / React Three Fiber · TensorFlow.js |
-| 测试 | Vitest（约 240 条单测 / 24 文件）· Playwright（2 条浏览器级 E2E）· GitHub Actions 四道门禁（lint / tsc / test / build） |
+| 测试 | Vitest（**253 条单测 / 25 文件**）· Playwright（2 条浏览器级 E2E）· GitHub Actions 四道门禁（lint / tsc / test / build） |
 
-规模：约 3 万行 TS/TSX，工具注册表 **19 项**，**28** 个 API 路由。
+规模：**41.8k 行** TS/TSX，工具注册表 **19 项**，**29** 个 API 路由。
 
 ### 工作流主线
 
@@ -201,7 +259,7 @@ pnpm build                # next build --webpack；任何 env 都不配也能构
    - **邮箱**：默认开启。
    - **Google 一键登录**：在 Google Cloud Console 建一个 OAuth 2.0 Web 客户端，已授权重定向 URI 填 `https://<你的项目>.supabase.co/auth/v1/callback`，拿到 Client ID / Secret 填回 Supabase 的 Google provider。
    - **手机号**（可选）：需要接付费 SMS 服务商（如 Twilio）；没接时登录框的手机方式会报错，属正常，邮箱 / Google 不受影响。
-4. **回跳地址白名单（最容易出问题的一步——邮件确认打不开多半在这）**：**Authentication → URL Configuration** → **Site URL** 填生产域名（如 `https://www.z1ha0.com`；如果仍是 `localhost:3000`，所有确认邮件会回跳到本地打不开）；**Redirect URLs** 加上 `https://<生产域名>/**`、`http://localhost:3000/**`、`https://*.vercel.app/**`。回跳统一落到 `/auth/callback`。
+4. **回跳地址白名单（最容易出问题的一步——邮件确认打不开多半在这）**：**Authentication → URL Configuration** → **Site URL** 填生产域名（如 `https://paperweave-app.vercel.app`；如果仍是 `localhost:3000`，所有确认邮件会回跳到本地打不开）；**Redirect URLs** 加上 `https://<生产域名>/**`、`http://localhost:3000/**`、`https://*.vercel.app/**`。回跳统一落到 `/auth/callback`。
 5. **在 Vercel 配环境变量**（Production + Preview 都加），保存后 Redeploy 一次：
    ```
    NEXT_PUBLIC_SUPABASE_URL = https://<你的项目>.supabase.co
@@ -218,18 +276,17 @@ pnpm build                # next build --webpack；任何 env 都不配也能构
 
 ---
 
-## 🌐 部署上线（Vercel + Cloudflare）
+## 🌐 部署上线（Vercel）
 
-目标：部署成「任何人打开链接就能用」的公开站点。平台用 **Vercel**（Next.js 官方，免费 Hobby 足够）+ 域名用 **Cloudflare**（成本价）+ AI 用**访客自带 key**（公开零成本、不会被刷爆）。代码层的适配已完成，下面是需要你**亲自操作**（登录账号 / 付费）的步骤。
+本项目当前部署在 **https://paperweave-app.vercel.app**（Vercel 免费 Hobby，`git push` 到 `main` 自动重新部署）。要自己部署一份：
 
-1. **推 GitHub**：`git push`（仓库已在 `github.com/unumbrela/PaperWeave`）。
-2. **部署到 Vercel**（约 5 分钟）：打开 vercel.com 用 GitHub 登录 → **Add New → Project** → 选仓库 Import → Framework 自动识别为 Next.js（默认即可）→ **环境变量推荐全部留空**（走 BYOK：访客在 `/settings` 自带 key；想让 AI 默认可用且自己付费，再加 `DEEPSEEK_API_KEY` 并在后台设预算上限）→ **Deploy**。之后每次 `git push` 到 main 自动重新部署。
-3. **买域名**（Cloudflare，约 $10/年）：打开 dash.cloudflare.com → **Domain Registration → Register Domains** → 搜名字付款。
-4. **接域名到 Vercel**（约 5 分钟）：Vercel **Settings → Domains** 输入域名 Add → 按它给出的 DNS 记录（根域 `A → 76.76.21.21`、`www CNAME → cname.vercel-dns.com`，以页面实际为准）回到 Cloudflare **DNS → Records** 添加 → **关键一步**：把这两条记录的代理状态设为 **DNS only（灰色云朵）**，否则 Cloudflare 代理与 Vercel 证书会冲突 → 等几分钟生效，Vercel 自动签发 HTTPS。
+1. **推 GitHub**：fork 或 push 本仓库。
+2. **部署到 Vercel**（约 5 分钟）：vercel.com 用 GitHub 登录 → **Add New → Project** → 选仓库 Import → Framework 自动识别为 Next.js（默认即可）→ **环境变量可以全部留空**（走 BYOK：访客在 `/settings` 自带 key；若希望 AI 开箱即用且由你付费，再加 `DEEPSEEK_API_KEY` 并在后台设预算上限）→ **Deploy**。部署完成即获得一个免费的 `*.vercel.app` 域名。
+3. **（可选）绑自定义域名**：Vercel **Settings → Domains** 添加域名，按提示在你的 DNS 服务商处加记录。如果 DNS 托管在 Cloudflare，**记得把记录的代理状态设为 DNS only（灰色云朵）**，否则 Cloudflare 代理会和 Vercel 的证书签发冲突。绑好后把 `NEXT_PUBLIC_SITE_URL` 环境变量设成新域名（它决定 canonical / OpenGraph / `sitemap.xml` 里写的地址），并同步更新 Supabase 的回跳白名单。
 
-**AI 成本模型**：服务端默认不带任何 LLM key；访客的 key 只存在他本机的 localStorage，调用时经请求头转发给模型厂商，我们的服务器不持久化——公开 demo 不花你的钱、不会被刷爆，检索 / 阅读 / 批注 / 可视化等不依赖 key 的功能照常可用。
+**AI 成本模型**：服务端默认不带任何 LLM key；访客的 key 只存在他本机的 localStorage，调用时经请求头转发给模型厂商，服务端不持久化——**公开 demo 不花站长的钱、也不会被刷爆**，而检索 / 阅读 / 批注 / 引文导出 / 可视化等不依赖 key 的功能对所有人照常可用。
 
-**上线前的诚实清单**：① Vercel Hobby = 个人非商业用途，函数超时 60s（所有 AI 路由的 `maxDuration` 已压到 60；长文本生成偶发超时可升 Pro 放宽到 300s）；② 第三方素材版权——公开发布前注意内置第三方素材的授权；③ 全中文、无 i18n，海外门槛较高，可以先做一个英文落地页。
+**已知限制（诚实清单）**：① Vercel Hobby 仅限个人非商业用途，函数超时 60s（所有 AI 路由的 `maxDuration` 已压到 60；长文本生成偶发超时，可升 Pro 放宽到 300s）；② 全中文、无 i18n，海外用户有门槛；③ 公开发布前请确认内置第三方素材的授权。
 
 ---
 
@@ -244,7 +301,7 @@ app/                  # Next.js App Router
 ├── share/[token]/    #   只读分享页
 ├── tools/<slug>/     #   工具页（与注册表一一对应：workflow / utility / gallery / lab）
 ├── opengraph-image.tsx, sitemap.ts, robots.ts
-└── api/              #   28 个 route.ts（检索 / AI / 分享 / 指标…），全部 runtime=nodejs、maxDuration≤60
+└── api/              #   29 个 route.ts（检索 / AI / 分享 / 指标…），全部 runtime=nodejs、maxDuration≤60
 components/           # UI 组件（按工具域分目录）；通用件 states / use-stream（可 stop）/ tool-shell / workflow 控件
 lib/
 ├── tools-registry.ts #   ★ 全站工具单一数据来源（19 项，4 track）
@@ -259,7 +316,7 @@ lib/
 └── export/ share/    #   引文导出 / 分享快照（纯函数）
 skills/               # 可安装的 Claude Code skills（paper-search / research-genealogy / cite-paper / paper-figure）
 supabase/schema.sql   # 云端建表 + RLS（4 用户表 + search_cache + shares，控制台一次性运行）
-test/  e2e/           # Vitest 单测（约 240 条）  ·  Playwright（happy-path + ai-tools）
+test/  e2e/           # Vitest 单测（253 条 / 25 文件）  ·  Playwright（happy-path + ai-tools）
 ```
 
 ---

@@ -2,12 +2,22 @@
 
 [中文](./README.md) · **English**
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-paperweave--app.vercel.app-000?logo=vercel)](https://paperweave-app.vercel.app)
 [![CI](https://github.com/unumbrela/PaperWeave/actions/workflows/ci.yml/badge.svg)](https://github.com/unumbrela/PaperWeave/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
 [![React 19](https://img.shields.io/badge/React-19-61dafb)](https://react.dev/)
 
+**Live demo → https://paperweave-app.vercel.app** (no signup; bring your own AI key in `/settings` if you want the AI tools)
+
 **PaperWeave is a local-first workbench for reading papers and advancing research.** It does not write the paper for you. Instead, it brings every step around writing a paper — finding it, reading it, organizing your thoughts, drafting the structure, and producing figures — into a single workflow. All paper data lives in an in-browser paper library, which is the single source of truth.
+
+| | |
+| --- | --- |
+| **Scale** | 41.8k lines of TS/TSX · 19 tool pages · 29 API routes · 253 unit tests (25 files, all green) |
+| **Stack** | Next.js 16 (App Router) · React 19 · TypeScript 5 · Tailwind v4 · Dexie/IndexedDB · Supabase · D3 / Three.js / TensorFlow.js |
+| **Engineering thesis** | Availability first: when any external dependency (LLM key, database, cloud sync) is missing, the app **degrades instead of failing** — it builds, deploys, and runs with zero environment variables configured |
+| **Deployment** | Vercel (free Hobby) · four CI gates (lint / tsc / test / build) · zero server-side LLM cost in public deployment (BYOK) |
 
 ```
 Search → Read → Map → Theorize → Write → Illustrate
@@ -21,6 +31,54 @@ The main line has six steps, matching how a paper goes from a search to a finish
 > The project also includes a separate **visualization gallery** (interactive teaching demos for CNN / Transformer / GAN / diffusion / medical segmentation, etc.) that runs real in-browser inference or playback, used to understand and explain models. The gallery is **independent of the workflow** — it does not enter the library and does not take part in one-click handoff.
 
 > **This document is the repository's only documentation**: it introduces the features and onboarding for users, and gives a maintainer a map of the current code (architecture, conventions, invariants, known issues) plus an operations handbook (login cloud sync, deployment). Where the docs and the code disagree, the code wins.
+
+---
+
+## 🧭 Key engineering decisions
+
+> This section is for people reading the code: where the real trade-offs are, what I chose, and what it cost.
+
+### 1. Local-first with a single source of truth: offline-capable, and cloud sync never blocks the main path
+
+**Problem**: papers, annotations, notes, and reading progress must work with zero signup and no network — yet also sync across devices. Those two goals pull against each other.
+
+**Decision**: browser IndexedDB (Dexie) is the **single source of truth**. Every read and write goes through the repository layer, [`lib/db/repository.ts`](lib/db/repository.ts) — the UI never touches the database directly and never fetches paper endpoints itself. Once signed in, writes are mirrored to Supabase **fire-and-forget** (no `await`, failures swallowed). In other words: the local write is the main path and is instant; cloud sync is a side path.
+
+**Cost**: no strong-consistency conflict resolution. Conflicts resolve last-writer-wins by `updated_at`, which suits one person on several devices rather than collaborative editing. PDF binaries never leave the device (a separate `pdfBlobs` table), so a new device must reopen the PDF online once.
+
+**Result**: signed out or without cloud config, the app makes **zero network requests** (guarded by a unit test); if Supabase goes down, not a single local read or write is affected.
+
+### 2. A degradation chain throughout: nothing errors out, it just does less
+
+This is the most consistent principle in the project — **when an external dependency is missing, degrade rather than crash**:
+
+| Dependency | With it | Without it |
+| --- | --- | --- |
+| LLM key | Four-level fallback: ZenMux selection → DeepSeek → OpenAI → Gemini, switching **before the first token**, so a stream never breaks mid-flight | A route guard returns a **readable 503** (pointing to `/settings` to bring your own key) instead of a 500 stack trace |
+| Embedding key | Library Q&A uses vector cosine top-k retrieval | Falls back to **local BM25 keyword retrieval** — free, and the feature still works |
+| Supabase | Server-side search cache + trending searches + read-only sharing | **Transparently queries** the four upstream sources directly; the user notices nothing |
+
+**This implies a hard invariant**: `pnpm build` must pass with **no environment variables at all** — every external dependency initializes lazily and degrades to null. A CI build gate enforces it, so new features cannot quietly break it.
+
+### 3. BYOK cost model: a public demo that costs me nothing and cannot be drained
+
+**Problem**: a publicly reachable AI site with a key on the server is, in effect, paying the bill for the entire internet.
+
+**Decision**: the visitor's key lives in **their own browser's localStorage**, is forwarded to the model vendor via a request header at call time, and is never persisted server-side ([`lib/ai/keys.ts`](lib/ai/keys.ts), `resolveKeys`: header first, environment variable as fallback). The server can run with no LLM key whatsoever.
+
+**Result**: the demo above stays publicly online at **zero** server-side LLM cost — while search, reading, annotation, citation export, stats, and the visualizations (none of which need a key) remain fully available to every visitor.
+
+### 4. Registry-driven: adding a tool = one data entry + one page
+
+[`lib/tools-registry.ts`](lib/tools-registry.ts) is the single source of truth for every tool on the site (19 entries, split into four `track`s). The homepage grid, stage filtering, search, and `sitemap.xml` are all **derived from it** — there is no second place to keep in sync. Invariants are guarded by [`test/tools-registry.test.ts`](test/tools-registry.test.ts): slugs unique, `app/tools/<slug>/page.tsx` must exist, phases valid, and the four tracks must partition TOOLS exactly. Break one and CI goes red.
+
+### 5. Hardening the public, key-free routes
+
+Search, citation graph, PDF proxy, and sharing are **unauthenticated and callable by anyone**, so each is defended: `zod` validation on inputs; per-IP sliding-window rate limiting (`enforceRateLimit`); timeouts on every upstream fetch; **SSRF protection** on the PDF proxy (domain allowlist); and cloud data isolated per `user_id` by Postgres **row-level security (RLS)**, with the service-role key never reaching the frontend.
+
+### 6. Quality gates: surface a regression before it merges
+
+Four CI gates — `lint` / `tsc --noEmit` / `test` / `build` — any failure turns the build red. **253 unit tests across 25 files** stay fast and stable because testable logic (citation-graph construction, reference formatting, share snapshots, RAG retrieval, cache keys, rate limiting, fan-out reranking) is factored into **side-effect-free pure functions** under `lib/`, leaving routes to do orchestration only. E2E tests inject fixtures via `page.route`, so they never hit the network and never cost money. In production there are structured JSON logs plus an [`/api/metrics`](app/api/metrics/route.ts) aggregate view (call volume / error rate / mean latency / cache hit rate / share per LLM provider).
 
 ---
 
@@ -91,9 +149,9 @@ The main line has six steps, matching how a paper goes from a search to a finish
 | Search | OpenAlex + arXiv + Crossref + Europe PMC aggregation (with timeouts and rate limiting, cross-source dedup) |
 | Persistence | **local** Dexie / IndexedDB (single source of truth, including PDF Blob) + **optional cloud** Supabase (Auth + Postgres + row-level security RLS) cross-device sync |
 | Visualization | D3.js · Three.js / React Three Fiber · TensorFlow.js |
-| Testing | Vitest (~240 unit tests / 24 files) · Playwright (2 browser-level E2E) · GitHub Actions four gates (lint / tsc / test / build) |
+| Testing | Vitest (**253 unit tests / 25 files**) · Playwright (2 browser-level E2E) · GitHub Actions four gates (lint / tsc / test / build) |
 
-Scale: ~30k lines of TS/TSX, a tool registry of **19 items**, **28** API routes.
+Scale: **41.8k lines** of TS/TSX, a tool registry of **19 items**, **29** API routes.
 
 ### The workflow main line
 
@@ -185,7 +243,7 @@ At this point **all core features already work**: search, ingest, PDF reading/an
 ```bash
 pnpm lint                 # ESLint (CI gate; vendored visualization code is in eslint.config.mjs ignores)
 pnpm exec tsc --noEmit
-pnpm test                 # Vitest unit tests (~240 / 24 files, runs in ~0.6s)
+pnpm test                 # Vitest unit tests (253 / 25 files)
 pnpm test:e2e             # Playwright E2E (2 tests, APIs injected with fixtures via page.route, no external network)
 pnpm build                # next build --webpack; builds with no env configured
 ```
@@ -202,7 +260,7 @@ After login the library syncs across devices and browsers and survives cache cle
    - **Email**: enabled by default.
    - **Google one-click login**: create an OAuth 2.0 Web client in Google Cloud Console, set the authorized redirect URI to `https://<your-project>.supabase.co/auth/v1/callback`, and put the Client ID / Secret back into Supabase's Google provider.
    - **Phone** (optional): requires a paid SMS provider (such as Twilio); without it, the phone option in the login box erroring is expected, and email / Google are unaffected.
-4. **Redirect allowlist (the step most likely to break — broken confirmation emails are usually here)**: **Authentication → URL Configuration** → set **Site URL** to your production domain (e.g. `https://www.z1ha0.com`; if it is still `localhost:3000`, all confirmation emails redirect locally and won't open); add `https://<prod-domain>/**`, `http://localhost:3000/**`, and `https://*.vercel.app/**` to **Redirect URLs**. Redirects all land on `/auth/callback`.
+4. **Redirect allowlist (the step most likely to break — broken confirmation emails are usually here)**: **Authentication → URL Configuration** → set **Site URL** to your production domain (e.g. `https://paperweave-app.vercel.app`; if it is still `localhost:3000`, all confirmation emails redirect locally and won't open); add `https://<prod-domain>/**`, `http://localhost:3000/**`, and `https://*.vercel.app/**` to **Redirect URLs**. Redirects all land on `/auth/callback`.
 5. **Set env vars in Vercel** (add to both Production and Preview), save and Redeploy once:
    ```
    NEXT_PUBLIC_SUPABASE_URL = https://<your-project>.supabase.co
@@ -219,18 +277,17 @@ After login the library syncs across devices and browsers and survives cache cle
 
 ---
 
-## 🌐 Deployment (Vercel + Cloudflare)
+## 🌐 Deployment (Vercel)
 
-Goal: deploy a public site that "anyone can use just by opening the link." Use **Vercel** (official Next.js, free Hobby is enough) for the platform, **Cloudflare** (at cost) for the domain, and **bring-your-own-key** for AI (zero public cost, not abusable). The code-level adaptation is done; below are the steps you need to perform **yourself** (account login / payment).
+This project is deployed at **https://paperweave-app.vercel.app** (Vercel free Hobby; every `git push` to `main` redeploys automatically). To deploy your own copy:
 
-1. **Push to GitHub**: `git push` (the repo is already at `github.com/unumbrela/PaperWeave`).
-2. **Deploy to Vercel** (~5 minutes): log in at vercel.com with GitHub → **Add New → Project** → select and Import the repo → Framework auto-detected as Next.js (defaults are fine) → **leave all env vars empty (recommended)** (BYOK: visitors bring their key in `/settings`; to make AI available by default at your own cost, add `DEEPSEEK_API_KEY` and set a budget cap in the dashboard) → **Deploy**. Every subsequent `git push` to main redeploys automatically.
-3. **Buy a domain** (Cloudflare, ~$10/year): open dash.cloudflare.com → **Domain Registration → Register Domains** → search a name and pay.
-4. **Attach the domain to Vercel** (~5 minutes): in Vercel **Settings → Domains**, enter the domain and Add → per the DNS records it gives (root `A → 76.76.21.21`, `www CNAME → cname.vercel-dns.com`, follow the actual page) add them in Cloudflare **DNS → Records** → **key step**: set both records' proxy status to **DNS only (grey cloud)**, otherwise the Cloudflare proxy and the Vercel certificate conflict → wait a few minutes, and Vercel issues HTTPS automatically.
+1. **Push to GitHub**: fork or push this repo.
+2. **Deploy to Vercel** (~5 minutes): log in at vercel.com with GitHub → **Add New → Project** → select and Import the repo → Framework auto-detected as Next.js (defaults are fine) → **you can leave every env var empty** (BYOK: visitors bring their key in `/settings`; to make AI work out of the box at your own cost, add `DEEPSEEK_API_KEY` and set a budget cap in the dashboard) → **Deploy**. You get a free `*.vercel.app` domain when it finishes.
+3. **(Optional) Attach a custom domain**: add it under Vercel **Settings → Domains** and create the DNS records it shows you. If your DNS is on Cloudflare, **set those records' proxy status to DNS only (grey cloud)** — otherwise the Cloudflare proxy conflicts with Vercel's certificate issuance. Then point `NEXT_PUBLIC_SITE_URL` at the new domain (it drives canonical URLs, OpenGraph, and `sitemap.xml`) and update the Supabase redirect allowlist to match.
 
-**AI cost model**: the server carries no LLM key by default; the visitor's key lives only in their browser localStorage, is forwarded via request headers to the model vendor on each call, and our server never persists it — a public demo costs you nothing and can't be drained, while key-free features (search / reading / annotation / visualization) keep working.
+**AI cost model**: the server carries no LLM key by default; the visitor's key lives only in their browser localStorage, is forwarded via request headers to the model vendor on each call, and the server never persists it — **a public demo costs the owner nothing and can't be drained**, while key-free features (search / reading / annotation / citation export / visualization) keep working for everyone.
 
-**Honest pre-launch checklist**: ① Vercel Hobby = personal non-commercial use, 60s function timeout (all AI routes' `maxDuration` is capped at 60; occasional timeouts on long generation can be relaxed to 300s on Pro); ② third-party asset licensing — mind the licenses of bundled third-party assets before public release; ③ the app UI is Chinese-only with no i18n, raising the bar for overseas users — an English landing page can come first.
+**Known limitations (honest list)**: ① Vercel Hobby is personal non-commercial use only, with a 60s function timeout (all AI routes cap `maxDuration` at 60; long generations occasionally time out and can be relaxed to 300s on Pro); ② the UI is Chinese-only with no i18n, which raises the bar for overseas users; ③ mind the licenses of bundled third-party assets before any public release.
 
 ---
 
@@ -245,7 +302,7 @@ app/                  # Next.js App Router
 ├── share/[token]/    #   read-only share page
 ├── tools/<slug>/     #   tool pages (one-to-one with the registry: workflow / utility / gallery / lab)
 ├── opengraph-image.tsx, sitemap.ts, robots.ts
-└── api/              #   28 route.ts files (search / AI / share / metrics…), all runtime=nodejs, maxDuration≤60
+└── api/              #   29 route.ts files (search / AI / share / metrics…), all runtime=nodejs, maxDuration≤60
 components/           # UI components (organized by tool domain); shared parts states / use-stream (stoppable) / tool-shell / workflow controls
 lib/
 ├── tools-registry.ts #   ★ single source of truth for all tools (19 items, 4 tracks)
@@ -260,7 +317,7 @@ lib/
 └── export/ share/    #   citation export / share snapshots (pure functions)
 skills/               # installable Claude Code skills (paper-search / research-genealogy / cite-paper / paper-figure)
 supabase/schema.sql   # cloud tables + RLS (4 user tables + search_cache + shares, run once in the console)
-test/  e2e/           # Vitest unit tests (~240)  ·  Playwright (happy-path + ai-tools)
+test/  e2e/           # Vitest unit tests (253 / 25 files)  ·  Playwright (happy-path + ai-tools)
 ```
 
 ---
